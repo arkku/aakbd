@@ -1,0 +1,12 @@
+*.o
+*.hex
+*.bin
+*.elf
+*.a
+*~
+local.mk
+layers.c
+macros.c
+.ccls
+.tags
+schematic/*
