@@ -881,15 +881,6 @@ reset_keys (void) {
 #define is_time_to_release_at(now)  ((now) != pending_release_since)
 #endif
 
-/// Called approximately once every 10 milliseconds with an 8-bit time value.
-void
-keys_tick (uint8_t tick_10ms_count) {
-    if (pending_release && is_time_to_release_at(tick_10ms_count)) {
-        send_pending_release();
-    }
-    handle_tick(tick_10ms_count);
-}
-
 /// Mask of overridden LEDs, where lower 4 bits are a mask to add to the
 /// mask requested by host, and the upper 4 bits are a mask to subtract
 /// from the LEDs requested by host. The subtraction is done first.
@@ -1065,8 +1056,13 @@ keycode_from_layer (uint8_t key, uint8_t num) {
     return key;
 }
 
-#if LAYER_COUNT == 0
+/// Called approximately once every 10 milliseconds with an 8-bit time value.
 void
 keys_tick (uint8_t tick_10ms_count) {
-}
+#if LAYER_COUNT > 0
+    if (pending_release && is_time_to_release_at(tick_10ms_count)) {
+        send_pending_release();
+    }
+    handle_tick(tick_10ms_count);
 #endif
+}
