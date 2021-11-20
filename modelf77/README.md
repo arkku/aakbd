@@ -35,3 +35,6 @@ DEVICE_FLAGS += -DENABLE_GENERIC_HID_ENDPOINT=1 -DENABLE_DFU_INTERFACE=1
 ## Note
 
 This is a work in progress.
+
+I recommend not setting `ENABLE_GENERIC_HID_ENDPOINT` for now if you use
+Windows OS, it doesn't seem to work there at the moment.

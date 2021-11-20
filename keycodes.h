@@ -247,7 +247,7 @@ typedef uint16_t keycode_t;
 #define META_AND_LAYER(num)                 LAYER_AND_MOD_ON_HOLD(num, META)
 
 /// Activate both AltGr and a layer while the key is held down.
-#define ALTGR_AND_LAYER(num)                LAYER_AND_MOD_ON_HOLD(num, RIGHT_ALT)
+#define ALTGR_AND_LAYER(num)                LAYER_AND_MOD_ON_HOLD(num, ALTGR)
 
 /// Activate both Right Shift and a layer while the key is held down.
 #define RIGHT_SHIFT_AND_LAYER(num)          LAYER_AND_MOD_ON_HOLD(num, RIGHT_SHIFT)
