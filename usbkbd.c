@@ -1162,7 +1162,7 @@ usb_keyboard_type_char (const char c) {
     if (key == 0) {
         return false;
     }
-    return usb_keyboard_simulate_keypress(key, shift ? MODIFIER_BIT(MODIFIER_KEY_SHIFT_LEFT) : 0);
+    return usb_keyboard_simulate_keypress(key, shift ? SHIFT_BIT : 0);
 }
 
 void
@@ -1228,7 +1228,7 @@ usb_keyboard_modifiers (void) {
 void
 usb_keyboard_set_modifiers (const uint8_t modifier_flags) {
     if (keys_modifier_flags != modifier_flags) {
-        if (modifier_flags == (MODIFIER_BIT(MODIFIER_KEY_SHIFT_LEFT) | MODIFIER_BIT(MODIFIER_KEY_SHIFT_RIGHT)) && !(keys_modifier_flags & MODIFIER_BIT(MODIFIER_KEY_SHIFT_RIGHT))) {
+        if (modifier_flags == (SHIFT_BIT | RIGHT_SHIFT_BIT) && !(keys_modifier_flags & RIGHT_SHIFT_BIT)) {
 #if ENABLE_BOOTLOADER_SHORTCUT
             if (keys_buffer[0] == USB_KEY_SCROLL_LOCK) {
                 jump_to_bootloader();
