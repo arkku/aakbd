@@ -75,7 +75,7 @@
 #else
 #define GENERIC_ENDPOINT_SIZE       8
 #endif
-#endif
+#endif // ^ ENABLE_GENERIC_HID_ENDPOINT
 
 #if ENABLE_DFU_INTERFACE
 #define DFU_INTERFACE_INDEX         (INTERFACES_COUNT - 1)
@@ -83,7 +83,7 @@
 static volatile uint8_t usb_request_detach = 0;
 
 #define dfu_app_state   (usb_request_detach ? DFU_APP_STATE_DETACH : DFU_APP_STATE_IDLE)
-#endif
+#endif // ^ ENABLE_DFU_INTERFACE
 
 /// Possible future placeholder, not actually supported.
 #define USE_MULTIPLE_REPORTS        0
@@ -197,7 +197,7 @@ static uint8_t generic_request[GENERIC_HID_FEATURE_SIZE];
 #else
 static uint8_t generic_request[1] = { 0 };
 #endif
-#endif
+#endif // ^ ENABLE_GENERIC_HID_ENDPOINT
 
 // MARK: - Keyboard Variables
 
@@ -386,21 +386,20 @@ static const uint8_t PROGMEM generic_hid_descriptor[] = {
     HID_USAGE_WORD,         WORD_BYTES(GENERIC_HID_USAGE),
     HID_COLLECTION,         HID_COLLECTION_APPLICATION,
 
+#if GENERIC_HID_REPORT_SIZE != 0
+    HID_USAGE,              GENERIC_HID_INPUT_USAGE,
     HID_REPORT_SIZE,        8,
     HID_LOGICAL_MINIMUM,    0x00,
     HID_LOGICAL_MAXIMUM,    0xFF,
-
-#if GENERIC_HID_REPORT_SIZE != 0
     HID_REPORT_COUNT,       GENERIC_HID_REPORT_SIZE,
-    HID_USAGE,              GENERIC_HID_INPUT_USAGE,
     HID_INPUT,              HID_IO_VARIABLE,
 #endif
 
+    HID_USAGE,              GENERIC_HID_OUTPUT_USAGE,
     HID_REPORT_SIZE,        8,
     HID_LOGICAL_MINIMUM,    0x00,
     HID_LOGICAL_MAXIMUM,    0xFF,
     HID_REPORT_COUNT,       GENERIC_HID_FEATURE_SIZE,
-    HID_USAGE,              GENERIC_HID_OUTPUT_USAGE,
     HID_FEATURE,            HID_IO_VARIABLE,
 
     HID_END_COLLECTION
@@ -531,11 +530,13 @@ static const uint8_t PROGMEM configuration_descriptor[] = {
 #endif
 };
 
+#define SUPPORTED_LANGUAGES_SIZE (2 + (SUPPORTED_LANGUAGE_COUNT * 2))
+
 /// The list of supported language ids.
 /// To support more languages, one would need to add the language ids to this
 /// list, and then add corresponding strings to the descriptor list such that
 /// the `wIndex` is the language id.
-static const uint16_t PROGMEM supported_languages[2 + (SUPPORTED_LANGUAGE_COUNT * 2)] = {
+static const uint16_t PROGMEM supported_languages[] = {
     BYTES_WORD(2 + (SUPPORTED_LANGUAGE_COUNT * 2), DESCRIPTOR_TYPE_STRING),
     LANGUAGE_ID
 };
@@ -631,9 +632,7 @@ static const struct descriptor PROGMEM descriptor_list[] = {
     DESC_FULL(DESCRIPTOR_TYPE_STRING, 0, 0, supported_languages),
     DESC_STR(STRING_INDEX_MANUFACTURER,     LANGUAGE_ID, manufacturer_string),
     DESC_STR(STRING_INDEX_PRODUCT,          LANGUAGE_ID, product_string),
-#if STRING_INDEX_SERIAL_NUMBER
     DESC_STR(STRING_INDEX_SERIAL_NUMBER,    LANGUAGE_ID, serial_string),
-#endif
 #if HARDWARE_SUPPORTS_HIGH_SPEED
     DESC_FULL(
         DESCRIPTOR_TYPE_DEVICE_QUALIFIER, 0,
@@ -681,6 +680,7 @@ void
 usb_init (void) {
     _Static_assert(DESCRIPTOR_SIZE_DEVICE == sizeof(device_descriptor), "Invalid device_descriptor (size mismatch)");
     _Static_assert(CONFIGURATION_SIZE == sizeof(configuration_descriptor), "CONFIGURATION_SIZE calculation needs updating");
+    _Static_assert(SUPPORTED_LANGUAGES_SIZE == sizeof(supported_languages), "Invalid supported_languages");
 
     usb_hardware_init();
     usb_reset();
@@ -732,6 +732,7 @@ usb_init_endpoints (void) {
         default:
             usb_set_endpoint(i);
             usb_disable_endpoint();
+            break;
         }
     }
     usb_reset_endpoints_1to(USB_MAX_ENDPOINT);
@@ -874,7 +875,7 @@ generic_request_call_handler (const uint8_t report_id, const uint8_t length) {
     }
     return true;
 }
-#endif
+#endif // ^ ENABLE_GENERIC_HID_ENDPOINT
 
 void
 usb_tick (void) {
@@ -1464,7 +1465,7 @@ ISR(USB_GEN_vect) {
                     usb_release_tx();
                 }
             }
-#endif
+#endif // ^ ENABLE_GENERIC_HID_ENDPOINT
         }
     }
 
@@ -1665,6 +1666,7 @@ ISR(USB_COM_vect) {
     } else if (index == KEYBOARD_INTERFACE_INDEX) {
         if (type == USB_REQUEST_DEVICE_TO_HOST_CLASS_INTERFACE) {
             if (request == HID_REQUEST_GET_REPORT) {
+                usb_wait_tx_in();
                 usb_tx_keys_state();
             } else if (request == HID_REQUEST_GET_IDLE) {
 #if IDLE_COUNT_FRAME_DIVIDER == 4
@@ -1752,7 +1754,7 @@ ISR(USB_COM_vect) {
             success = false;
         }
     }
-#endif
+#endif // ^ ENABLE_GENERIC_HID_ENDPOINT
 #if ENABLE_DFU_INTERFACE
     else if (index == DFU_INTERFACE_INDEX) {
         if (type == USB_REQUEST_HOST_TO_DEVICE_CLASS_INTERFACE) {
@@ -1780,7 +1782,7 @@ ISR(USB_COM_vect) {
             success = false;
         }
     }
-#endif
+#endif // ^ ENABLE_DFU_INTERFACE
     else {
         success = false;
     }
