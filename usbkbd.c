@@ -39,7 +39,13 @@
 /// Frame divider for the idle counter. Must be a power of 2.
 #define IDLE_COUNT_FRAME_DIVIDER    4
 
+#ifndef IS_SUSPEND_SUPPORTED
 #define IS_SUSPEND_SUPPORTED        1
+#endif
+
+#ifndef ENABLE_KEYBOARD_ENDPOINT
+#define ENABLE_KEYBOARD_ENDPOINT    1
+#endif
 
 #define CONFIGURATIONS_COUNT        1
 #define KEYBOARD_ENDPOINT_NUM       1
@@ -49,8 +55,8 @@
 #define KEYBOARD_INTERFACE_INDEX    0
 #define KEYBOARD_CONFIGURATION      1
 
-#define ENDPOINT_COUNT              (1 + ENABLE_GENERIC_HID_ENDPOINT)
-#define INTERFACES_COUNT            (1 + ENABLE_GENERIC_HID_ENDPOINT + ENABLE_DFU_INTERFACE)
+#define ENDPOINT_COUNT              ((ENABLE_KEYBOARD_ENDPOINT | ENABLE_DFU_INTERFACE) + ENABLE_GENERIC_HID_ENDPOINT)
+#define INTERFACES_COUNT            (ENABLE_KEYBOARD_ENDPOINT + ENABLE_GENERIC_HID_ENDPOINT + ENABLE_DFU_INTERFACE)
 
 #if ENABLE_GENERIC_HID_ENDPOINT
 // A per-device custom generic HID endpoint (e.g., for configuration software)
@@ -58,7 +64,7 @@
 #define GENERIC_ENDPOINT_ADDRESS    (ENDPOINT_DIR_IN | GENERIC_HID_ENDPOINT_NUM)
 #define GENERIC_ENDPOINT_FLAGS      EP_SINGLE_BUFFER
 #define GENERIC_ENDPOINT_TYPE       EP_TYPE_INTERRUPT_IN
-#define GENERIC_INTERFACE_INDEX     (INTERFACES_COUNT - (1 + ENABLE_DFU_INTERFACE))
+#define GENERIC_INTERFACE_INDEX     (INTERFACES_COUNT - (ENABLE_KEYBOARD_ENDPOINT + ENABLE_DFU_INTERFACE))
 
 #if GENERIC_HID_REPORT_SIZE > GENERIC_HID_FEATURE_SIZE
 #define GENERIC_HID_MAX_SIZE GENERIC_HID_REPORT_SIZE
@@ -78,6 +84,9 @@
 #endif // ^ ENABLE_GENERIC_HID_ENDPOINT
 
 #if ENABLE_DFU_INTERFACE
+#if !ENABLE_KEYBOARD_ENDPOINT
+#error "ENABLE_DFU_INTERFACE requires ENABLE_KEYBOARD_ENDPOINT"
+#endif
 #define DFU_INTERFACE_INDEX         (INTERFACES_COUNT - 1)
 
 static volatile uint8_t usb_request_detach = 0;
@@ -115,8 +124,6 @@ static volatile uint8_t usb_request_detach = 0;
 #else
 #define KEYBOARD_ENDPOINT_SIZE      64
 #endif
-
-#define MAX_ENDPOINT                KEYBOARD_ENDPOINT_NUM
 
 #define ENDPOINT_0_SIZE             64
 #define ENDPOINT_0_FLAGS            EP_SINGLE_BUFFER
@@ -450,6 +457,7 @@ static const uint8_t PROGMEM configuration_descriptor[] = {
     CONFIGURATION_ATTRIBUTES,               // bmAttributes
     DIV_ROUND_BYTE(2, MAX_POWER_CONSUMPTION_MA), // bMaxPower (2mA units)
 
+#if ENABLE_KEYBOARD_ENDPOINT
     // Interface
     DESCRIPTOR_SIZE_INTERFACE,              // bLength
     DESCRIPTOR_TYPE_INTERFACE,              // bDescriptorType
@@ -469,7 +477,9 @@ static const uint8_t PROGMEM configuration_descriptor[] = {
     1,                                      // bNumDescriptors
     HID_DESCRIPTOR_TYPE_REPORT,             // bDescriptorType
     WORD_BYTES(sizeof kbd_boot_hid_descriptor), // wDescriptorLength
+#endif
 
+#if (ENABLE_KEYBOARD_ENDPOINT || ENABLE_DFU_INTERFACE)
     // Endpoint
     DESCRIPTOR_SIZE_ENDPOINT,               // bLength
     DESCRIPTOR_TYPE_ENDPOINT,               // bDescriptorType
@@ -477,6 +487,7 @@ static const uint8_t PROGMEM configuration_descriptor[] = {
     ENDPOINT_ATTRIBUTES_INTERRUPT,          // bmAttributes
     WORD_BYTES(KEYBOARD_ENDPOINT_SIZE),     // wMaxPacketSize
     KEYBOARD_POLL_INTERVAL_MS,              // bInterval
+#endif
 
 #if ENABLE_GENERIC_HID_ENDPOINT
     // Interface
@@ -673,6 +684,7 @@ usb_reset (void) {
     while (!is_pll_locked)
         ;
     usb_start_clock();
+
     usb_attach();
 }
 
@@ -700,7 +712,7 @@ usb_init (void) {
 #endif
 }
 
-#if ENDPOINT_COUNT != (1 + ENABLE_GENERIC_HID_ENDPOINT)
+#if ENDPOINT_COUNT != ((ENABLE_KEYBOARD_ENDPOINT | ENABLE_DFU_INTERFACE) + ENABLE_GENERIC_HID_ENDPOINT)
 #error "Some endpoints are not initialised in usb_init_endpoints!"
 #endif
 
@@ -711,6 +723,7 @@ usb_init_endpoints (void) {
     for (int_fast8_t i = 1; i < USB_MAX_ENDPOINT; ++i) {
         usb_set_endpoint(i);
         switch (i) {
+#if ENABLE_KEYBOARD_ENDPOINT
         case KEYBOARD_ENDPOINT_NUM:
             usb_setup_endpoint(
                 KEYBOARD_ENDPOINT_NUM,
@@ -719,6 +732,7 @@ usb_init_endpoints (void) {
                 KEYBOARD_ENDPOINT_FLAGS
             );
             break;
+#endif
 #if ENABLE_GENERIC_HID_ENDPOINT
         case GENERIC_HID_ENDPOINT_NUM:
             usb_setup_endpoint(
@@ -1350,6 +1364,7 @@ usb_keyboard_wait_to_send (uint8_t * const sregptr, const int_fast8_t endpoint) 
 
 bool
 usb_keyboard_send_report (void) {
+#if ENABLE_KEYBOARD_ENDPOINT
     if (!usb_configuration) {
         usb_error = 'c';
         return false;
@@ -1371,7 +1386,7 @@ usb_keyboard_send_report (void) {
     keyboard_idle_count = 0;
     usb_error = 0;
     SREG = old_sreg;
-
+#endif
     return true;
 }
 
@@ -1427,6 +1442,7 @@ ISR(USB_GEN_vect) {
         }
 #endif
         if ((++frame_count % IDLE_COUNT_FRAME_DIVIDER) == 0 && !usb_suspended) {
+#if ENABLE_KEYBOARD_ENDPOINT
             if (keyboard_update_on_idle_count) {
                 usb_set_endpoint(KEYBOARD_ENDPOINT_NUM);
                 if (is_usb_rw_allowed) {
@@ -1443,6 +1459,7 @@ ISR(USB_GEN_vect) {
                     usb_release_tx();
                 }
             }
+#endif
 #if ENABLE_GENERIC_HID_ENDPOINT
             if (generic_update_on_idle_count) {
                 usb_set_endpoint(GENERIC_HID_ENDPOINT_NUM);
@@ -1634,7 +1651,7 @@ ISR(USB_COM_vect) {
                 if (value == USB_FEATURE_HALT_ENDPOINT) {
                     // Halt
                     i = index & 0x7FU;
-                    if (i != 0 && i <= MAX_ENDPOINT) {
+                    if (i != 0 && i <= USB_MAX_ENDPOINT) {
                         usb_set_endpoint(i);
                         if (request == USB_REQUEST_CLEAR_FEATURE) {
                             usb_clear_stall();
