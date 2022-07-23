@@ -23,8 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
-#include "config_common.h"
-
 #ifndef DEBOUNCE
 /// Number of milliseconds to debounce switches. Cherry MX switches should be
 /// ok with 5, but some other switches may (according to internet forums)

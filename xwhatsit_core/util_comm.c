@@ -30,8 +30,12 @@
 
 #define min(x, y) (((x) < (y))?(x):(y))
 
-extern const char *KEYBOARD_FILENAME; // This must be defined in keyboard_name.c to equal the filename. This is sent back to the PC-side software for it to determine which keyboard we are using.
+#define STRIFY(a)           #a
+#define STR(a)              STRIFY(a)
 
+#ifdef KEYBOARD_NAME
+#define KEYBOARD_FILENAME (STR(KEYBOARD_NAME)".c")
+#endif
 extern matrix_row_t raw_matrix[MATRIX_ROWS];
 
 static const uint8_t magic[] = UTIL_COMM_MAGIC;
@@ -108,7 +112,7 @@ uint8_t handle_generic_hid_report(uint8_t report_id, uint8_t count, uint8_t data
             break;
         case UTIL_COMM_GET_KEYBOARD_FILENAME:
             {
-                int string_length = strlen(KEYBOARD_FILENAME) + 1;
+                int string_length = sizeof(KEYBOARD_FILENAME);
                 response[2] = UTIL_COMM_RESPONSE_OK;
                 if (data[3] >= string_length) {
                     response[3] = 0;

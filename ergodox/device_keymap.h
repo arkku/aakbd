@@ -1,8 +1,8 @@
 #ifndef KK_ERGODOX_KEYMAP_H
 #define KK_ERGODOX_KEYMAP_H
 
-#include "keycodes.h"
-#include "keymap.h"
+#include <keymap.h>
+#include <usb_keys.h>
 
 #define USB_KEY_ERGODOX_LEFT_BACKSPACE  USB_KEY_CAPS_LOCK
 #define USB_KEY_ERGODOX_HYPER           USB_KEY_VIRTUAL_APPLE_FN
