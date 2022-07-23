@@ -188,12 +188,27 @@
 #define ENABLE_DFU_INTERFACE        1
 #endif
 
+#ifndef ENABLE_KEYBOARD_ENDPOINT
+/// For debugging only: allows disabling the keyboard USB endpoint, which
+/// kind of defeats the purpose of a USB keyboard.
+#define ENABLE_KEYBOARD_ENDPOINT    1
+#endif
+
+#ifndef USE_MULTIPLE_REPORTS
+/// Possible future placeholder, not actually supported.
+#define USE_MULTIPLE_REPORTS        0
+#endif
+
 // MARK: - Constants
 
 #ifndef HARDWARE_SUPPORTS_HIGH_SPEED
 /// Does the USB hardware support high speed (480 Mbps)? In case of the
 /// ATMEGA32U4, for which this is originally written, the answer is no.
 #define HARDWARE_SUPPORTS_HIGH_SPEED 0
+#endif
+
+#ifndef IS_SUSPEND_SUPPORTED
+#define IS_SUSPEND_SUPPORTED        1
 #endif
 
 // MARK: - USB

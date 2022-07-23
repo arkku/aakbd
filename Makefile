@@ -20,7 +20,7 @@ HEX = $(DEVICE:=.hex)
 BIN = $(HEX:.hex=.bin)
 OBJ = $(BIN:.bin=.o)
 
-OBJS = $(OBJ) usbkbd.o keys.o $(DEVICE_OBJS)
+OBJS = $(OBJ) usbkbd_descriptors.o usbkbd.o keys.o $(DEVICE_OBJS)
 
 vpath %.c . $(DEVICE)
 vpath %.h . $(DEVICE)
@@ -74,7 +74,8 @@ UPLOAD_PROTOCOL ?= avr109
 
 OBJECT_FILES = $(OBJS:%.o=$(BUILDDIR)/%.o)
 
-$(BUILDDIR)/usbkbd.o: usbkbd.h usb.h avrusb.h generic_hid.h main.h local.mk
+$(BUILDDIR)/usbkbd.o: usbkbd.h usb.h usbkbd_descriptors.h usb_keys.h avrusb.h generic_hid.h main.h local.mk
+$(BUILDDIR)/usbkbd_descriptors.o: usbkbd_descriptors.h usbkbd.h usb.h usb_keys.h generic_hid.h local.mk
 $(BUILDDIR)/keys.o: keys.h keycodes.h usbkbd.h main.h usb_keys.h layers.h macros.h $(MACROS_C) $(LAYERS_C)
 $(OBJECT_FILES): Makefile $(DEVICE)/$(DEVICE).mk $(wildcard local.mk) $(wildcard $(DEVICE)/local.mk)
 

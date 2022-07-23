@@ -352,6 +352,7 @@ enum usb_consumer_control {
 
 #define MODIFIERS_START             USB_KEY_LEFT_CTRL
 #define MODIFIERS_END               USB_KEY_RIGHT_WIN
+#define MODIFIER_COUNT              ((MODIFIERS_END - MODIFIERS_START) + 1)
 
 #define MODIFIER_BIT(key)           (1U << ((key) - MODIFIERS_START))
 
