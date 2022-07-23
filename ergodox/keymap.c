@@ -1,4 +1,4 @@
-#include <avr/pgmspace.h>
+#include "progmem.h"
 #include "ergodox_ez.h"
 #include "device_keymap.h"
 

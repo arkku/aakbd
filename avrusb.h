@@ -26,6 +26,12 @@
 
 #include <avr/io.h>
 
+#if (defined(__AVR_AT90USB162__) || defined(__AVR_AT90USB82__)  || defined(__AVR_ATmega32U2__) || defined(__AVR_ATmega16U2__) || defined(__AVR_ATmega8U2__))
+#define USB_SERIES_2_AVR
+#elif (defined(__AVR_ATmega32U4__) || defined(__AVR_ATmega16U4__))
+#define USB_SERIES_4_AVR
+#endif
+
 #ifdef EPRST6
 #define USB_MAX_ENDPOINT            6
 #elif defined(EPRST5)
@@ -81,7 +87,13 @@
 #define usb_wait_rx_out()           do { } while (!is_usb_rx_out_ready)
 #define usb_wait_in_or_out()        do { } while (!is_usb_in_or_out_ready)
 
+#if defined(UEBCX)
+#define usb_fifo_byte_count         UEBCX
+#elif defined(UEBCHX)
+#define usb_fifo_byte_count         ((((uint16_t) UEBCHX) << 8) | UEBCLX)
+#else
 #define usb_fifo_byte_count         UEBCLX
+#endif
 #define usb_interrupt_flags_reg     UDINT
 #define usb_interrupt_enable_reg    UDIEN
 #define usb_frame_count             UDFNUML
@@ -89,7 +101,7 @@
 #ifdef UHWCON
 #define usb_hardware_init()         (UHWCON = (1 << UVREGE))
 #else
-#define usb_hardware_init()         do { } while (0)
+#define usb_hardware_init()         (REGCR &= ~(1 << REGDIS))
 #endif
 #define usb_freeze()                (USBCON = (1 << USBE) | (1 << FRZCLK))
 
@@ -115,7 +127,11 @@
 #define usb_set_endpoint_type(t)    (UECFG0X = (t))
 
 #define usb_clear_interrupts(x)         (usb_interrupt_flags_reg &= ~(x))
+#ifdef USBINT
+#define usb_clear_all_interrupts(x)     do { usb_interrupt_flags_reg = 0; USBINT = 0; } while (0)
+#else
 #define usb_clear_all_interrupts(x)     (usb_interrupt_flags_reg = 0)
+#endif
 #define usb_enable_interrupts(x)        (usb_interrupt_enable_reg |= (x))
 #define usb_disable_interrupts(x)       (usb_interrupt_enable_reg &= ~(x))
 #define usb_set_enabled_interrupts(x)   (usb_interrupt_enable_reg = (x))
@@ -127,7 +143,11 @@
 #define usb_ack_rx_out()            (UEINTX = ~(1 << RXOUTI))
 #define usb_flush_tx_in()           (UEINTX = ~(1 << TXINI))
 
-#define pll_enable()                (PLLCSR = (1 << PLLE) | PLL_DIV_FLAG)
+#define pll_enable()                do { \
+    PLLCSR = PLL_DIV_FLAG; \
+    (PLLCSR = (1 << PLLE) | PLL_DIV_FLAG); \
+} while (0)
+
 #define pll_disable()               (PLLCSR &= ~(1 << PLLE))
 #define is_pll_locked               (PLLCSR & (1 << PLOCK))
 

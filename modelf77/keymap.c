@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include <avr/pgmspace.h>
+#include "progmem.h"
 #include "keymap.h"
 #include "wcass.h"
 

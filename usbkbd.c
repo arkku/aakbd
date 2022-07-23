@@ -1,7 +1,7 @@
 /*
  * usbkbd.c: USB HID keyboard implementation for ATMEGA32U4.
  *
- * Copyright (c) 2021 Kimmo Kulovesi, https://arkku.dev/
+ * Copyright (c) 2021-2022 Kimmo Kulovesi, https://arkku.dev/
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
