@@ -34,7 +34,7 @@
 #define STR(a)              STRIFY(a)
 
 #ifdef KEYBOARD_NAME
-#define KEYBOARD_FILENAME (STR(KEYBOARD_NAME)".c")
+static const char PROGMEM KEYBOARD_FILENAME[] = STR(KEYBOARD_NAME)".c";
 #endif
 extern matrix_row_t raw_matrix[MATRIX_ROWS];
 
@@ -121,7 +121,7 @@ uint8_t handle_generic_hid_report(uint8_t report_id, uint8_t count, uint8_t data
                     const char *substring = KEYBOARD_FILENAME + data[3];
                     string_length -= data[3];
                     *response_length = min(*response_length - 3, string_length);
-                    memcpy(&response[3], substring, string_length);
+                    memcpy_P(&response[3], substring, string_length);
                     *response_length += 3;
                 }
                 break;
