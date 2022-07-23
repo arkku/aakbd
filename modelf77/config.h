@@ -38,9 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CAPSENSE_DAC_SETTLE_TIME_US 8
 #define CAPSENSE_HARDCODED_SAMPLE_TIME 4
 
-#define CAPSENSE_CAL_ENABLED 1
+#define CAPSENSE_CAL_ENABLED 0
 // #define CAPSENSE_CAL_ENABLED 0
-#define CAPSENSE_CAL_DEBUG 1
+#define CAPSENSE_CAL_DEBUG 0
 // #define CAPSENSE_CAL_DEBUG 0
 #define CAPSENSE_CAL_INIT_REPS 16
 #define CAPSENSE_CAL_EACHKEY_REPS 16
@@ -72,11 +72,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define LED_NUM_LOCK_PIN B4
 #define LED_CAPS_LOCK_PIN B5
-#define LED_SCROLL_LOCK_PIN B6
+//#define LED_SCROLL_LOCK_PIN B6
 
 // Uncomment below if the leds are on when the pin is driving zero:
 //#define LED_NUM_LOCK_ACTIVE_LOW
 //#define LED_CAPS_LOCK_ACTIVE_LOW
 //#define LED_SCROLL_LOCK_ACTIVE_LOW
 
-#include "post_config.h"
+#include "../xwhatsit_core/post_config.h"

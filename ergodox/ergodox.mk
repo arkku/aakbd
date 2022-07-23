@@ -8,7 +8,7 @@ KEYBOARD_NAME = ergodox_ez
 
 include qmk_core/qmk_port.mk
 
-DEVICE_OBJS = qmk_main.o ergodox_ez.o matrix.o keymap.o i2c_master.o matrix_common.o timer.o bitwise.o suspend.o bootloader.o $(DEBOUNCE_TYPE).o
+DEVICE_OBJS = keyboard.o qmk_main.o ergodox_ez.o matrix.o keymap.o i2c_master.o matrix_common.o timer.o bitwise.o suspend.o bootloader.o $(DEBOUNCE_TYPE).o
 DEVICE_FLAGS += -DBOOTLOADER_HALFKAY -DBOOTLOADER_SIZE=512 -DENABLE_I2C=1
 DEVICE_FLAGS += -DGENERIC_HID_REPORT_SIZE=22 -DGENERIC_HID_FEATURE_SIZE=2
 

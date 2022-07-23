@@ -17,7 +17,8 @@ vpath %.h $(TMK_DIR) $(TMK_DIR)/avr $(QMK_DIR)
 COMMON_HEADERS += config.h config_common.h pin_defs.h quantum.h platform_deps.h wait.h matrix.h timer.h gpio.h bitwise.h print.h _wait.h _timer.h util.h avr/gpio.h
 COMMON_HEADERS += $(wildcard local.mk) $(wildcard $(DEVICE)/local.mk)
 
-$(BUILDDIR)/qmk_main.o: avrtimer.h keys.h led.h main.h usbkbd.h keymap.h $(COMMON_HEADERS)
+$(BUILDDIR)/qmk_main.o: avrtimer.h keys.h led.h main.h usbkbd.h keyboard.h keymap.h $(COMMON_HEADERS)
+$(BUILDDIR)/keyboard.o: keyboard.h $(COMMON_HEADERS)
 $(BUILDDIR)/matrix.o: matrix.h debounce.h debug.h action_layer.h $(COMMON_HEADERS)
 $(BUILDDIR)/i2c_master.o: i2c_master.h $(COMMON_HEADERS)
 $(BUILDDIR)/matrix_common.o: $(COMMON_HEADERS)

@@ -47,14 +47,16 @@
 #include "quantum.h"
 #include "matrix.h"
 #include "keymap.h"
+#include "keyboard.h"
 #include "bootloader.h"
 #include "led.h"
 
 #define BOOT_KEY_SKIP_BOOTLOADER  0
 #define BOOT_KEY_GO_TO_BOOTLOADER 0x7777U
 
-#ifdef JDT
-#define disable_jtag()          (MCUCR |= (1 << JTD))
+#ifdef JTD
+#define disable_jtag_()         (MCUCR |= (1 << JTD))
+#define disable_jtag()          do { disable_jtag_(); disable_jtag_(); } while (0)
 #else
 #define disable_jtag()          do { } while (0)
 #endif
@@ -108,6 +110,11 @@ kbd_set_leds (uint8_t new_state) {
 }
 
 void
+keyboard_set_leds (uint8_t leds) {
+    (void) kbd_set_leds(leds);
+}
+
+void
 suspend_wakeup_init_user (void) {
     wdt_reset();
     wdt_enable(WDTO_4S);
@@ -126,6 +133,13 @@ kbd_input (void) {
         matrix_row_t matrix_row = matrix_get_row(row);
         matrix_change = matrix_row ^ previous_matrix[row];
         if (matrix_change) {
+#ifdef MATRIX_HAS_GHOST
+#error "Ghost detection not implemented, port from tmk_core/keyboard.c"
+            if (has_ghost_in_row(r, matrix_row)) {
+                continue;
+            }
+#endif
+
             matrix_row_t column_bit = 1;
             for (int_fast8_t column = 0; column < MATRIX_COLS; ++column, column_bit <<= 1) {
                 if (matrix_change & column_bit) {
@@ -142,10 +156,10 @@ kbd_input (void) {
     return have_changes;
 }
 
-static bool
+static inline bool
 kbd_init (void) {
     wdt_reset();
-    matrix_init();
+    keyboard_init();
     return true;
 }
 
@@ -173,14 +187,16 @@ setup (const bool is_power_up) {
         // Disable interrupts during setup
         cli();
 
+        keyboard_setup();
+        wdt_reset();
+
+        previous_tick = tick_10ms_count - 1;
+
         usb_init();
         wdt_reset();
-        previous_tick = tick_10ms_count - 1;
 
         // Enable interrupts
         sei();
-
-        matrix_setup();
     }
 
     if (kbd_init()) {
@@ -206,10 +222,16 @@ update_keyboard_leds (const uint8_t usb_state) {
     }
 }
 
+static inline void
+keyboard_task (void) {
+    (void) kbd_input();
+    update_keyboard_leds(keys_led_state());
+    wdt_reset();
+}
+
 int
 main (void) {
     cpu_clear_prescaler();
-    disable_jtag();
 
     setup(true);
 
@@ -220,9 +242,7 @@ main (void) {
             previous_tick = now;
         }
 
-        (void) kbd_input();
-        update_keyboard_leds(keys_led_state());
-        wdt_reset();
+        keyboard_task();
 
         usb_tick();
     }
@@ -256,8 +276,7 @@ jump_to_bootloader (void) {
 
 void
 matrix_setup() {
-    // Need timer for debounce
-    timer_init();
+    disable_jtag();
 }
 
 void

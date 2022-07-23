@@ -1,5 +1,5 @@
 XWHATSIT_DIR = xwhatsit_core
-KEYBOARD_NAME = xwhatsit
+KEYBOARD_NAME ?= xwhatsit
 
 vpath %.c $(XWHATSIT_DIR)
 vpath %.h $(XWHATSIT_DIR)
