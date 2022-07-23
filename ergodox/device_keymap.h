@@ -1,6 +1,7 @@
 #ifndef KK_ERGODOX_KEYMAP_H
 #define KK_ERGODOX_KEYMAP_H
 
+#include "keycodes.h"
 #include "keymap.h"
 
 #define USB_KEY_ERGODOX_LEFT_BACKSPACE  USB_KEY_CAPS_LOCK

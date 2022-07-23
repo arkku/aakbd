@@ -17,55 +17,28 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef F_CPU
-/// Crystal frequency.
-#define F_CPU   16000000UL
-#endif
-
 #include <stdint.h>
 #include <stdbool.h>
-
-#include <avr/eeprom.h>
-#include <avr/io.h>
-#include <avr/interrupt.h>
-#include <avr/pgmspace.h>
-#include <avr/power.h>
-#include <avr/sleep.h>
-#include <avr/wdt.h>
-#include <util/delay.h>
 
 #define INCLUDE_USB_HARDWARE_ACCESS
 #include <usbkbd.h>
 #include <keys.h>
 #include <main.h>
 
-#include "timer.h"
+#include "quantum.h"
+#include "qmk_port.h"
+#include "bootloader.h"
+#include "keyboard.h"
+#include "progmem.h"
+#include "suspend.h"
 
 #define TIMER_NUM 1
 #include <avrtimer.h>
 
-#include "quantum.h"
-#include "matrix.h"
-#include "keymap.h"
-#include "keyboard.h"
-#include "bootloader.h"
-#include "led.h"
-
-#define BOOT_KEY_SKIP_BOOTLOADER  0
-#define BOOT_KEY_GO_TO_BOOTLOADER 0x7777U
-
-#ifdef JTD
-#define disable_jtag_()         (MCUCR |= (1 << JTD))
-#define disable_jtag()          do { disable_jtag_(); disable_jtag_(); } while (0)
-#else
-#define disable_jtag()          do { } while (0)
-#endif
-#define cpu_clear_prescaler()   do { CLKPR = (1 << CLKPCE); CLKPR = 0; } while (0)
-
 #define STRIFY(a)           #a
 #define STR(a)              STRIFY(a)
 
-#ifdef XWHATSIT
+#ifdef KEYBOARD_NAME
 const char KEYBOARD_FILENAME[] = STR(KEYBOARD_NAME)".c";
 #endif
 
@@ -96,36 +69,10 @@ ISR (TIMER_COMPA_VECTOR) {
 
 #define tick_is_due_at(count)   ((previous_tick - (count)) & 0x80U)
 
-volatile uint16_t * const boot_key_pointer = (volatile uint16_t *) 0x0800U;
-
-static uint8_t kbd_led_state = 0;
-
-static inline uint8_t
-kbd_set_leds (uint8_t new_state) {
-    if (kbd_led_state != new_state) {
-        kbd_led_state = new_state;
-        led_set(new_state);
-    }
-    return kbd_led_state;
-}
-
-void
-keyboard_set_leds (uint8_t leds) {
-    (void) kbd_set_leds(leds);
-}
-
-void
-suspend_wakeup_init_user (void) {
-    wdt_reset();
-    wdt_enable(WDTO_4S);
-}
-
 static bool
 kbd_input (void) {
     static matrix_row_t previous_matrix[MATRIX_ROWS];
     matrix_row_t matrix_change = 0;
-
-    wdt_reset();
 
     bool have_changes = matrix_scan();
 
@@ -134,7 +81,6 @@ kbd_input (void) {
         matrix_change = matrix_row ^ previous_matrix[row];
         if (matrix_change) {
 #ifdef MATRIX_HAS_GHOST
-#error "Ghost detection not implemented, port from tmk_core/keyboard.c"
             if (has_ghost_in_row(r, matrix_row)) {
                 continue;
             }
@@ -156,95 +102,104 @@ kbd_input (void) {
     return have_changes;
 }
 
-static inline bool
-kbd_init (void) {
-    wdt_reset();
-    keyboard_init();
-    return true;
+static void
+protocol_init (void) {
+    protocol_pre_init();
+    usb_init();
+    previous_tick = tick_10ms_count - 1;
+    protocol_post_init();
 }
 
 void
-keyboard_reset (void) {
-    if (!kbd_init()) {
-        (void) kbd_set_leds(LED_NUM_LOCK_BIT | LED_SCROLL_LOCK_BIT);
-    }
-    _delay_ms(32);
+suspend_power_down_quantum (void) {
+    suspend_power_down_kb();
+
+#ifdef BACKLIGHT_ENABLE
+    backlight_set(0);
+#endif
+    led_suspend();
+#if defined(RGBLIGHT_SLEEP) && defined(RGBLIGHT_ENABLE)
+    rgblight_suspend();
+#endif
+#if defined(LED_MATRIX_ENABLE)
+    led_matrix_set_suspend_state(true);
+#endif
+#if defined(RGB_MATRIX_ENABLE)
+    rgb_matrix_set_suspend_state(true);
+#endif
 }
 
-static void
-setup (const bool is_power_up) {
-    // If the watchdog resets us during setup, go to bootloader since it
-    // probably means the firmware (or hardware) is broken
-    *boot_key_pointer = BOOT_KEY_GO_TO_BOOTLOADER;
+void
+suspend_wakeup_init_quantum (void) {
+#ifdef BACKLIGHT_ENABLE
+    backlight_init();
+#endif
 
-    // Use the watchdog timer to recover from error states
-    wdt_reset();
-    wdt_enable(WDTO_4S);
+    // Restore LED indicators
+    led_wakeup();
 
-    led_init_ports();
+// Wake up underglow
+#if defined(RGBLIGHT_SLEEP) && defined(RGBLIGHT_ENABLE)
+    rgblight_wakeup();
+#endif
 
-    if (is_power_up) {
-        // Disable interrupts during setup
-        cli();
-
-        keyboard_setup();
-        wdt_reset();
-
-        previous_tick = tick_10ms_count - 1;
-
-        usb_init();
-        wdt_reset();
-
-        // Enable interrupts
-        sei();
-    }
-
-    if (kbd_init()) {
-        // Resets after this point should skip the bootloader
-        if (is_power_up && *boot_key_pointer == BOOT_KEY_GO_TO_BOOTLOADER) {
-            *boot_key_pointer = BOOT_KEY_SKIP_BOOTLOADER;
-        }
-    }
+#if defined(LED_MATRIX_ENABLE)
+    led_matrix_set_suspend_state(false);
+#endif
+#if defined(RGB_MATRIX_ENABLE)
+    rgb_matrix_set_suspend_state(false);
+#endif
+    suspend_wakeup_init_kb();
 }
+
+uint8_t keyboard_leds = 0;
 
 static inline void
 update_keyboard_leds (const uint8_t usb_state) {
     if (usb_is_configured()) {
         if (usb_is_suspended()) {
-            (void) kbd_set_leds(0);
+            keyboard_leds = 0;
         } else {
-            (void) kbd_set_leds(usb_state |
+            keyboard_leds = usb_state |
 #if SCROLL_LOCK_LED_ON_OVERFLOW
                 ((keys_error() && blink_state) ? LED_SCROLL_LOCK_BIT : 0)
 #endif
-            );
+            ;
         }
     }
 }
 
 static inline void
 keyboard_task (void) {
+    const uint8_t now = tick_10ms_count;
+    if (tick_is_due_at(now)) {
+        keys_tick(now);
+        previous_tick = now;
+    }
+
     (void) kbd_input();
+
     update_keyboard_leds(keys_led_state());
-    wdt_reset();
+    led_task();
+}
+
+static inline void
+protocol_task (void) {
+    keyboard_task();
+    usb_tick();
 }
 
 int
 main (void) {
-    cpu_clear_prescaler();
+    platform_setup();
+    protocol_setup();
+    keyboard_setup();
 
-    setup(true);
+    protocol_init();
+    keyboard_init();
 
     for (;;) {
-        const uint8_t now = tick_10ms_count;
-        if (tick_is_due_at(now)) {
-            keys_tick(now);
-            previous_tick = now;
-        }
-
-        keyboard_task();
-
-        usb_tick();
+        protocol_task();
     }
 }
 
@@ -252,8 +207,10 @@ main (void) {
 #include "i2c_master.h"
 #endif
 
-void
-jump_to_bootloader (void) {
+static void
+shutdown_quantum (void) {
+    keyboard_init();
+
     // Tear down USB
     usb_deinit();
 
@@ -262,21 +219,29 @@ jump_to_bootloader (void) {
     i2c_stop();
 #endif
 
-    _delay_ms(32);
-
-    wdt_disable();
-
-    cli();
-
     timer_disable();
 
-    *boot_key_pointer = BOOT_KEY_GO_TO_BOOTLOADER;
+    wait_ms(32);
+
+#ifdef HAPTIC_ENABLE
+    haptic_shutdown();
+#endif
+}
+
+void
+keyboard_reset (void) {
+    keyboard_init();
+    wait_ms(32);
+}
+
+void
+jump_to_bootloader (void) {
+    shutdown_quantum();
     bootloader_jump();
 }
 
 void
 matrix_setup() {
-    disable_jtag();
 }
 
 void
@@ -288,18 +253,6 @@ matrix_init_quantum() {
 void
 matrix_scan_quantum() {
     matrix_scan_kb();
-}
-
-#define EECONFIG_KEYBOARD ((uint32_t *) 15)
-
-uint32_t
-eeconfig_read_kb(void) {
-    return eeprom_read_dword(EECONFIG_KEYBOARD);
-}
-
-void
-eeconfig_update_kb (uint32_t val) {
-    eeprom_update_dword(EECONFIG_KEYBOARD, val);
 }
 
 uint8_t

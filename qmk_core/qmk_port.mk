@@ -1,31 +1,29 @@
 QMK_DIR = qmk_core
-TMK_DIR = tmk_core/common
+QMK_PLATFORMS_DIR = $(QMK_DIR)/platforms
+PLATFORM_DIR = $(QMK_PLATFORMS_DIR)/$(QMK_PLATFORM)
 
 KEYBOARD_NAME ?= $(DEVICE)
 
-DEVICE_FLAGS += -DKEYBOARD_NAME=$(KEYBOARD_NAME) -Dasm=__asm -DNO_PRINT -DNO_DEBUG -I$(QMK_DIR) -I$(TMK_DIR) -I$(TMK_DIR)/avr -Wno-old-style-declaration -Wno-pedantic
-DEVICE_FLAGS += -funsigned-char
-DEVICE_FLAGS += -funsigned-bitfields
-DEVICE_FLAGS += -ffunction-sections
-DEVICE_FLAGS += -fdata-sections
-DEVICE_FLAGS += -fpack-struct
-DEVICE_FLAGS += -fshort-enums
+DEVICE_FLAGS += -DKEYBOARD_NAME=$(KEYBOARD_NAME) -Dasm=__asm -DNO_PRINT -DNO_DEBUG -I$(QMK_DIR) -I$(QMK_PLATFORMS_DIR) -I$(PLATFORM_DIR) -Wno-old-style-declaration -Wno-pedantic -include config.h
 
-vpath %.c $(TMK_DIR) $(TMK_DIR)/avr $(QMK_DIR) $(QMK_DIR)/debounce
-vpath %.h $(TMK_DIR) $(TMK_DIR)/avr $(QMK_DIR)
+include $(PLATFORM_DIR)/$(QMK_PLATFORM).mk
 
-COMMON_HEADERS += config.h config_common.h pin_defs.h quantum.h platform_deps.h wait.h matrix.h timer.h gpio.h bitwise.h print.h _wait.h _timer.h util.h avr/gpio.h
+vpath %.c $(QMK_DIR) $(QMK_DIR)/debounce $(QMK_PLATFORMS_DIR)
+vpath %.h $(QMK_DIR) $(QMK_PLATFORMS_DIR)
+
+COMMON_HEADERS += config.h config_common.h pin_defs.h _pin_defs.h quantum.h platform_deps.h wait.h _wait.h matrix.h timer.h _timer.h gpio.h bitwise.h print.h util.h $(QMK_PLATFORM)/gpio.h eeconfig.h
 COMMON_HEADERS += $(wildcard local.mk) $(wildcard $(DEVICE)/local.mk)
 
-$(BUILDDIR)/qmk_main.o: avrtimer.h keys.h led.h main.h usbkbd.h keyboard.h keymap.h $(COMMON_HEADERS)
-$(BUILDDIR)/keyboard.o: keyboard.h $(COMMON_HEADERS)
+$(BUILDDIR)/qmk_main.o: keys.h led.h main.h usbkbd.h keyboard.h keymap.h qmk_port.h progmem.h suspend.h $(COMMON_HEADERS)
+
+$(BUILDDIR)/keyboard.o: keyboard.h led.h $(COMMON_HEADERS)
+$(BUILDDIR)/led.o: led.h debug.h host.h $(COMMON_HEADERS)
 $(BUILDDIR)/matrix.o: matrix.h debounce.h debug.h action_layer.h $(COMMON_HEADERS)
-$(BUILDDIR)/i2c_master.o: i2c_master.h $(COMMON_HEADERS)
 $(BUILDDIR)/matrix_common.o: $(COMMON_HEADERS)
-$(BUILDDIR)/timer.o: timer.h timer_avr.h _timer.h
+$(BUILDDIR)/i2c_master.o: i2c_master.h $(COMMON_HEADERS)
 $(BUILDDIR)/bitwise.o: bitwise.h util.h
-$(BUILDDIR)/suspend.o: suspend.h $(COMMON_HEADERS)
-$(BUILDDIR)/bootloader.o: bootloader.h
+$(BUILDDIR)/suspend_core.o: suspend.h matrix.h
+
 $(BUILDDIR)/sym_eager_pk.o: debounce.h $(COMMON_HEADERS)
 $(BUILDDIR)/sym_eager_pr.o: debounce.h $(COMMON_HEADERS)
 $(BUILDDIR)/sym_defer_pk.o: debounce.h $(COMMON_HEADERS)

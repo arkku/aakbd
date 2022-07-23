@@ -2,26 +2,18 @@
 #include <avr/sleep.h>
 #include <avr/wdt.h>
 #include <avr/interrupt.h>
-#include "matrix.h"
 #include "suspend.h"
+#include "action.h"
 #include "timer.h"
-#include "config.h"
 
-/** \brief Suspend idle
- *
- * FIXME: needs doc
- */
-void suspend_idle(uint8_t time) {
-    cli();
-    set_sleep_mode(SLEEP_MODE_IDLE);
-    sleep_enable();
-    sei();
-    sleep_cpu();
-    sleep_disable();
-}
+#ifdef PROTOCOL_LUFA
+#    include "lufa.h"
+#endif
+#ifdef PROTOCOL_VUSB
+#    include "vusb.h"
+#endif
 
-__attribute__((weak)) void suspend_power_down_user(void) {}
-__attribute__((weak)) void suspend_power_down_kb(void) { suspend_power_down_user(); }
+// TODO: This needs some cleanup
 
 #if !defined(NO_SUSPEND_POWER_DOWN) && defined(WDT_vect)
 
@@ -83,6 +75,18 @@ static void power_down(uint8_t wdto) {
     // Disable watchdog after sleep
     wdt_disable();
 }
+
+/* watchdog timeout */
+ISR(WDT_vect) {
+    // compensate timer for sleep
+    switch (wdt_timeout) {
+        case WDTO_15MS:
+            timer_count += 15 + 2; // WDTO_15MS + 2(from observation)
+            break;
+        default:;
+    }
+}
+
 #endif
 
 /** \brief Suspend power down
@@ -90,56 +94,30 @@ static void power_down(uint8_t wdto) {
  * FIXME: needs doc
  */
 void suspend_power_down(void) {
-    suspend_power_down_kb();
+#ifdef PROTOCOL_LUFA
+    if (USB_DeviceState == DEVICE_STATE_Configured) return;
+#endif
+#ifdef PROTOCOL_VUSB
+    if (!vusb_suspended) return;
+#endif
 
+    suspend_power_down_quantum();
+
+#ifndef NO_SUSPEND_POWER_DOWN
     // Enter sleep state if possible (ie, the MCU has a watchdog timeout interrupt)
 #    if defined(WDT_vect)
     power_down(WDTO_15MS);
 #    endif
+#endif
 }
-
-__attribute__((weak)) void matrix_power_up(void) {}
-__attribute__((weak)) void matrix_power_down(void) {}
-bool                       suspend_wakeup_condition(void) {
-    matrix_power_up();
-    matrix_scan();
-    matrix_power_down();
-    for (uint8_t r = 0; r < MATRIX_ROWS; r++) {
-        if (matrix_get_row(r)) return true;
-    }
-    return false;
-}
-
-/** \brief run user level code immediately after wakeup
- *
- * FIXME: needs doc
- */
-__attribute__((weak)) void suspend_wakeup_init_user(void) {}
-
-/** \brief run keyboard level code immediately after wakeup
- *
- * FIXME: needs doc
- */
-__attribute__((weak)) void suspend_wakeup_init_kb(void) { suspend_wakeup_init_user(); }
 
 /** \brief run immediately after wakeup
  *
  * FIXME: needs doc
  */
 void suspend_wakeup_init(void) {
-    // Turn on backlight
-    suspend_wakeup_init_kb();
-}
+    // clear keyboard state
+    clear_keyboard();
 
-#if !defined(NO_SUSPEND_POWER_DOWN) && defined(WDT_vect)
-/* watchdog timeout */
-ISR(WDT_vect) {
-    // compensate timer for sleep
-    switch (wdt_timeout) {
-        case WDTO_15MS:
-            timer_count += 15 + 2;  // WDTO_15MS + 2(from observation)
-            break;
-        default:;
-    }
+    suspend_wakeup_init_quantum();
 }
-#endif

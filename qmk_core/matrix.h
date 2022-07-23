@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifndef MATRIX_ROWS
+#error "MATRIX_ROWS not defined"
+#endif
 #if (MATRIX_COLS <= 8)
 typedef uint8_t matrix_row_t;
 #elif (MATRIX_COLS <= 16)
@@ -46,8 +49,6 @@ void matrix_setup(void);
 void matrix_init(void);
 /* scan all key states on matrix */
 uint8_t matrix_scan(void);
-/* whether modified from previous scan. used after matrix_scan. */
-bool matrix_is_modified(void) __attribute__((deprecated));
 /* whether a switch is on */
 bool matrix_is_on(uint8_t row, uint8_t col);
 /* matrix state on row */
@@ -75,6 +76,7 @@ void matrix_init_user(void);
 void matrix_scan_user(void);
 
 #ifdef SPLIT_KEYBOARD
+bool matrix_post_scan(void);
 void matrix_slave_scan_kb(void);
 void matrix_slave_scan_user(void);
 #endif

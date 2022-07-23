@@ -5,10 +5,13 @@ PRODUCT ?= "ErgoDox EZ"
 DEBOUNCE ?= 8
 DEBOUNCE_TYPE = sym_eager_pr
 KEYBOARD_NAME = ergodox_ez
+MCU ?= atmega32u4
 
+QMK_PLATFORM = avr
+BOOTLOADER_TYPE = halfkay
 include qmk_core/qmk_port.mk
 
-DEVICE_OBJS = keyboard.o qmk_main.o ergodox_ez.o matrix.o keymap.o i2c_master.o matrix_common.o timer.o bitwise.o suspend.o bootloader.o $(DEBOUNCE_TYPE).o
+DEVICE_OBJS = keyboard.o qmk_main.o ergodox_ez.o matrix.o keymap.o i2c_master.o matrix_common.o timer.o bitwise.o led.o suspend.o suspend_core.o eeconfig.o platform.o $(QMK_PLATFORM).o $(BOOTLOADER_TYPE).o $(DEBOUNCE_TYPE).o
 DEVICE_FLAGS += -DBOOTLOADER_HALFKAY -DBOOTLOADER_SIZE=512 -DENABLE_I2C=1
 DEVICE_FLAGS += -DGENERIC_HID_REPORT_SIZE=22 -DGENERIC_HID_FEATURE_SIZE=2
 

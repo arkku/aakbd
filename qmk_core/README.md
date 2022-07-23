@@ -12,7 +12,7 @@ AAKBD Note
 ----------
 
 AAKBD does not use QMK for the actual key processing, but parts of the firmware
-(and the underlying [TMK firmware](../tmk_core/)) are included to ease porting
+(and the platform-specific abstraction layers) are included to ease porting
 matrix-based keyboards from QMK to AAKBD. This is done mostly "for science",
 since QMK is an established system that can do pretty much anything one could
 ever want a keyboard to do, and has a large community and relatively

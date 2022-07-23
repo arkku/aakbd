@@ -35,11 +35,7 @@
 #include "print.h"
 
 #include "keymap.h"
-
-uint32_t eeconfig_read_kb(void);
-void eeconfig_update_kb(uint32_t config);
-
-#define eeconfig_init_user() do { } while (0)
+#include "eeconfig.h"
 
 #include <main.h>
 #define reset_keyboard() keyboard_reset()

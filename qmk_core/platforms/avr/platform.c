@@ -1,7 +1,4 @@
-/**
- * modelf.c: An alternative firmware for Brand New Model F keyboards.
- *
- * Copyright (c) 2021 Kimmo Kulovesi, https://arkku.dev/
+/* Copyright 2021 QMK
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,15 +14,19 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdbool.h>
-#include <stdint.h>
+#include "platform_deps.h"
 
-extern bool keyboard_scan_enabled;
-
-#include "generic_hid.h"
-#if ENABLE_GENERIC_HID_ENDPOINT
-bool
-make_generic_hid_report (uint8_t report_id, uint8_t count, uint8_t report[static count]) {
-    return true;
-}
+static void disable_jtag(void) {
+// To use PF4-7 (PC2-5 on ATmega32A), disable JTAG by writing JTD bit twice within four cycles.
+#if (defined(__AVR_AT90USB646__) || defined(__AVR_AT90USB647__) || defined(__AVR_AT90USB1286__) || defined(__AVR_AT90USB1287__) || defined(__AVR_ATmega16U4__) || defined(__AVR_ATmega32U4__))
+    MCUCR |= _BV(JTD);
+    MCUCR |= _BV(JTD);
+#elif defined(__AVR_ATmega32A__)
+    MCUCSR |= _BV(JTD);
+    MCUCSR |= _BV(JTD);
 #endif
+}
+
+void platform_setup(void) {
+    disable_jtag();
+}
