@@ -1312,13 +1312,3 @@ usb_deinit (void) {
     usb_disable();
     sei();
 }
-
-#if (USB_MAX_KEY_ROLLOVER + ENABLE_APPLE_FN_KEY) < USB_BOOT_PROTOCOL_ROLLOVER
-#error "USB_MAX_KEY_ROLLOVER must be at least 6 (or 5 with ENABLE_APPLE_FN_KEY)"
-#endif
-#if MAX_KEY_ROLLOVER < USB_MAX_KEY_ROLLOVER
-#error "MAX_KEY_ROLLOVER must be at least equal to USB_MAX_KEY_ROLLOVER"
-#endif
-#if ENABLE_APPLE_FN_KEY && USB_VENDOR_ID != USB_VENDOR_ID_APPLE
-#error "USB_VENDOR_ID must be USB_VENDOR_ID_APPLE for ENABLE_APPLE_FN_KEY"
-#endif

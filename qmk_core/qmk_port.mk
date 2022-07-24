@@ -14,7 +14,7 @@ vpath %.h $(QMK_DIR) $(QMK_PLATFORMS_DIR)
 COMMON_HEADERS += config.h config_common.h pin_defs.h _pin_defs.h quantum.h platform_deps.h wait.h _wait.h matrix.h timer.h _timer.h gpio.h bitwise.h print.h util.h $(QMK_PLATFORM)/gpio.h eeconfig.h
 COMMON_HEADERS += $(wildcard local.mk) $(wildcard $(DEVICE)/local.mk)
 
-$(BUILDDIR)/qmk_main.o: keys.h led.h main.h usbkbd.h keyboard.h keymap.h qmk_port.h progmem.h suspend.h $(COMMON_HEADERS)
+$(BUILDDIR)/qmk_main.o: keys.h led.h main.h usbkbd.h usbkbd_config.h keyboard.h keymap.h qmk_port.h progmem.h suspend.h $(COMMON_HEADERS)
 
 $(BUILDDIR)/keyboard.o: keyboard.h led.h $(COMMON_HEADERS)
 $(BUILDDIR)/led.o: led.h debug.h host.h $(COMMON_HEADERS)

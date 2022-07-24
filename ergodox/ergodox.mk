@@ -22,7 +22,7 @@ CONFIG_FLAGS ?= \
 	-DPRODUCT_STRING='$(PRODUCT)'
 	-DDEBOUNCE=$(DEBOUNCE)
 
-$(BUILDDIR)/ergodox.o: led.h ergodox_ez.h
+$(BUILDDIR)/ergodox.o: led.h ergodox_ez.h usbkbd.h usbkbd_config.h
 $(BUILDDIR)/ergodox_ez.o: ergodox_ez.h i2c_master.h $(COMMON_HEADERS)
 $(BUILDDIR)/keymap.o: device_keymap.h keymap.h ergodox_ez.h config.h usb_keys.h
 $(BUILDDIR)/keys.o: device_keymap.h keymap.h ergodox_ez.h

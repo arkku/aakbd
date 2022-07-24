@@ -17,13 +17,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "usbkbd_config.h"
 #include "usb.h"
 #include "usbkbd_descriptors.h"
 #include "usb_keys.h"
 #include "generic_hid.h"
-
-#define INCLUDE_USB_HARDWARE_ACCESS
-#include "usbkbd.h"
 
 // MARK: - USB Descriptors
 

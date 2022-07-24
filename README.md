@@ -95,7 +95,7 @@ to use `dfu-util`.
 
 It is recommended to create a file called `local.mk` where you set up the
 configuration. The various options are documented mainly in
-[usbkbd.h](usbkbd.h). An example local configuration might be:
+[usbkbd_config.h](usbkbd_config.h). An example local configuration might be:
 
 ``` Make
 DEVICE = ps2usb
@@ -413,7 +413,7 @@ The arguments of this function are as follows:
 
 The helper facilities available to macros are mostly listed in `macros.h`.
 However, since this is an arbitrary program, you can call any C function,
-use inline assembly, etc. The file `usbkbd.h` has various lower level
+use inline assembly, etc. The file `usbkbd_config.h` has various lower level
 functions, such as simulated keypresses (bypassing the key processing system)
 and simulated typing (if enabled at compile type) where you can
 `fprintf(usb_kbd_type, "any text");` and the keyboard will "type" it.
