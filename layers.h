@@ -20,7 +20,7 @@
 #ifndef KK_LAYERS_H
 #define KK_LAYERS_H
 
-#include <avr/pgmspace.h>
+#include "progmem.h"
 #include "keycodes.h"
 
 // MARK: - Internals

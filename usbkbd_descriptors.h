@@ -5,12 +5,7 @@
 
 #include "usb.h"
 #include "usbkbd.h"
-
-#if defined(__AVR__)
-#include <avr/pgmspace.h>
-#elif !defined(PROGMEM)
-#define PROGMEM
-#endif
+#include "progmem.h"
 
 // MARK: - Configuration
 

@@ -20,7 +20,6 @@
 #include <stdio.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <avr/pgmspace.h>
 #include <avr/wdt.h>
 #include <util/delay.h>
 
@@ -34,6 +33,7 @@
 #include "usb.h"
 #include "usb_keys.h"
 #include "generic_hid.h"
+#include "progmem.h"
 
 // MARK: - Configuration
 

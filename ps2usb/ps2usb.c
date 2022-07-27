@@ -28,7 +28,6 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <avr/pgmspace.h>
 #include <avr/power.h>
 #include <avr/sleep.h>
 #include <avr/wdt.h>
@@ -43,6 +42,7 @@
 #include "led.h"
 #include "kk_ps2.h"
 #include "ps2usb_keys.h"
+#include "progmem.h"
 
 #ifndef MAX_ERROR_COUNT
 /// The maximum number of PS/2 protocol errors before we will try to reset the
