@@ -37,7 +37,7 @@
 #include "keymap.h"
 #include "eeconfig.h"
 
-#include <main.h>
+#include <aakbd.h>
 #define reset_keyboard() keyboard_reset()
 
 extern const uint8_t keymaps[1][MATRIX_ROWS][MATRIX_COLS];

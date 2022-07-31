@@ -53,9 +53,10 @@ led_set (uint8_t new_state) {
 }
 
 #if ENABLE_GENERIC_HID_ENDPOINT
-#define INCLUDE_USB_HARDWARE_ACCESS
+#define USB_KEYBOARD_ACCESS_STATE
 #include "usbkbd.h"
 #include "keys.h"
+#include "usb_hardware.h"
 
 enum generic_request {
     NONE,
@@ -102,7 +103,7 @@ make_generic_hid_report (uint8_t report_id, uint8_t count, uint8_t report[static
     }
     report[0] = usb_last_error();
     report[1] = keys_error();
-    report[2] = usb_is_in_boot_protocol();
+    report[2] = usb_keyboard_is_in_boot_protocol;
     report[3] = mcp23018_status;
     report[4] = keyboard_config.led_level;
     report[5] = (keyboard_config.disable_layer_led ? 0 : 1) | (keyboard_config.rgb_matrix_enable ? 2 : 0); 

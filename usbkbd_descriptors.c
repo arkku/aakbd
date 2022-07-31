@@ -350,6 +350,9 @@ typedef int16_t unicode_char_t;
 typedef uint16_t unicode_char_t;
 #endif
 
+// Flexible array member initialisation is a GCC extension
+#pragma GCC diagnostic ignored "-Wpedantic"
+
 struct usb_string_descriptor {
     uint8_t size;
     uint8_t type;
@@ -435,6 +438,9 @@ usb_descriptors_init (void) {
     _Static_assert(DESCRIPTOR_SIZE_DEVICE == sizeof(device_descriptor), "Invalid device_descriptor (size mismatch)");
     _Static_assert(CONFIGURATION_SIZE == sizeof(configuration_descriptor), "CONFIGURATION_SIZE calculation needs updating");
     _Static_assert(SUPPORTED_LANGUAGES_SIZE == sizeof(supported_languages), "Invalid supported_languages");
+#ifdef FIXED_NUM_CONFIGURATIONS
+    _Static_assert(FIXED_NUM_CONFIGURATIONS == CONFIGURATIONS_COUNT, "Wrong FIXED_NUM_CONFIGURATIONS");
+#endif
 }
 
 #define DESCRIPTOR_COUNT ((int_fast8_t) (sizeof(descriptor_list)/sizeof(*descriptor_list)))

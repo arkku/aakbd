@@ -1,5 +1,5 @@
 /**
- * usbkbd.h USB HID keyboard implementation for ATMEGA32U4.
+ * usbkbd.h: USB HID keyboard implementation.
  *
  * Copyright (c) 2021-2022 Kimmo Kulovesi, https://arkku.dev/
  *
@@ -23,50 +23,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "usb.h"
 #include "usbkbd_config.h"
 
-// MARK: - USB
-
-#ifdef INCLUDE_USB_HARDWARE_ACCESS
-
-/// Start USB.
-void usb_init(void);
-
-/// Is USB configured and was the last operation a success?
-bool usb_is_ok(void);
-
-/// Is USB configured?
-bool usb_is_configured(void);
-
-/// Zero if the last USB operation was a success, a non-zero code otherwise.
-uint8_t usb_last_error(void);
-
-/// Is USB suspended?
-bool usb_is_suspended(void);
-
-/// Deinit and disable USB.
-void usb_deinit(void);
-
-/// Is USB host requesting detach (e.g., for firmware update)?
-/// If yes, this is the nearest positive 8-bit value of the detach timeout
-/// requested (in milliseconds).
-uint8_t usb_detach_requested(void);
-
-/// This should be called periodically to allow the USB keyboard to handle any
-/// internal timers, etc.
-void usb_tick(void);
-
-/// Is USB using boot protocol mode?
-bool usb_is_in_boot_protocol(void);
-
-/// The USB address of the device.
-uint8_t usb_address(void);
-
-#endif
-
 // MARK: - Keyboard
-
-#ifdef INCLUDE_USB_KEYBOARD_ACCESS
 
 #define KEY_ROLLOVER_ERROR_CODE         0x01
 #define KEY_UNDEFINED_ERROR_CODE        0x03
@@ -76,6 +36,10 @@ uint8_t usb_address(void);
 #define KEY_ERROR_OVERFLOW_REPORTED     (KEY_ERROR_OVERFLOW + 1)
 #define KEY_ERROR_GENERAL               KEY_UNDEFINED_ERROR_CODE
 #define KEY_ERROR_GENERAL_REPORTED      (KEY_ERROR_GENERAL + 1)
+
+/// Reset the USB keyboard state to initial, unconfigured values.
+/// This should be called before using the other functions.
+void usb_keyboard_reset(void);
 
 /// Press `key` down. It can be any USB key, including modifier or error state.
 void usb_keyboard_press(const uint8_t key);
@@ -94,10 +58,6 @@ bool usb_keyboard_send_report(void);
 /// for the keyboard to react propertly to the press/release calls.
 /// This is not needed, however, for simulated typing / keypresses.
 bool usb_keyboard_send_if_needed(void);
-
-/// The desired keyboard LED state as set by the USB host. This should be
-/// polled periodically to sync the state of the physical LEDs.
-uint8_t usb_keyboard_led_state(void);
 
 /// Error state of the keyboard, such as `KEY_ERROR_OVERFLOW`. Overflow errors
 /// are automatically cleared when all keys are released, and a reset will be
@@ -124,6 +84,11 @@ void usb_keyboard_remove_modifiers(const uint8_t modifier_flags);
 /// protocol mode).
 bool usb_keyboard_simulate_keypress(const uint8_t key, const uint8_t modifier_flags);
 
+/// Toggles the keyboard protocol between boot protocol and report protocol.
+/// This can be used to work around a BIOS that does not request the boot
+/// protocol correctly, even though according to spec it should.
+void usb_keyboard_toggle_boot_protocol(void);
+
 #if ENABLE_APPLE_FN_KEY
 /// Set the Apple Fn key down. This key does _not_ count as a modifier, even
 /// though it technically is.
@@ -135,6 +100,8 @@ void release_apple_virtual(const uint8_t key);
 /// Is the Apple Fn key being held down?
 bool is_apple_virtual_pressed(const uint8_t key);
 #endif
+
+// MARK: - Simulated typing
 
 #if ENABLE_SIMULATED_TYPING
 #include <stdio.h>
@@ -154,11 +121,68 @@ extern FILE *usb_kbd_type;
 void usb_keyboard_type_debug_report(void);
 #endif
 
-/// Toggles the keyboard protocol between boot protocol and report protocol.
-/// This can be used to work around a BIOS that does not request the boot
-/// protocol correctly, even though according to spec it should.
-void usb_keyboard_toggle_boot_protocol(void);
+/// Sends the keyboard state report.
+bool usb_keyboard_send_report(void);
 
-#endif // INCLUDE_USB_KEYBOARD_ACCESS
+// MARK: - Keyboard State
+
+/// Get the keyboard LEDs state, as requested by the USB host.
+/// Note: For low-level access, use `usb_keyboard_leds` directly.
+uint8_t usb_keyboard_led_state(void);
+
+#ifdef USB_KEYBOARD_ACCESS_STATE
+
+/// Desired state of the keyboard LEDs as set over USB.
+extern volatile uint8_t usb_keyboard_leds;
+
+/// The buffer for keys currently pressed. Terminated by a zero, hence one
+/// element more than required.
+extern uint8_t usb_keys_buffer[MAX_KEY_ROLLOVER + 1];
+
+/// Flags indicating which modifier keys are currently pressed. Note that if
+/// multiple keys are mapped to the same modifier key, releasing either of
+/// them causes the modifier to be released.
+extern uint8_t usb_keys_modifier_flags;
+
+/// Flags of extended keys (e.g., Apple Fn).
+extern uint8_t usb_keys_extended_flags;
+
+/// The selected keyboard protocol.
+extern uint8_t usb_keyboard_protocol;
+
+/// Are there changes to the pressed keys that we haven't sent?
+extern volatile bool usb_keyboard_updated;
+
+/// Are there currently no keys pressed?
+#define usb_keyboard_is_idle                (usb_keys_buffer[0] == 0 && usb_keys_modifier_flags == 0 && usb_keys_extended_flags == 0)
+
+#define usb_keyboard_is_in_boot_protocol    (usb_keyboard_protocol == HID_PROTOCOL_BOOT)
+
+/// Effective rollover.
+#define usb_keyboard_rollover               (usb_keyboard_is_in_boot_protocol ? USB_BOOT_PROTOCOL_ROLLOVER : USB_MAX_KEY_ROLLOVER)
+
+// MARK: - Keyboard Errors
+
+#define KEY_ERROR_NEEDS_REPORTING_FLAG  (1)
+
+/// Error status of the keyboard (e.g., overflow). The least significant bit
+/// is 1 if the error has not yet been sent to the host in a report.
+extern volatile uint8_t key_error;
+
+#endif
+
+// MARK: - Virtual keys
+
+#if ENABLE_APPLE_FN_KEY
+#include "usb_keys.h"
+
+#define APPLE_VIRTUAL_START     USB_KEY_VIRTUAL_APPLE_FN
+#define APPLE_VIRTUAL_END       USB_KEY_VIRTUAL_APPLE_EXPOSE_DESKTOP
+#define APPLE_VIRTUAL_MASK      (0xFFU)
+
+#define IS_APPLE_VIRTUAL(key)   ((key) >= APPLE_VIRTUAL_START && (key) <= APPLE_VIRTUAL_END)
+
+#define APPLE_VIRTUAL_BIT(key)  (1 << ((key) - APPLE_VIRTUAL_START))
+#endif
 
 #endif

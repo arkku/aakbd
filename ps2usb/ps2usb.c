@@ -33,9 +33,9 @@
 #include <avr/wdt.h>
 #include <util/delay.h>
 
-#define INCLUDE_USB_HARDWARE_ACCESS
+#include <usb_hardware.h>
 #include <usbkbd.h>
-#include <main.h>
+#include <aakbd.h>
 #include <avrtimer.h>
 #include <keys.h>
 

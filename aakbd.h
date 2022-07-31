@@ -1,7 +1,7 @@
 /**
- * main.h: USB keyboard implementation for ATMEGA32U4.
+ * aakbd.h: USB keyboard implementation.
  *
- * Copyright (c) 2021 Kimmo Kulovesi, https://arkku.dev/
+ * Copyright (c) 2021-2022 Kimmo Kulovesi, https://arkku.dev/
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,8 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef KK_USB_KBD_MAIN_H
-#define KK_USB_KBD_MAIN_H
+#ifndef KK_AAKBD_MAIN_H
+#define KK_AAKBD_MAIN_H
 
 #include <stdint.h>
 
@@ -32,5 +32,15 @@ void keyboard_reset(void);
 /// The current 10 ms tick count, i.e., a monotonically increasing counter that
 /// increments approximately once per 10 milliseconds.
 uint8_t current_10ms_tick_count(void);
+
+#ifdef __AVR__
+#include <util/delay.h>
+#include <avr/wdt.h>
+
+#define delay_milliseconds(x) _delay_ms(x)
+#define reset_watchdog_timer() wdt_reset()
+#else
+#error "Platform not supported, edit aakbd.h accordingly."
+#endif
 
 #endif

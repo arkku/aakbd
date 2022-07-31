@@ -21,10 +21,11 @@
  */
 #include <assert.h>
 #include "keys.h"
-#include "main.h"
+#include "aakbd.h"
 
-#define INCLUDE_USB_KEYBOARD_ACCESS
 #include "usbkbd.h"
+#include "usb_keys.h"
+#include "keycodes.h"
 
 #include <layers.c> // Yes, including .c
 

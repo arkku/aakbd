@@ -20,10 +20,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define INCLUDE_USB_HARDWARE_ACCESS
+#include <usb_hardware.h>
 #include <usbkbd.h>
 #include <keys.h>
-#include <main.h>
+#include <aakbd.h>
 
 #include "quantum.h"
 #include "qmk_port.h"
@@ -46,7 +46,6 @@ const char KEYBOARD_FILENAME[] = STR(KEYBOARD_NAME)".c";
 #define TICKS_PER_10MS      ((TICKS_PER_SECOND / 100UL) + (((TICKS_PER_SECOND % 100UL) >= 50UL) ? 1UL : 0UL)
 
 static volatile uint8_t tick_10ms_count = 0;
-static volatile uint8_t tick_320ms_count = 0;
 static uint8_t previous_tick;
 
 uint8_t
@@ -57,15 +56,8 @@ current_10ms_tick_count (void) {
 // A state that changes over time, can be used to blink LEDs.
 // This fires approx. once per 10 ms, i.e., 100 times per second
 ISR (TIMER_COMPA_VECTOR) {
-    if ((++tick_10ms_count % 32) == 0) {
-        ++tick_320ms_count;
-    }
+    ++tick_10ms_count;
 }
-
-#define blink_state             (tick_320ms_count & 1)
-
-/// A less frequent blink state, used for the suspend blink.
-#define suspend_blink_state     ((tick_320ms_count % 16) == 0)
 
 #define tick_is_due_at(count)   ((previous_tick - (count)) & 0x80U)
 
@@ -152,23 +144,6 @@ suspend_wakeup_init_quantum (void) {
     suspend_wakeup_init_kb();
 }
 
-uint8_t keyboard_leds = 0;
-
-static inline void
-update_keyboard_leds (const uint8_t usb_state) {
-    if (usb_is_configured()) {
-        if (usb_is_suspended()) {
-            keyboard_leds = 0;
-        } else {
-            keyboard_leds = usb_state |
-#if SCROLL_LOCK_LED_ON_OVERFLOW
-                ((keys_error() && blink_state) ? LED_SCROLL_LOCK_BIT : 0)
-#endif
-            ;
-        }
-    }
-}
-
 static inline void
 keyboard_task (void) {
     const uint8_t now = tick_10ms_count;
@@ -179,7 +154,6 @@ keyboard_task (void) {
 
     (void) kbd_input();
 
-    update_keyboard_leds(keys_led_state());
     led_task();
 }
 

@@ -30,15 +30,15 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <util/delay.h>
 
-#define INCLUDE_USB_KEYBOARD_ACCESS
 #include "usbkbd.h"
+#include "progmem.h"
 
+#include "usb_hardware.h"
 #include "usb_keys.h"
 #include "keycodes.h"
 #include "keys.h"
-#include "main.h"
+#include "aakbd.h"
 
 #if LAYER_COUNT > 31
 #error "The maximum LAYER_COUNT is 31."
