@@ -83,6 +83,17 @@
 #define STRING_INDEX_PRODUCT        2
 #define STRING_INDEX_SERIAL_NUMBER  3
 
+#ifndef USB_STRINGS_STORED_AS_ASCII
+/// If USB_STRINGS_STORED_AS_ASCII is 1, then descriptor memory is saved by
+/// storing USB strings (e.g., manufacturer and product names) as ASCII,
+/// which is converted on the fly to the expected UTF-16 (doubling the size).
+///
+/// However, if storage space is available, it is simpler to store as UTF-16
+/// directly. Also, not all USB implementations/platforms may support the
+/// on-the-fly conversion.
+#define USB_STRINGS_STORED_AS_ASCII 0
+#endif
+
 // MARK: - Descriptors
 
 struct usb_descriptor {
@@ -98,9 +109,10 @@ struct usb_descriptor {
     uint16_t    index;
 
     /// A pointer to the `PROGMEM` stored data for the descriptor. Normally it
-    /// is sent as is, but if the type string and this is not the list of
-    /// supported languages, then the data is expected to be a plain ASCII
-    /// string that will be converted to UTF-16 when sending.
+    /// is sent as is, but if `USB_STRINGS_STORED_AS_ASCII` is non-zero, and
+    /// the type is string, and this is not the list of supported languages,
+    /// then the data is expected to be a plain ASCII string that will be
+    /// converted to UTF-16 when sending.
     const char *data;
 
     /// The length of the descriptor. Note that for ASCII strings (see `data`),
@@ -109,10 +121,16 @@ struct usb_descriptor {
     uint8_t     length;
 };
 
-extern const uint8_t descriptor_count;
 extern const struct usb_descriptor PROGMEM descriptor_list[];
 
+/// Does any runtime setup needed for the USB descriptors.
 void usb_descriptors_init(void);
+
+/// Given the `wValue` and `wIndex` of the USB descriptor request, returns
+/// the length of the matching descriptor, and sets the `address` pointer
+/// (which must be non-NULL) to the address of the data for that descriptor.
+/// If no matching descriptor is found, returns 0.
+uint8_t usb_descriptor_length_and_data(const uint16_t value, const uint16_t index, const char *address[static 1]);
 
 // MARK: - Helper macros
 

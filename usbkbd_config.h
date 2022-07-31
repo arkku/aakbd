@@ -100,7 +100,7 @@
 #endif
 #ifndef PRODUCT_STRING
 /// The product name to report.
-#define PRODUCT_STRING              "PS/2 Keyboard"
+#define PRODUCT_STRING              "AAKBD"
 #endif
 #ifndef SERIAL_NUMBER_STRING
 /// The serial number to report. (It doesn't actually have to be a number.)

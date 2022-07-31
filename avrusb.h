@@ -123,8 +123,14 @@
 #define usb_set_endpoint(num)       (UENUM = (num))
 #define usb_enable_endpoint()       (UECONX = (1 << EPEN))
 #define usb_disable_endpoint()      (UECONX = 0)
-#define usb_set_endpoint_flags(f)   (UECFG1X = (f))
 #define usb_set_endpoint_type(t)    (UECFG0X = (t))
+#define usb_set_endpoint_flags_and_size(f, size)   (UECFG1X = (f) | EP_SIZE_FLAGS((size)))
+
+#define usb_deallocate_endpoint()   (UECFG1X &= ~EP_ALLOC)
+
+#define usb_endpoint_flags_config       UECFG1X
+#define usb_endpoint_type_config        UECFG0X
+#define usb_endpoint_interrupts_config  UEIENX
 
 #define usb_clear_interrupts(x)         (usb_interrupt_flags_reg &= ~(x))
 #ifdef USBINT
@@ -153,6 +159,7 @@
 
 #define usb_stall()                 (UECONX = (1 << STALLRQ) | (1 << EPEN))
 #define usb_clear_stall()           (UECONX = (1 << STALLRQC) | (1 << RSTDT) | (1 << EPEN))
+#define usb_reset_data_toggle()     (UECONX |= (1 << RSTDT))
 
 #define usb_set_remote_wakeup()     (UDCON |= (1 << RMWKUP))
 #define usb_clear_remote_wakeup()   (UDCON &= ~(1 << RMWKUP))
@@ -160,6 +167,7 @@
 #define usb_set_address(addr)       (UDADDR = (addr) | (1 << ADDEN))
 #define usb_get_address()           (UDADDR & ~(1 << ADDEN))
 
+#define usb_clear_setup()           (UEINTX &= ~(1 << RXSTPI))
 #define usb_clear_setup_int()       (UEINTX = ~((1 << RXSTPI) | (1 << RXOUTI) | (1 << TXINI)))
 #define usb_release_rx()            (UEINTX = (1 << NAKINI) | (1 << RWAL) | (1 << RXSTPI) | (1 << STALLEDI) | (1 << TXINI)) // 0x6B
 #define usb_release_tx()            (UEINTX = (1 << NAKOUTI) | (1 << RWAL) | (1 << RXSTPI) | (1 << STALLEDI)) // 0x3A
@@ -185,7 +193,7 @@
     usb_set_endpoint(number);                                               \
     usb_enable_endpoint();                                                  \
     usb_set_endpoint_type((type));                                          \
-    usb_set_endpoint_flags((flags) | EP_SIZE_FLAGS((size)));                \
+    usb_set_endpoint_flags_and_size(flags, size);                           \
 } while (0)
 
 #if EORSTE != EORSTI || SOFE != SOFI || WAKEUPE != WAKEUPI || SUSPE != SUSPI

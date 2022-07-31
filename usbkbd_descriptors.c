@@ -322,6 +322,8 @@ static const uint16_t PROGMEM supported_languages[] = {
     LANGUAGE_ID
 };
 
+
+#if USB_STRINGS_STORED_AS_ASCII
 // Note that string descriptors (other than `supported_languages` are stored as
 // ASCII strings, and the UTF-16 strings are formed programmatically from them.
 // This may cause trouble if you want non-ASCII characters in the strings, but
@@ -331,6 +333,38 @@ static const char PROGMEM manufacturer_string[] = MANUFACTURER_STRING;
 static const char PROGMEM product_string[] = PRODUCT_STRING;
 static const char PROGMEM serial_string[] = SERIAL_NUMBER_STRING;
 
+/// Helper to list a descriptor from an ASCII string.
+#define DESC_STR(num, lang, str, ascii) {BYTES_WORD((num), DESCRIPTOR_TYPE_STRING), (lang), (str), sizeof(ascii) * 2}
+#else
+#include <stddef.h>
+
+#define STR_TO_UNICODE(ascii) L ## ascii
+
+#ifndef PACKED
+#define PACKED __attribute__ ((packed))
+#endif
+
+#if WCHAR_MAX == 0x7FFF
+typedef int16_t unicode_char_t;
+#else
+typedef uint16_t unicode_char_t;
+#endif
+
+struct usb_string_descriptor {
+    uint8_t size;
+    uint8_t type;
+    unicode_char_t unicode_string[];
+} PACKED;
+
+#define USB_STRING_DESCRIPTOR(ascii) { .size = sizeof(ascii) * 2, .type = DESCRIPTOR_TYPE_STRING, .unicode_string = STR_TO_UNICODE(ascii) }
+
+static const struct usb_string_descriptor PROGMEM manufacturer_string = USB_STRING_DESCRIPTOR(MANUFACTURER_STRING);
+static const struct usb_string_descriptor PROGMEM product_string = USB_STRING_DESCRIPTOR(PRODUCT_STRING);
+static const struct usb_string_descriptor PROGMEM serial_string = USB_STRING_DESCRIPTOR(SERIAL_NUMBER_STRING);
+
+#define DESC_STR(num, lang, desc, ascii) {BYTES_WORD((num), DESCRIPTOR_TYPE_STRING), (lang), (const char *) &(desc), sizeof(ascii) * 2 }
+#endif
+
 /// Helper to list a descriptor that is the entire contents of the array
 /// or struct provided.
 #define DESC_FULL(type, num, index, data) {BYTES_WORD((num), (type)), (index), (const char *) (data), sizeof((data))}
@@ -338,9 +372,6 @@ static const char PROGMEM serial_string[] = SERIAL_NUMBER_STRING;
 /// Helper to list a descriptor from a pointer to partial contents of an
 /// array or struct. The size must be provided explicitly.
 #define DESC_PART(type, num, index, data, size) {BYTES_WORD((num), (type)), (index), (const char *) (data), (size)}
-
-/// Helper to list a descriptor from an ASCII string.
-#define DESC_STR(num, lang, str) {BYTES_WORD((num), DESCRIPTOR_TYPE_STRING), (lang), (str), 2 * sizeof((str))}
 
 /// The list of descriptors. This list is available via USB request.
 const struct usb_descriptor PROGMEM descriptor_list[] = {
@@ -387,9 +418,9 @@ const struct usb_descriptor PROGMEM descriptor_list[] = {
     ),
 #endif
     DESC_FULL(DESCRIPTOR_TYPE_STRING, 0, 0, supported_languages),
-    DESC_STR(STRING_INDEX_MANUFACTURER,     LANGUAGE_ID, manufacturer_string),
-    DESC_STR(STRING_INDEX_PRODUCT,          LANGUAGE_ID, product_string),
-    DESC_STR(STRING_INDEX_SERIAL_NUMBER,    LANGUAGE_ID, serial_string),
+    DESC_STR(STRING_INDEX_MANUFACTURER,     LANGUAGE_ID, manufacturer_string, MANUFACTURER_STRING),
+    DESC_STR(STRING_INDEX_PRODUCT,          LANGUAGE_ID, product_string, PRODUCT_STRING),
+    DESC_STR(STRING_INDEX_SERIAL_NUMBER,    LANGUAGE_ID, serial_string, SERIAL_NUMBER_STRING),
 #if HARDWARE_SUPPORTS_HIGH_SPEED
     DESC_FULL(
         DESCRIPTOR_TYPE_DEVICE_QUALIFIER, 0,
@@ -399,13 +430,29 @@ const struct usb_descriptor PROGMEM descriptor_list[] = {
 #endif
 };
 
-const uint8_t descriptor_count = (sizeof(descriptor_list)/sizeof(*descriptor_list));
-
 void
 usb_descriptors_init (void) {
     _Static_assert(DESCRIPTOR_SIZE_DEVICE == sizeof(device_descriptor), "Invalid device_descriptor (size mismatch)");
     _Static_assert(CONFIGURATION_SIZE == sizeof(configuration_descriptor), "CONFIGURATION_SIZE calculation needs updating");
     _Static_assert(SUPPORTED_LANGUAGES_SIZE == sizeof(supported_languages), "Invalid supported_languages");
+}
+
+#define DESCRIPTOR_COUNT ((int_fast8_t) (sizeof(descriptor_list)/sizeof(*descriptor_list)))
+
+uint8_t
+usb_descriptor_length_and_data (const uint16_t value, const uint16_t index, const char *address[static 1]) {
+    for (int_fast8_t i = 0; i < DESCRIPTOR_COUNT; ++i) {
+        if (pgm_read_word(&(descriptor_list[i].value)) != value) {
+            continue;
+        }
+        if (pgm_read_word(&(descriptor_list[i].index)) != index) {
+            continue;
+        }
+        *address = pgm_read_ptr(&(descriptor_list[i].data));
+        return pgm_read_byte(&(descriptor_list[i].length));
+    }
+
+    return 0;
 }
 
 #if (USB_MAX_KEY_ROLLOVER + ENABLE_APPLE_FN_KEY) < USB_BOOT_PROTOCOL_ROLLOVER

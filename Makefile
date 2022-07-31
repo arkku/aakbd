@@ -5,16 +5,24 @@
 -include local.mk
 
 CC=avr-gcc
-CFLAGS=-Wall -std=c11 -pedantic -Wextra -Wno-unused-parameter -Os -I$(DEVICE) -I. $(AVR_FLAGS) $(DEVICE_FLAGS) $(CONFIG_FLAGS)
-LDFLAGS=-Os $(AVR_FLAGS)
+OPTIMIZATION=s
+CC_FLAGS=-I$(DEVICE) -I. $(AVR_FLAGS)
+CFLAGS=-O$(OPTIMIZATION) -Wall -std=c11 -pedantic -Wextra -Wno-unused-parameter $(CC_FLAGS) $(DEVICE_FLAGS) $(CONFIG_FLAGS)
+LD_FLAGS=$(AVR_FLAGS)
+LDFLAGS=-O$(OPTIMIZATION) $(LD_FLAGS)
 AR=avr-ar
 ARFLAGS=rcs
 OBJCOPY=avr-objcopy
 AVRDUDE=avrdude
 
-AVR_FLAGS=-mmcu=$(MCU) -DF_CPU=$(F_CPU)
+AVR_FLAGS=-mmcu=$(MCU) -DF_CPU=$(F_CPU) -DF_USB=$(F_USB)
 
+ifneq (,$(TARGET))
+DEVICE = $(TARGET)
+else
 DEVICE ?= ps2usb
+TARGET = $(DEVICE)
+endif
 
 HEX = $(DEVICE:=.hex)
 BIN = $(HEX:.hex=.bin)
@@ -44,10 +52,13 @@ else
 LAYERS_C = layers.c
 endif
 
+BOARD = NONE
+
 ### AVR MCU ###################################################################
 
 MCU ?= atmega32u4
 F_CPU ?= 16000000UL
+F_USB ?= $(F_CPU)
 
 # LFUSE configures the clock speed; it is probably correct out of the box if
 # you use a ready-made board. If not, `make fuses LFUSE=CE` for a 16 MHz

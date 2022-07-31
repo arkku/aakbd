@@ -192,9 +192,9 @@ usb_init (void) {
     usb_keyboard_reset();
     usb_clear_interrupts(INT_SUSPEND_FLAG | INT_WAKE_UP_FLAG);
 #if IS_SUSPEND_SUPPORTED
-    usb_set_enabled_interrupts(INT_START_OF_FRAME_FLAG | INT_END_OF_RESET_FLAG | INT_SUSPEND_FLAG);
+    usb_set_enabled_interrupts(INT_END_OF_RESET_FLAG | INT_SUSPEND_FLAG);
 #else
-    usb_set_enabled_interrupts(INT_START_OF_FRAME_FLAG | INT_END_OF_RESET_FLAG);
+    usb_set_enabled_interrupts(INT_END_OF_RESET_FLAG);
 #endif
 #if ENABLE_DFU_INTERFACE
     usb_request_detach = 0;
@@ -202,39 +202,60 @@ usb_init (void) {
 }
 
 static INLINE void
-usb_init_endpoints (void) {
-    _Static_assert(IS_ENDPOINT_SIZE_VALID(KEYBOARD_ENDPOINT_SIZE), "Invalid keyboard endpoint size");
+usb_init_endpoint (const uint8_t num, const uint8_t type, const uint8_t size, const uint8_t flags) {
+    for (uint8_t i = num; i <= USB_MAX_ENDPOINT; ++i) {
+        uint8_t cfg_type;
+        uint8_t cfg_flags;
+        uint8_t cfg_interrupts;
 
-    for (int_fast8_t i = 1; i < USB_MAX_ENDPOINT; ++i) {
         usb_set_endpoint(i);
-        switch (i) {
-#if ENABLE_KEYBOARD_ENDPOINT
-        case KEYBOARD_ENDPOINT_NUM:
-            usb_setup_endpoint(
-                KEYBOARD_ENDPOINT_NUM,
-                KEYBOARD_ENDPOINT_TYPE,
-                KEYBOARD_ENDPOINT_SIZE,
-                KEYBOARD_ENDPOINT_FLAGS
-            );
-            break;
-#endif
-#if ENABLE_GENERIC_HID_ENDPOINT
-        case GENERIC_HID_ENDPOINT_NUM:
-            usb_setup_endpoint(
-                GENERIC_HID_ENDPOINT_NUM,
-                GENERIC_ENDPOINT_TYPE,
-                GENERIC_ENDPOINT_SIZE,
-                GENERIC_ENDPOINT_FLAGS
-            );
-            break;
-#endif
-        default:
-            usb_set_endpoint(i);
-            usb_disable_endpoint();
-            break;
+
+        if (i == num) {
+            cfg_type = type;
+            cfg_flags = flags | EP_SIZE_FLAGS(size);
+            cfg_interrupts = 0;
+        } else {
+            cfg_type = usb_endpoint_type_config;
+            cfg_flags = usb_endpoint_flags_config;
+            cfg_interrupts = usb_endpoint_interrupts_config;
         }
+
+        if (!(cfg_flags & EP_ALLOC)) {
+            continue;
+        }
+
+        usb_disable_endpoint();
+        usb_deallocate_endpoint();
+
+        usb_enable_endpoint();
+        usb_endpoint_type_config = cfg_type;
+        usb_endpoint_flags_config = cfg_flags;
+        usb_endpoint_interrupts_config = cfg_interrupts;
     }
-    usb_reset_endpoints_1to(USB_MAX_ENDPOINT);
+
+    usb_set_endpoint(num);
+}
+
+static INLINE void
+usb_init_endpoints (void) {
+#if ENABLE_KEYBOARD_ENDPOINT
+    _Static_assert(IS_ENDPOINT_SIZE_VALID(KEYBOARD_ENDPOINT_SIZE), "Invalid keyboard endpoint size");
+    usb_init_endpoint(KEYBOARD_ENDPOINT_NUM, KEYBOARD_ENDPOINT_TYPE, KEYBOARD_ENDPOINT_SIZE, KEYBOARD_ENDPOINT_FLAGS);
+#endif
+
+#if ENABLE_GENERIC_HID_ENDPOINT
+    _Static_assert(IS_ENDPOINT_SIZE_VALID(GENERIC_ENDPOINT_SIZE), "Invalid Generic HID endpoint size");
+    usb_init_endpoint(GENERIC_HID_ENDPOINT_NUM, GENERIC_ENDPOINT_TYPE, GENERIC_ENDPOINT_SIZE, GENERIC_ENDPOINT_FLAGS);
+#endif
+
+    //usb_reset_endpoints_1to(USB_MAX_ENDPOINT);
+}
+
+static INLINE void
+usb_configuration_changed() {
+    usb_clear_setup();
+    usb_init_endpoints();
+    usb_enable_interrupts(INT_START_OF_FRAME_FLAG);
 }
 
 bool
@@ -1013,29 +1034,20 @@ ISR(USB_COM_vect) {
 
     if ((type & USB_REQUEST_TYPE_MASK) == USB_REQUEST_TYPE_STANDARD) {
         if (request == USB_REQUEST_GET_DESCRIPTOR) {
-            const char *data = 0;
-            uint8_t desc_length;
+            const char *data;
+            uint8_t desc_length = usb_descriptor_length_and_data(value, index, &data);
 
-            for (i = 0; i < descriptor_count; ++i) {
-                if (pgm_read_word(&(descriptor_list[i].value)) != value) {
-                    continue;
-                }
-                if (pgm_read_word(&(descriptor_list[i].index)) != index) {
-                    continue;
-                }
-                data = pgm_read_ptr(&(descriptor_list[i].data));
-                desc_length = pgm_read_byte(&(descriptor_list[i].length));
-                break;
-            }
-            if (!data) {
+            if (!desc_length) {
                 // Descriptor not found
                 usb_stall();
                 usb_error = 'D';
                 return;
             }
 
+#if USB_STRINGS_STORED_AS_ASCII
             // 1 = string, 0 = data
             type = (index != 0 && MSB(value) == DESCRIPTOR_TYPE_STRING);
+#endif
 
             if (desc_length < length) {
                 length = desc_length;
@@ -1046,6 +1058,7 @@ ISR(USB_COM_vect) {
                 i = (length < ENDPOINT_0_SIZE) ? length : ENDPOINT_0_SIZE;
                 length -= i;
 
+#if USB_STRINGS_STORED_AS_ASCII
                 if (type) {
                     // String - convert ASCII to UTF-16 on the fly
 
@@ -1063,11 +1076,11 @@ ISR(USB_COM_vect) {
                         usb_tx(pgm_read_byte(data++));
                         usb_tx(0); // Upper byte of the UTF-16 string
                     }
-                } else {
-                    // Normal data, already in the correct format
-                    while (i--) {
-                        usb_tx(pgm_read_byte(data++));
-                    }
+                } else
+#endif
+                // Normal data, already in the correct format
+                while (i--) {
+                    usb_tx(pgm_read_byte(data++));
                 }
 
                 usb_flush_tx_in();
@@ -1112,9 +1125,9 @@ ISR(USB_COM_vect) {
         } else if (request == USB_REQUEST_SET_CONFIGURATION) {
             // Set configuration
             if ((type & USB_REQUEST_RECIPIENT_MASK) == USB_REQUEST_RECIPIENT_DEVICE) {
-                usb_init_endpoints();
                 if (value <= CONFIGURATIONS_COUNT) {
                     usb_configuration = value;
+                    usb_configuration_changed();
                 } else {
                     success = false;
                 }
@@ -1141,6 +1154,7 @@ ISR(USB_COM_vect) {
                         if (request == USB_REQUEST_CLEAR_FEATURE) {
                             usb_clear_stall();
                             usb_reset_endpoint(i);
+                            usb_reset_data_toggle();
                         } else {
                             usb_stall();
                         }
