@@ -63,7 +63,7 @@ void
 usb_keyboard_reset (void) {
     usb_keyboard_leds = 0;
     usb_keyboard_protocol = HID_PROTOCOL_REPORT;
-    usb_release_all_keys();
+    usb_keyboard_release_all_keys();
     usb_keyboard_updated = true;
 }
 
@@ -166,7 +166,7 @@ is_apple_virtual_pressed (const uint8_t key) {
 #endif
 
 void
-usb_release_all_keys (void) {
+usb_keyboard_release_all_keys (void) {
     for (int_fast8_t i = 0; i < MAX_KEY_ROLLOVER; ++i) {
         keys_buffer[i] = 0;
     }
@@ -361,7 +361,7 @@ usb_keyboard_type_debug_report (void) {
     extern int __heap_start, *__brkval;
     int free_bytes = ((int) &free_bytes) - (__brkval ? (int) __brkval : (int) &__heap_start);
 
-    usb_release_all_keys();
+    usb_keyboard_release_all_keys();
 
     (void) fprintf_P(
         usb_kbd_type,
@@ -378,7 +378,7 @@ usb_keyboard_type_debug_report (void) {
         usb_is_suspended() ? '!' : '@'
     );
 
-    usb_release_all_keys();
+    usb_keyboard_release_all_keys();
     usb_keys_modifier_flags = old_mods;
 }
 #endif

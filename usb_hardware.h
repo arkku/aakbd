@@ -53,6 +53,9 @@ bool usb_is_suspended(void);
 /// requested (in milliseconds).
 uint8_t usb_detach_requested(void);
 
+/// Wake up the USB host.
+bool usb_wake_up_host(void);
+
 /// The USB address of the device.
 uint8_t usb_address(void);
 

@@ -48,7 +48,7 @@ void usb_keyboard_press(const uint8_t key);
 void usb_keyboard_release(const uint8_t key);
 
 /// Release all keys and modifiers.
-void usb_release_all_keys(void);
+void usb_keyboard_release_all_keys(void);
 
 /// Send the current keyboard state to the USB host.
 bool usb_keyboard_send_report(void);

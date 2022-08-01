@@ -905,7 +905,7 @@ ISR(USB_COM_vect) {
 
 void
 usb_deinit (void) {
-    usb_release_all_keys();
+    usb_keyboard_release_all_keys();
     usb_keyboard_leds = 5;
     usb_keyboard_send_report();
     _delay_ms(8);

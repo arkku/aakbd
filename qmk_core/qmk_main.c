@@ -32,8 +32,24 @@
 #include "progmem.h"
 #include "suspend.h"
 
+#ifdef BACKLIGHT_ENABLE
+#include "backlight.h"
+#endif
+#ifdef HAPTIC_ENABLE
+#include "haptic.h"
+#endif
+#ifdef LED_MATRIX_ENABLE
+#include "led_matrix.h"
+#endif
+#ifdef RGB_MATRIX_ENABLE
+#include "rgb_matrix.h"
+#endif
+#ifdef ENCODER_ENABLE
+#include "encoder.h"
+#endif
+
 #define TIMER_NUM 1
-#include <avrtimer.h>
+#include <avrtimer.h> // TODO: Remove AVR dependency from this file
 
 #define STRIFY(a)           #a
 #define STR(a)              STRIFY(a)
@@ -61,6 +77,16 @@ ISR (TIMER_COMPA_VECTOR) {
 
 #define tick_is_due_at(count)   ((previous_tick - (count)) & 0x80U)
 
+static inline void
+switch_events (uint8_t row, uint8_t col, bool pressed) {
+#if defined(LED_MATRIX_ENABLE)
+    process_led_matrix(row, col, pressed);
+#endif
+#if defined(RGB_MATRIX_ENABLE)
+    process_rgb_matrix(row, col, pressed);
+#endif
+}
+
 static bool
 kbd_input (void) {
     static matrix_row_t previous_matrix[MATRIX_ROWS];
@@ -87,6 +113,7 @@ kbd_input (void) {
                         process_key(key, is_key_release);
                     }
                     previous_matrix[row] ^= column_bit;
+                    switch_events(row, column, !is_key_release);
                 }
             }
         }
@@ -110,9 +137,6 @@ suspend_power_down_quantum (void) {
     backlight_set(0);
 #endif
     led_suspend();
-#if defined(RGBLIGHT_SLEEP) && defined(RGBLIGHT_ENABLE)
-    rgblight_suspend();
-#endif
 #if defined(LED_MATRIX_ENABLE)
     led_matrix_set_suspend_state(true);
 #endif
@@ -130,17 +154,13 @@ suspend_wakeup_init_quantum (void) {
     // Restore LED indicators
     led_wakeup();
 
-// Wake up underglow
-#if defined(RGBLIGHT_SLEEP) && defined(RGBLIGHT_ENABLE)
-    rgblight_wakeup();
-#endif
-
 #if defined(LED_MATRIX_ENABLE)
     led_matrix_set_suspend_state(false);
 #endif
 #if defined(RGB_MATRIX_ENABLE)
     rgb_matrix_set_suspend_state(false);
 #endif
+
     suspend_wakeup_init_kb();
 }
 
@@ -154,12 +174,47 @@ keyboard_task (void) {
 
     (void) kbd_input();
 
+#if defined(RGBLIGHT_ENABLE)
+    rgblight_task();
+#endif
+
+#ifdef LED_MATRIX_ENABLE
+    led_matrix_task();
+#endif
+#ifdef RGB_MATRIX_ENABLE
+    rgb_matrix_task();
+#endif
+
+#if defined(BACKLIGHT_ENABLE)
+#if defined(BACKLIGHT_PIN) || defined(BACKLIGHT_PINS)
+    backlight_task();
+#endif
+#endif
+
+#ifdef ENCODER_ENABLE
+    (void) encoder_read();
+#endif
+#ifdef HAPTIC_ENABLE
+    haptic_task();
+#endif
+
     led_task();
 }
 
 static inline void
 protocol_task (void) {
-    keyboard_task();
+    if (usb_is_suspended()) {
+        while (usb_is_suspended()) {
+            suspend_power_down();
+            if (suspend_wakeup_condition()) {
+                usb_wake_up_host();
+                usb_keyboard_reset();
+                delay_milliseconds(200);
+            }
+        }
+        suspend_wakeup_init();
+    }
+
     usb_tick();
 }
 
@@ -174,6 +229,7 @@ main (void) {
 
     for (;;) {
         protocol_task();
+        keyboard_task();
     }
 }
 
@@ -195,7 +251,7 @@ shutdown_quantum (void) {
 
     timer_disable();
 
-    wait_ms(32);
+    delay_milliseconds(32);
 
 #ifdef HAPTIC_ENABLE
     haptic_shutdown();
@@ -205,17 +261,13 @@ shutdown_quantum (void) {
 void
 keyboard_reset (void) {
     keyboard_init();
-    wait_ms(32);
+    delay_milliseconds(32);
 }
 
 void
 jump_to_bootloader (void) {
     shutdown_quantum();
     bootloader_jump();
-}
-
-void
-matrix_setup() {
 }
 
 void
@@ -228,6 +280,18 @@ void
 matrix_scan_quantum() {
     matrix_scan_kb();
 }
+
+#ifdef ENCODER_ENABLE
+#ifdef ENCODER_MAP_ENABLE
+#error "Do not define ENCODER_MAP_ENABLE, see encoder_update_kb instead."
+#endif
+
+bool
+encoder_update_kb(uint8_t index, bool clockwise) {
+    // To support encoder, simulate keypress from here or implement _user:
+    return encoder_update_user(index, clockwise);
+}
+#endif
 
 uint8_t
 usb_keycode_for_matrix (const int8_t row, const int8_t column) {

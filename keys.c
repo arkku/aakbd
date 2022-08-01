@@ -860,7 +860,7 @@ reset_keys (void) {
     reset_layers();
     pending_release = 0;
 #endif
-    usb_release_all_keys();
+    usb_keyboard_release_all_keys();
 #if ENABLE_KEYLOCK
     keylock_key = 0;
 #endif
