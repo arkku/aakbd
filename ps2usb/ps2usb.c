@@ -574,6 +574,14 @@ jump_to_bootloader (void) {
     __asm volatile("jmp 0x7E00");
 }
 
+void
+usb_wake_up_interrupt (void) {
+}
+
+void
+usb_suspend_interrupt (void) {
+}
+
 #include "generic_hid.h"
 #if ENABLE_GENERIC_HID_ENDPOINT
 

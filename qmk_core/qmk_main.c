@@ -203,19 +203,36 @@ keyboard_task (void) {
 
 static inline void
 protocol_task (void) {
+#ifndef NO_USB_STARTUP_CHECK
     if (usb_is_suspended()) {
         while (usb_is_suspended()) {
             suspend_power_down();
             if (suspend_wakeup_condition()) {
-                usb_wake_up_host();
-                usb_keyboard_reset();
-                delay_milliseconds(200);
+                if (usb_wake_up_host()) {
+                    usb_keyboard_reset();
+                    delay_milliseconds(200);
+                }
             }
         }
         suspend_wakeup_init();
     }
+#endif
 
     usb_tick();
+}
+
+void
+usb_wake_up_interrupt (void) {
+#ifdef NO_USB_STARTUP_CHECK
+    suspend_wakeup_init();
+#endif
+}
+
+void
+usb_suspend_interrupt (void) {
+#ifdef NO_USB_STARTUP_CHECK
+    suspend_power_down();    
+#endif
 }
 
 int
@@ -271,13 +288,13 @@ jump_to_bootloader (void) {
 }
 
 void
-matrix_init_quantum() {
+matrix_init_quantum (void) {
     reset_keys();
     matrix_init_kb();
 }
 
 void
-matrix_scan_quantum() {
+matrix_scan_quantum (void) {
     matrix_scan_kb();
 }
 

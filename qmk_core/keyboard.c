@@ -79,9 +79,6 @@ void keyboard_init(void) {
 #ifdef ENCODER_ENABLE
     encoder_init();
 #endif
-#ifdef SLEEP_LED_ENABLE
-    sleep_led_init();
-#endif
 
     keyboard_post_init_kb(); /* Always keep this last */
 }

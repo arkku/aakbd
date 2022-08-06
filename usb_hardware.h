@@ -59,4 +59,10 @@ bool usb_wake_up_host(void);
 /// The USB address of the device.
 uint8_t usb_address(void);
 
+/// Called when USB wakes up.
+void usb_wake_up_interrupt(void);
+
+/// Called when USB is suspended.
+void usb_suspend_interrupt(void);
+
 #endif

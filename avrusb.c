@@ -44,10 +44,8 @@
 #define USB_STATUS_JUMP_TO_BOOTLOADER   (1 << 7)
 
 #define ENDPOINT_0_FLAGS            EP_SINGLE_BUFFER
-
 #define KEYBOARD_ENDPOINT_FLAGS     EP_DOUBLE_BUFFER
 #define KEYBOARD_ENDPOINT_TYPE      EP_TYPE_INTERRUPT_IN
-
 #define GENERIC_ENDPOINT_FLAGS      EP_SINGLE_BUFFER
 #define GENERIC_ENDPOINT_TYPE       EP_TYPE_INTERRUPT_IN
 
@@ -587,11 +585,13 @@ ISR(USB_GEN_vect) {
         usb_disable_interrupts(INT_WAKE_UP_FLAG);
         usb_enable_interrupts(INT_SUSPEND_FLAG);
         usb_suspended = false;
+        usb_wake_up_interrupt();
         usb_clear_interrupts(INT_WAKE_UP_FLAG);
     } else if (intflags & INT_SUSPEND_FLAG) {
         usb_disable_interrupts(INT_SUSPEND_FLAG);
         usb_enable_interrupts(INT_WAKE_UP_FLAG);
         usb_suspended = true;
+        usb_suspend_interrupt();
         usb_clear_interrupts(INT_SUSPEND_FLAG | INT_WAKE_UP_FLAG);
     }
 }
