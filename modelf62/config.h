@@ -67,9 +67,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #error "Solenoid support has not been ported to AAKBD (yet?)."
 #endif
 
+#ifndef LED_NUM_LOCK_PIN
 #define LED_NUM_LOCK_PIN B4
+#endif
+#ifndef LED_CAPS_LOCK_PIN
 #define LED_CAPS_LOCK_PIN B5
+#endif
+#ifndef LED_SCROLL_LOCK_PIN
 //#define LED_SCROLL_LOCK_PIN B6
+#endif
 
 // Uncomment below if the leds are on when the pin is driving zero:
 //#define LED_NUM_LOCK_ACTIVE_LOW
