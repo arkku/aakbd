@@ -59,6 +59,7 @@ uint8_t usb_keycode_for_matrix(const int8_t row, const int8_t column);
 #define KC_RBRC USB_KEY_CLOSE_BRACKET
 #define KC_SCLN USB_KEY_SEMICOLON
 #define KC_LGUI USB_KEY_LEFT_CMD
+#define KC_RGUI USB_KEY_RIGHT_CMD
 #define KC_APP  USB_KEY_MENU
 #define KC_MINS USB_KEY_DASH
 #define KC_BSLS USB_KEY_BACKSLASH
