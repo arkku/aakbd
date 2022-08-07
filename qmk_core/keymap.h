@@ -112,5 +112,7 @@ uint8_t usb_keycode_for_matrix(const int8_t row, const int8_t column);
 #define KC_NLCK     USB_KEY_NUM_LOCK
 #define KC_NUBS     USB_KEY_INT_NEXT_TO_LEFT_SHIFT
 #define KC_NUHS     USB_KEY_INT_NEXT_TO_RETURN
-
+#define KC_INT3     USB_KEY_INT_LEFT_OF_BACKSPACE
+#define KC_INT4     USB_KEY_KANJI
+#define KC_INT5     USB_KEY_HIRAGANA
 #endif

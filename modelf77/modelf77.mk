@@ -3,3 +3,5 @@ PRODUCT ?= "F77 Keyboard"
 DEBOUNCE ?= 5
 
 include $(DEVICE)/modelf-common.mk
+
+DEVICE_FLAGS += -DMODELF=77

@@ -5,3 +5,5 @@ DEBOUNCE ?= 5
 vpath modelf.c modelf77
 
 include modelf77/modelf-common.mk
+
+DEVICE_FLAGS += -DMODELF=62

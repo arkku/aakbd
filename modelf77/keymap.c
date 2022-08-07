@@ -44,6 +44,7 @@
 #endif
 
 #if SPLIT_BACKSPACE
+//#define K_BSPL  KC_INT3
 #define K_BSPL  KC_GRV
 #else
 #define K_BSPL  KC_NO
@@ -67,9 +68,9 @@
 
 #if ISO_ENTER
 #if SPLIT_ENTER
-#define K_USBS  KC_NO
-#else
 #define K_USBS  KC_BSLS
+#else
+#define K_USBS  KC_NO
 #endif
 #if BA_ENTER
 #define K_ISOH  KC_NO

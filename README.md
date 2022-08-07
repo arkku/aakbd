@@ -50,12 +50,14 @@ on a positional matrix. So, for any keyboard that has some kind of natural
 naming/mapping for the keys, remapping is simply a listing of the differences,
 rather than a set of complete layers with all positions listed.
 
-Currently this repository contains two implementations:
+Currently this repository contains three implementations:
 * A PS/2 to USB keyboard converter (which I made to convert an IBM Model
   M keyboard to USB, but it should work with any PS/2 keyboard)
 * An alternative firmware for the OG [ErgoDox Ez](https://ergodox-ez.com)
   (which I happen to have from an old job, and decided to port as a proof of
   concept that this engine is reusable)
+* An alternative firmware for the [Brand New Model F Keyboards](https://www.modelfkeyboards.com/)
+  (F77 and F62), split into the `modelf77` and `modelf62` directories
 
 ~ [Kimmo Kulovesi](https://arkku.dev/), 2021-10-10
 
@@ -67,10 +69,8 @@ something other than USB, but apart from that there is no additional hardware
 required beyond the oscillator and components required for the USB connector.
 It is probably simplest to buy a pre-made breakout board with these components.
 
-I have also tested with an ATMEGA32U2 that the keyboard shows up in the list
-of USB devices, but I have not actually hooked up a keyboard to one. Porting
-to other AVR devices should be relatively simple, and most of that code is
-in [avrusb.h](avrusb.h).
+It also works on the ATMEGA32U2 found in the Model F keyboards' xwhatsit
+controller (wcass version).
 
 An ISP programming device is needed unless the microcontroller is already set
 up with a bootloader.
@@ -82,6 +82,15 @@ For ErgoDox Ez, you need the original version of the keyboard. It contains an
 ATMEGA32U4 using the Halfkay bootloader. You can simply flash the hex file
 after compiling with `DEVICE=ergodox`. See the
 [ErgoDox Ez firmware README](ergodox/README.md) for details.
+
+For Model F keyboards, this has only been tested with the last USB-C versions
+of the keyboards (both F77 and F62).
+<kbd>Fn</kbd>+<kbd>Space</kbd>+<kbd>R</kbd> may work to reset the keyboard,
+or you can power it up while shorting the programming pads (but they are
+inconviently located on the "inner" side of the PCB, so you probably need to
+unscrew the board). You can flash the hex file using the same tools as you
+would for the original firmware. I recommend enabling the DFU interface so
+the keyboard can be reset through that in case something goes wrong.
 
 ## Software Requirements
 

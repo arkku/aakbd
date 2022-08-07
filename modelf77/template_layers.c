@@ -66,8 +66,17 @@ DEFINE_LAYER(1) {
     [KEY(CAPS_LOCK)] = CMD_OR(ESC),
 
     // Apple arrangement for modifiers
-    [KEY(LEFT_WIN)] = KEY(ALT_GR),
+    [KEY(LEFT_WIN)] = KEY(ALT),
     [KEY(LEFT_ALT)] = KEY(LEFT_CMD),
+
+#if SPLIT_BACKSPACE
+    [KEY(BACKTICK)] = KEY(BACKSPACE),
+    [KEY(BACKSPACE)] = KEY(DELETE),
+#endif
+
+#if ISO_ENTER && SPLIT_ENTER
+    [KEY(ANSI_BACKSLASH)] = KEY(KP_ENTER),
+#endif
 
 #if RIGHT_MODIFIERS_ARE_ARROWS
     [KEY(RIGHT_SHIFT)] = KEY(UP_ARROW),
@@ -249,7 +258,12 @@ DEFINE_LAYER(APPLE_FN_LAYER) {
     [KEY(EQUALS)] = KEY(F12),
 
     // Convenience shortcuts
+#if SPLIT_BACKSPACE
+    [KEY(BACKSPACE)] = KEY(NUM_LOCK),
+    [KEY(BACKTICK)] = KEY(DELETE),
+#else
     [KEY(BACKSPACE)] = KEY(DELETE),
+#endif
 
     [KEY(Q)] = KEY(HOME),
     [KEY(W)] = KEY(UP_ARROW),
@@ -363,6 +377,10 @@ DEFINE_LAYER(WINDOWS_FN_LAYER) {
 
     [KEY(LEFT_WIN)] = KEY(LEFT_WIN),
     [KEY(LEFT_ALT)] = KEY(LEFT_ALT),
+
+#if SPLIT_BACKSPACE
+    [KEY(BACKSPACE)] = KEY(INSERT),
+#endif
 
 #if DVORAK_MAPPINGS
     [KEY(T)] = CTRL(DVORAK_OPEN_BRACKET),
