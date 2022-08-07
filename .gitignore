@@ -4,6 +4,8 @@
 *.elf
 *.a
 *~
+*/keymap_custom.c
+*/keymap_*.c
 local.mk
 layers.c
 macros.c

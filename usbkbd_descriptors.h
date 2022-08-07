@@ -4,29 +4,42 @@
 #include <stdint.h>
 
 #include "usb.h"
-#include "usbkbd.h"
+#include "usbkbd_config.h"
 #include "progmem.h"
 
 // MARK: - Configuration
 
+#if APPLE_FN_IS_MODIFIER
+#define APPLE_BYTES_IN_REPORT ENABLE_EXTRA_APPLE_KEYS
+#else
+#define APPLE_BYTES_IN_REPORT ENABLE_APPLE_FN_KEY
+#endif
+
+#ifndef RESERVE_BOOT_PROTOCOL_RESERVED_BYTE
 #if USE_MULTIPLE_REPORTS
 #define RESERVE_BOOT_PROTOCOL_RESERVED_BYTE 0
-#elif !ENABLE_APPLE_FN_KEY
-#if USB_MAX_KEY_ROLLOVER > USB_BOOT_PROTOCOL_ROLLOVER
+#elif APPLE_BYTES_IN_REPORT
+#if USB_MAX_KEY_ROLLOVER >= USB_BOOT_PROTOCOL_ROLLOVER
 #define RESERVE_BOOT_PROTOCOL_RESERVED_BYTE 0
 #endif
-#elif USB_MAX_KEY_ROLLOVER >= USB_BOOT_PROTOCOL_ROLLOVER
+#elif USB_MAX_KEY_ROLLOVER > USB_BOOT_PROTOCOL_ROLLOVER
 #define RESERVE_BOOT_PROTOCOL_RESERVED_BYTE 0
-#endif
-#ifndef RESERVE_BOOT_PROTOCOL_RESERVED_BYTE
+#else
 // If we don't exceed the boot protocol report size, the boot protocol
 // reserved byte is kept as zero. Otherwise we can claim it to use for the
 // last key, which should be fine since it will be zero unless we are at
 // maximum rollover.
 #define RESERVE_BOOT_PROTOCOL_RESERVED_BYTE 1
 #endif
+#endif
 
-#define KEYBOARD_REPORT_SIZE        (1 + RESERVE_BOOT_PROTOCOL_RESERVED_BYTE + USB_MAX_KEY_ROLLOVER + ENABLE_APPLE_FN_KEY)
+#if RESERVE_BOOT_PROTOCOL_RESERVED_BYTE || APPLE_BYTES_IN_REPORT
+#define KEY_IN_RESERVED_BYTE 0
+#else
+#define KEY_IN_RESERVED_BYTE 1
+#endif
+
+#define KEYBOARD_REPORT_SIZE        (1 + RESERVE_BOOT_PROTOCOL_RESERVED_BYTE + USB_MAX_KEY_ROLLOVER + APPLE_BYTES_IN_REPORT)
 
 #if KEYBOARD_REPORT_SIZE <= 8
 #define KEYBOARD_ENDPOINT_SIZE      8

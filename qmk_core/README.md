@@ -21,3 +21,35 @@ unless you happen to be of the very small minority that actually prefers to
 define their keyboard by writing custom C code. In that case, AAKBD _may_ be
 easier to start developing with, specifically because it is not as full of
 features to begin with.
+
+
+Porting Keyboards
+-----------------
+
+To port a QMK keyboard to AAKBD, first you need to check that it uses an AVR
+controller (preferably ATMEGA32U4 or ATMEGA32U2, but others may work). Other
+controllers have not (yet) been ported, so the USB implementation won't work.
+In theory you could reimplement the entire `avrusb.c`, but for now let's assume
+AVR.
+
+The makefile (e.g., `mykeyboard.mk`) should have at least the following:
+
+``` Make
+QMK_PLATFORM = avr
+include qmk_core/qmk_port.mk
+
+DEVICE_OBJS = mykeyboard.o avrusb.o $(QMK_CORE_OBJS)
+```
+
+Then you need to port these files from QMK:
+
+* `config.h` – the keyboard hardware configuration (you probably need some
+  changes to disable things that are not used by AAKBD)
+* `matrix.c` – ideally it should work without changes
+* `keymap.c` – this needs to be created specifically for AAKBD: you must define
+  only a single layer that has a _unique_ plain keycode (i.e., no commands
+  or macros) for every key
+* `layers.c` – use this to remap keys as desired, using the keycodes from
+  `keymap.c` as the basis (which is why they have to be unique)
+
+I recommend looking at `ergodox` and `modelf77` for examples. Good luck!

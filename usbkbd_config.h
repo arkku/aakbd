@@ -166,15 +166,39 @@
 #define ENABLE_APPLE_FN_KEY 0
 #endif
 #endif
+#if !ENABLE_APPLE_FN_KEY
+#undef APPLE_FN_IS_MODIFIER
+#define APPLE_FN_IS_MODIFIER 0
+#endif
+#ifndef APPLE_FN_IS_MODIFIER
+/// If you don't need the right command key, Apple Fn can be placed there,
+/// which allows using it like a modifier. This means that you don't have to
+/// use the `USB_KEY_VIRTUAL_APPLE_FN` anymore, and can instead use the "real"
+/// key `USB_KEY_APPLE_FN` (which has the same keycode as right Cmd/Win).
+#define APPLE_FN_IS_MODIFIER 0
+#endif
 #if ENABLE_APPLE_FN_KEY && !defined(ENABLE_EXTRA_APPLE_KEYS)
+#if APPLE_FN_IS_MODIFIER
+/// If Apple Fn is a modifier, we don't need an extra byte in the report.
+#define ENABLE_EXTRA_APPLE_KEYS 0
+#else
 /// Instead of wasting 7 bits on padding for the Apple Fn key, it seems to
 /// be ok to combine it with other Apple keys. This can be disabled, though,
 /// if there are compatibility issues (e.g., with older OS X versions).
 #define ENABLE_EXTRA_APPLE_KEYS 1
 #endif
+#endif
+
+#if ENABLE_APPLE_FN_KEY && APPLE_FN_IS_MODIFIER
+/// Repurpose the last modifier (right command) to be Apple Fn.
+#define USB_KEY_APPLE_FN    MODIFIERS_END
+#define APPLE_FN_BIT        MODIFIER_BIT(USB_KEY_APPLE_FN)
+#endif
+
 #if !ENABLE_SIMULATED_TYPING && ENABLE_DEBUG_SHORTCUT
 #error "ENABLE_DEBUG_SHORTCUT requires ENABLE_SIMULATED_TYPING"
 #endif
+
 #ifndef ENABLE_DFU_INTERFACE
 /// Enable the DFU interface? This has very low use of resources and allows
 /// resetting the device into bootloader mode easily, so this is recommended
@@ -185,7 +209,9 @@
 
 #ifndef ENABLE_KEYBOARD_ENDPOINT
 /// For debugging only: allows disabling the keyboard USB endpoint, which
-/// kind of defeats the purpose of a USB keyboard.
+/// kind of defeats the purpose of a USB keyboard. Perhaps in the future this
+/// might be useful if the keyboard data is sent over PS/2 and USB exists for
+/// debugging and firmware updates only.
 #define ENABLE_KEYBOARD_ENDPOINT    1
 #endif
 

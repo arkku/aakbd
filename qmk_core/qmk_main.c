@@ -27,10 +27,12 @@
 
 #include "quantum.h"
 #include "qmk_port.h"
-#include "bootloader.h"
 #include "keyboard.h"
-#include "progmem.h"
-#include "suspend.h"
+
+#include <progmem.h>
+#include "platforms/bootloader.h"
+#include "platforms/timer.h"
+#include "platforms/suspend.h"
 
 #ifdef BACKLIGHT_ENABLE
 #include "backlight.h"
@@ -48,9 +50,6 @@
 #include "encoder.h"
 #endif
 
-#define TIMER_NUM 1
-#include <avrtimer.h> // TODO: Remove AVR dependency from this file
-
 #define STRIFY(a)           #a
 #define STR(a)              STRIFY(a)
 
@@ -58,24 +57,14 @@
 const char KEYBOARD_FILENAME[] = STR(KEYBOARD_NAME)".c";
 #endif
 
-#define TICKS_PER_SECOND    (F_CPU / 1024UL)
-#define TICKS_PER_10MS      ((TICKS_PER_SECOND / 100UL) + (((TICKS_PER_SECOND % 100UL) >= 50UL) ? 1UL : 0UL)
+#define TICKS_PER_10MS      10
 
-static volatile uint8_t tick_10ms_count = 0;
-static uint8_t previous_tick;
+static uint16_t previous_tick_count;
 
 uint8_t
 current_10ms_tick_count (void) {
-    return tick_10ms_count;
+    return timer_read() / TICKS_PER_10MS;
 }
-
-// A state that changes over time, can be used to blink LEDs.
-// This fires approx. once per 10 ms, i.e., 100 times per second
-ISR (TIMER_COMPA_VECTOR) {
-    ++tick_10ms_count;
-}
-
-#define tick_is_due_at(count)   ((previous_tick - (count)) & 0x80U)
 
 static inline void
 switch_events (uint8_t row, uint8_t col, bool pressed) {
@@ -125,7 +114,7 @@ static void
 protocol_init (void) {
     protocol_pre_init();
     usb_init();
-    previous_tick = tick_10ms_count - 1;
+    previous_tick_count = timer_read();
     protocol_post_init();
 }
 
@@ -166,10 +155,10 @@ suspend_wakeup_init_quantum (void) {
 
 static inline void
 keyboard_task (void) {
-    const uint8_t now = tick_10ms_count;
-    if (tick_is_due_at(now)) {
-        keys_tick(now);
-        previous_tick = now;
+    const uint16_t now = timer_read();
+    if (TIMER_DIFF_FAST(now, previous_tick_count) >= 10) {
+        previous_tick_count = now;
+        keys_tick(now / TICKS_PER_10MS);
     }
 
     (void) kbd_input();
@@ -265,8 +254,6 @@ shutdown_quantum (void) {
     // Also stop I2C if we are using it
     i2c_stop();
 #endif
-
-    timer_disable();
 
     delay_milliseconds(32);
 

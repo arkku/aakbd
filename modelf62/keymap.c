@@ -11,7 +11,8 @@
 // rather than editing these keymaps. That being said, if your keys all have
 // unique keycaps, it may make sense to edit the layout here to match those.
 // But keep in mind that this file is included in the Git repository, so
-// updating that may overwrite your local changes.
+// updating that may overwrite your local changes. You can use
+// `keymap_custom.c` to do local variant.
 //
 // Make sure to define the correct layout parameters for your used keys!
 // Defining unused keys here may make calibration worse since flipperless

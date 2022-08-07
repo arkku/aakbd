@@ -1,6 +1,7 @@
 QMK_DIR = qmk_core
 QMK_PLATFORMS_DIR = $(QMK_DIR)/platforms
 PLATFORM_DIR = $(QMK_PLATFORMS_DIR)/$(QMK_PLATFORM)
+DEBOUNCE_TYPE ?= sym_defer_g
 
 KEYBOARD_NAME ?= $(DEVICE)
 
@@ -14,8 +15,21 @@ vpath %.h $(QMK_DIR) $(QMK_PLATFORMS_DIR)
 COMMON_HEADERS += config.h config_common.h pin_defs.h _pin_defs.h quantum.h platform_deps.h wait.h _wait.h matrix.h timer.h _timer.h gpio.h bitwise.h print.h util.h $(QMK_PLATFORM)/gpio.h eeconfig.h
 COMMON_HEADERS += $(wildcard local.mk) $(wildcard $(DEVICE)/local.mk)
 
-$(BUILDDIR)/qmk_main.o: keys.h led.h aakbd.h usb_hardware.h usbkbd.h usbkbd_config.h keyboard.h keymap.h qmk_port.h progmem.h suspend.h $(COMMON_HEADERS)
+ifneq (,$(CUSTOM_KEYMAP))
+KEYMAP_FILE = keymap_$(CUSTOM_KEYMAP)
+else
+ifneq (,$(wildcard $(DEVICE)/keymap_custom.c))
+KEYMAP_FILE = keymap_custom
+else
+KEYMAP_FILE = keymap
+endif
+endif
 
+QMK_CORE_OBJS = keyboard.o led.o $(QMK_PLATFORM).o qmk_main.o $(KEYMAP_FILE).o matrix_common.o matrix.o timer.o bitwise.o suspend.o suspend_core.o $(BOOTLOADER_TYPE).o $(DEBOUNCE_TYPE).o platform.o
+
+$(BUILDDIR)/qmk_main.o: keys.h led.h aakbd.h usb_hardware.h usbkbd.h usbkbd_config.h keyboard.h keymap.h qmk_port.h progmem.h suspend.h timer.h $(COMMON_HEADERS)
+
+$(BUILDDIR)/$(KEYMAP_FILE).o: keymap.h
 $(BUILDDIR)/keyboard.o: keyboard.h led.h $(COMMON_HEADERS)
 $(BUILDDIR)/led.o: keys.h led.h debug.h host.h $(COMMON_HEADERS)
 $(BUILDDIR)/matrix.o: matrix.h debounce.h debug.h action_layer.h $(COMMON_HEADERS)

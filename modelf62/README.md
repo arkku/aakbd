@@ -14,21 +14,40 @@ You probably also want to define the key layout with the following defines
 
 ``` Make
 # local.mk
-ISO_LAYOUT = 1
-SPLIT_BACKSPACE = 1
-SPLIT_RIGHT_SHIFT = 1
-SPLIT_ENTER = 0
-SHORT_SPACE = 0
+ISO_LAYOUT ?= 1
+SPLIT_RIGHT_SHIFT ?= 1
+SPLIT_BACKSPACE ?= 1
+SHORT_SPACE ?= 0
+SPLIT_ENTER ?= 0
+RIGHT_MODIFIERS_ARE_ARROWS ?= 0 # Only affects layers.c from the template
+
+DEVICE_FLAGS += -DENABLE_DFU_INTERFACE=1
+DEVICE_FLAGS += -DRIGHT_MODIFIERS_ARE_ARROWS=$(RIGHT_MODIFIERS_ARE_ARROWS)
 ```
 
 If `ISO_LAYOUT` is `0`, then ANSI layout is used. If a split is `0`, then that
 key is not split. Short space splits on the right.
 
+You can also configure `SPLIT_LEFT_SHIFT` and `ISO_ENTER` independently of
+the `ISO_LAYOUT` setting, but by default both are controlled by that.
+
 You can also experiment with the pandrew QMK firmware utility that _may_ be
 compatible with this (unknown). For that, add the following to your `local.mk`:
 
 ``` Make
-DEVICE_FLAGS += -DENABLE_GENERIC_HID_ENDPOINT=1 -DENABLE_DFU_INTERFACE=1
+DEVICE_FLAGS += -DENABLE_GENERIC_HID_ENDPOINT=1
+```
+
+The `template_layers.c` goes together with `modelf77/template_macros.c`.
+
+# Uploading
+
+To upload the firmware, you can use the same tools as originally. Once you have
+AAKBD firmware installed, and `-DENABLE_DFU_INTERFACE=1` enabled, you can also
+use `dfu-util` and `dfu-programmer` to automate further:
+
+``` sh
+dfu-util -e && sleep 2 && dfu-programmer atmega32u2 erase && dfu-programmer atmega32u2 flash modelf62.hex && dfu-programmer atmega32u2 launch
 ```
 
 ## Note

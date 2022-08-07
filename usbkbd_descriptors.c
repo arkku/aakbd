@@ -57,6 +57,8 @@ static const uint8_t PROGMEM device_qualifier_descriptor[DESCRIPTOR_SIZE_DEVICE_
 };
 #endif
 
+#define HID_KEYBOARD_REPORT_KEY_ARRAY(rollover)         \
+
 /// HID descriptor for the keyboard (boot protocol compatible).
 static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
     HID_USAGE_PAGE,         HID_USAGE_PAGE_GENERIC_DESKTOP,
@@ -70,11 +72,11 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
     // Modifier keys
     HID_USAGE_PAGE,         HID_USAGE_PAGE_KEYCODES,
     HID_USAGE_MINIMUM,      MODIFIERS_START,
-    HID_USAGE_MAXIMUM,      MODIFIERS_END,
+    HID_USAGE_MAXIMUM,      MODIFIERS_END - APPLE_FN_IS_MODIFIER,
     HID_LOGICAL_MINIMUM,    0,
     HID_LOGICAL_MAXIMUM,    1,
     HID_REPORT_SIZE,        1,
-    HID_REPORT_COUNT,       MODIFIER_COUNT, // unusual order... cargo cult
+    HID_REPORT_COUNT,       MODIFIER_COUNT - APPLE_FN_IS_MODIFIER,
     HID_INPUT,              HID_IO_VARIABLE,
 
 #if RESERVE_BOOT_PROTOCOL_RESERVED_BYTE
@@ -94,35 +96,10 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
     HID_INPUT,              HID_IO_CONSTANT,
 #endif
 
-    // LEDs
-    HID_REPORT_COUNT,       LED_COUNT,
-    HID_REPORT_SIZE,        1,
-    HID_USAGE_PAGE,         HID_USAGE_PAGE_LEDS,
-    HID_USAGE_MINIMUM,      1,
-    HID_USAGE_MAXIMUM,      LED_COUNT,
-    HID_OUTPUT,             HID_IO_VARIABLE,
-
-    // Pad LEDs to 8 bits
-#if LED_COUNT < 8
-    HID_REPORT_COUNT,       1,
-    HID_REPORT_SIZE,        8 - LED_COUNT,
-    HID_OUTPUT,             HID_IO_CONSTANT,
-#endif
-
-    // Keys
-    HID_REPORT_COUNT,       USB_MAX_KEY_ROLLOVER,
-    HID_REPORT_SIZE,        8, // one byte per key
-    HID_LOGICAL_MINIMUM,    0x00,
-    HID_LOGICAL_MAXIMUM,    0xFF,
-    HID_USAGE_PAGE,         HID_USAGE_PAGE_KEYCODES,
-    HID_USAGE_MINIMUM,      0x00,
-    HID_USAGE_MAXIMUM,      0xFF,
-    HID_INPUT,              HID_IO_ARRAY,
-
 #if ENABLE_APPLE_FN_KEY
     HID_LOGICAL_MINIMUM,    0,
     HID_LOGICAL_MAXIMUM,    1,
-#if ENABLE_EXTRA_APPLE_KEYS
+#if ENABLE_EXTRA_APPLE_KEYS || APPLE_FN_IS_MODIFIER
     HID_REPORT_SIZE,        1,
 #else
     HID_REPORT_SIZE,        8,
@@ -132,6 +109,11 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
     HID_USAGE,              HID_USAGE_APPLE_FN_KEY,
     HID_INPUT,              HID_IO_VARIABLE,
 #if ENABLE_EXTRA_APPLE_KEYS
+#if APPLE_FN_IS_MODIFIER
+    HID_REPORT_COUNT,       1,
+    HID_REPORT_SIZE,        1,
+    HID_INPUT,              HID_IO_CONSTANT,
+#endif
     HID_LOGICAL_MINIMUM,    0,
     HID_LOGICAL_MAXIMUM,    1,
     HID_REPORT_SIZE,        1,
@@ -152,9 +134,34 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
     HID_USAGE,              HID_USAGE_APPLE_EXPOSE_DESKTOP,
     HID_INPUT,              HID_IO_VARIABLE,
 #endif // ENABLE_EXTRA_APPLE_KEYS
-#endif // ENABLE_APPLE_FN_KEY
+#endif // ^ ENABLE_APPLE_FN_KEY
 
-    HID_END_COLLECTION,
+    // LEDs
+    HID_REPORT_COUNT,       LED_COUNT,
+    HID_REPORT_SIZE,        1,
+    HID_USAGE_PAGE,         HID_USAGE_PAGE_LEDS,
+    HID_USAGE_MINIMUM,      1,
+    HID_USAGE_MAXIMUM,      LED_COUNT,
+    HID_OUTPUT,             HID_IO_VARIABLE,
+
+    // Pad LEDs to 8 bits
+#if LED_COUNT < 8
+    HID_REPORT_COUNT,       1,
+    HID_REPORT_SIZE,        8 - LED_COUNT,
+    HID_OUTPUT,             HID_IO_CONSTANT,
+#endif
+
+    // Keys
+    HID_REPORT_COUNT,       USB_MAX_KEY_ROLLOVER,
+    HID_REPORT_SIZE,        8,
+    HID_LOGICAL_MINIMUM,    0x00,
+    HID_LOGICAL_MAXIMUM,    0xFF,
+    HID_USAGE_PAGE,         HID_USAGE_PAGE_KEYCODES,
+    HID_USAGE_MINIMUM,      0x00,
+    HID_USAGE_MAXIMUM,      0xFF,
+    HID_INPUT,              HID_IO_ARRAY,
+
+    HID_END_COLLECTION
 };
 
 #if ENABLE_GENERIC_HID_ENDPOINT
@@ -461,7 +468,7 @@ usb_descriptor_length_and_data (const uint16_t value, const uint16_t index, cons
     return 0;
 }
 
-#if (USB_MAX_KEY_ROLLOVER + ENABLE_APPLE_FN_KEY) < USB_BOOT_PROTOCOL_ROLLOVER
+#if (USB_MAX_KEY_ROLLOVER + APPLE_BYTES_IN_REPORT) < USB_BOOT_PROTOCOL_ROLLOVER
 #error "USB_MAX_KEY_ROLLOVER must be at least 6 (or 5 with ENABLE_APPLE_FN_KEY)"
 #endif
 #if MAX_KEY_ROLLOVER < USB_MAX_KEY_ROLLOVER
@@ -469,4 +476,7 @@ usb_descriptor_length_and_data (const uint16_t value, const uint16_t index, cons
 #endif
 #if ENABLE_APPLE_FN_KEY && USB_VENDOR_ID != USB_VENDOR_ID_APPLE
 #error "USB_VENDOR_ID must be USB_VENDOR_ID_APPLE for ENABLE_APPLE_FN_KEY"
+#endif
+#if APPLE_FN_IS_MODIFIER && RESERVE_BOOT_PROTOCOL_RESERVED_BYTE
+#error "APPLE_FN_IS_MODIFIER is not compatible with RESERVE_BOOT_PROTOCOL_RESERVED_BYTE"
 #endif

@@ -11,7 +11,7 @@ QMK_PLATFORM = avr
 BOOTLOADER_TYPE = halfkay
 include qmk_core/qmk_port.mk
 
-DEVICE_OBJS = avrusb.o keyboard.o qmk_main.o ergodox_ez.o matrix.o keymap.o i2c_master.o matrix_common.o timer.o bitwise.o led.o suspend.o suspend_core.o eeconfig.o platform.o $(QMK_PLATFORM).o $(BOOTLOADER_TYPE).o $(DEBOUNCE_TYPE).o
+DEVICE_OBJS = ergodox_ez.o avrusb.o $(QMK_CORE_OBJS) i2c_master.o eeconfig.o
 DEVICE_FLAGS += -DBOOTLOADER_HALFKAY -DBOOTLOADER_SIZE=512 -DENABLE_I2C=1
 DEVICE_FLAGS += -DGENERIC_HID_REPORT_SIZE=22 -DGENERIC_HID_FEATURE_SIZE=2
 

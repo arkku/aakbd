@@ -437,7 +437,9 @@ typedef uint16_t keycode_t;
 #define KEY_EXT_RESET_LAYERS        EXTENDED(RESET_LAYERS)
 
 /// The Apple Fn key. To enable this you need to use Apple's USB vendor id
-/// and define `ENABLE_APPLE_FN_KEY`.
+/// and define `ENABLE_APPLE_FN_KEY`. Note that you can make Apple Fn
+/// non-virtual by setting `APPLE_FN_IS_MODIFIER=1`, in which case you can
+/// use it as a modifier that replaces the right command key.
 #define KEY_APPLE_FN                USB_KEY_VIRTUAL_APPLE_FN
 
 // MARK: - Advanced Keycodes
@@ -651,6 +653,11 @@ enum extended_keycode {
 #define MODS_CTRL_ALT_CMD_SHIFT         (MODS_CTRL | MODS_ALT | MODS_CMD | MODS_SHIFT)
 #define MODS_HYPER                      MODS_CTRL_ALT_CMD_SHIFT
 #define MODS_MEH                        MODS_CTRL_ALT_SHIFT
+
+#ifdef APPLE_FN_BIT
+#define MODS_APPLE_FN                   MODS_FOR_KEY(APPLE_FN_BIT)
+#define APPLE_FN(key)                   (MODS_APPLE_FN | KEY(key))
+#endif
 
 #define PASTE_(a, b)        a##b
 #define PASTE(a, b)         PASTE_(a, b)

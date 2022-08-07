@@ -18,6 +18,8 @@
  */
 
 #include <stdio.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 #define USB_KEYBOARD_ACCESS_STATE 1
 #include "usbkbd.h"
@@ -143,6 +145,11 @@ void
 press_apple_virtual (const uint8_t key) {
     if (IS_APPLE_VIRTUAL(key)) {
         usb_keys_extended_flags |= APPLE_VIRTUAL_BIT(key);
+#if APPLE_FN_IS_MODIFIER
+        if (key == USB_KEY_VIRTUAL_APPLE_FN) {
+            usb_keyboard_add_modifiers(APPLE_FN_BIT);
+        }
+#endif
         usb_keyboard_updated = true;
     }
 }
@@ -151,6 +158,11 @@ void
 release_apple_virtual (const uint8_t key) {
     if (IS_APPLE_VIRTUAL(key)) {
         usb_keys_extended_flags &= ~APPLE_VIRTUAL_BIT(key);
+#if APPLE_FN_IS_MODIFIER
+        if (key == USB_KEY_VIRTUAL_APPLE_FN) {
+            usb_keyboard_remove_modifiers(APPLE_FN_BIT);
+        }
+#endif
         usb_keyboard_updated = true;
     }
 }
@@ -158,6 +170,11 @@ release_apple_virtual (const uint8_t key) {
 bool
 is_apple_virtual_pressed (const uint8_t key) {
     if (IS_APPLE_VIRTUAL(key)) {
+#if APPLE_FN_IS_MODIFIER
+        if (key == USB_KEY_VIRTUAL_APPLE_FN && (usb_keys_modifier_flags & APPLE_FN_BIT)) {
+            return true;
+        }
+#endif
         return (usb_keys_extended_flags & APPLE_VIRTUAL_BIT(key)) != 0;
     } else {
         return false;

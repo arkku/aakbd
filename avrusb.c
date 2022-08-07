@@ -297,60 +297,53 @@ usb_tick (void) {
 }
 
 static INLINE void
-usb_tx_error_report (const uint8_t byte) {
-    int_fast8_t i = usb_keyboard_rollover;
-    keyboard_idle_count = 0;
+usb_tx_report_header (void) {
 #if USE_MULTIPLE_REPORTS
     if (!is_boot_protocol) {
         usb_tx(KEYBOARD_REPORT_ID);
     }
 #endif
+
     usb_tx(usb_keys_modifier_flags);
-    if (RESERVE_BOOT_PROTOCOL_RESERVED_BYTE || is_boot_protocol) {
-        usb_tx(0);
-    }
-    while (i--) {
-        usb_tx(byte);
-    }
-    if (!is_boot_protocol || USB_MAX_KEY_ROLLOVER < USB_BOOT_PROTOCOL_ROLLOVER) {
-#if ENABLE_APPLE_FN_KEY
-        usb_tx(usb_keys_extended_flags & APPLE_VIRTUAL_MASK);
+#if RESERVE_BOOT_PROTOCOL_RESERVED_BYTE
+    usb_tx(0);
 #endif
+#if APPLE_BYTES_IN_REPORT
+    if (!(RESERVE_BOOT_PROTOCOL_RESERVED_BYTE && is_boot_protocol)) {
+        usb_tx(usb_keys_extended_flags & APPLE_VIRTUAL_MASK);
+    }
+#endif
+}
+
+static INLINE void
+usb_tx_error_report (const uint8_t byte) {
+    usb_tx_report_header();
+    keyboard_idle_count = 0;
+    for (int_fast8_t i = usb_keyboard_rollover; i; --i) {
+        usb_tx(byte);
     }
 }
 
 static INLINE void
 usb_tx_keys_state (void) {
+    usb_tx_report_header();
+
     int_fast8_t count = usb_keyboard_rollover;
     keyboard_idle_count = 0;
     usb_keyboard_updated = false;
 
-#if USE_MULTIPLE_REPORTS
-    if (!is_boot_protocol) {
-        usb_tx(KEYBOARD_REPORT_ID);
-    }
+#if KEY_IN_RESERVED_BYTE
+    // Send the last key here so the end result is same as boot protocol
+    // until we exceed 6 non-modifier keys down (which is probably never
+    // unless specifically testing rollover). According to HID 1.11 spec
+    // the order of keys in the array doesn't matter, so conforming hosts
+    // should not have a problem with a leading zero byte.
+    usb_tx(usb_keys_buffer[--count]);
 #endif
-
-    usb_tx(usb_keys_modifier_flags);
-    if (RESERVE_BOOT_PROTOCOL_RESERVED_BYTE || is_boot_protocol) {
-        usb_tx(0);
-    } else {
-        // Send the last key here so the end result is same as boot protocol
-        // until we exceed 6 non-modifier keys down (which is probably never
-        // unless specifically testing rollover). According to HID 1.11 spec
-        // the order of keys in the array doesn't matter, so conforming hosts
-        // should not have a problem with a leading zero byte.
-        usb_tx(usb_keys_buffer[--count]);
-    }
     // ...although the order of keys in the array doesn't matter, somehow it
     // feels nicer to send them in chronological order.
     for (int_fast8_t i = 0; i < count; ++i) {
         usb_tx(usb_keys_buffer[i]);
-    }
-    if (!is_boot_protocol || USB_MAX_KEY_ROLLOVER < USB_BOOT_PROTOCOL_ROLLOVER) {
-#if ENABLE_APPLE_FN_KEY
-        usb_tx(usb_keys_extended_flags & APPLE_VIRTUAL_MASK);
-#endif
     }
 }
 
