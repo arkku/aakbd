@@ -382,12 +382,13 @@ usb_keyboard_type_debug_report (void) {
 
     (void) fprintf_P(
         usb_kbd_type,
-        PSTR("M %d A%d %d@%d $%d ^%d *%c%c%c %c\n"),
+        PSTR("M %d A%d %d@%d %d$%d ^%d *%c%c%c %c\n"),
         free_bytes,
         usb_address(),
         usb_is_configured(),
         usb_keyboard_protocol,
         key_count,
+        usb_keyboard_rollover,
         old_mods,
         (usb_keyboard_leds & 1) ? '1' : '0',
         (usb_keyboard_leds & 2) ? '1' : '0',

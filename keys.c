@@ -806,10 +806,11 @@ process_key (uint8_t key, bool is_release) {
                         usb_keyboard_toggle_boot_protocol();
                     }
                     break;
-
-#ifdef EXT_PRINT_DEBUG_INFO
+#if ENABLE_SIMULATED_TYPING
                 case EXT_PRINT_DEBUG_INFO:
-                    usb_keyboard_type_debug_report();
+                    if (!is_release) {
+                        usb_keyboard_type_debug_report();
+                    }
                     break;
 #endif
                 default:
