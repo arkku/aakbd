@@ -193,6 +193,13 @@ static inline void postprocess_release(keycode_t keycode, uint8_t physical_key, 
 /// and the active layers mask.
 static inline void layer_state_changed(uint8_t layer, bool is_enabled);
 
+/// Called when USB host LED state changes. This enables reacting to the
+/// computer programmatically changing things like Num Lock (e.g., for
+/// selecting numpad mappings accordingly).
+/// - Parameter leds: The new USB host LED state. Does not include local
+///   overrides or necessarily match the current state of the physical LEDs.
+static inline void keyboard_host_leds_changed(uint8_t leds);
+
 /// Called after reset. This can be used to customise the initial state of
 /// layers, etc. For example, configuration could be loaded from EEPROM, etc.
 static inline void handle_reset(void);

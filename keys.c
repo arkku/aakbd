@@ -4,7 +4,7 @@
  * This does all the work of managing layers, executing macros, handling
  * remapping, keeping track of modifiers, etc.
  *
- * Copyright (c) 2021 Kimmo Kulovesi, https://arkku.dev/
+ * Copyright (c) 2021-2022 Kimmo Kulovesi, https://arkku.dev/
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -888,6 +888,10 @@ reset_keys (void) {
 /// from the LEDs requested by host. The subtraction is done first.
 static uint8_t override_leds = 0;
 
+/// The previous USB LED state - so we can react to updates, such as
+/// programmatically turning on Num Lock.
+static uint8_t previous_usb_led_state = 0;
+
 static inline void
 remove_override_leds_on (const uint8_t mask) {
     override_leds &= ~(mask & 0x0FU);
@@ -916,6 +920,10 @@ clear_override_leds (void) {
 uint8_t
 keys_led_state (void) {
     uint8_t leds = usb_keyboard_led_state();
+    if (leds != previous_usb_led_state) {
+        previous_usb_led_state = leds;
+        keyboard_host_leds_changed(leds);
+    }
     leds &= ~(override_leds >> 4);
     leds |= override_leds & 0x0FU;
     return leds;

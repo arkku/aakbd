@@ -614,6 +614,30 @@ function and have local timers longer than that.
 All current devices implemented also use only timers 0 and 1 of the AVR. So
 you can use other hardware timers to implement your own timing.
 
+### Keyboard State
+
+``` C
+static inline void
+handle_reset(void) {
+}
+```
+
+The `handle_reset` function is called to initialise or reset the keyboard.
+It can be used to do custom setup (e.g., configuring custom variables to their
+default state).
+
+``` C
+static inline void
+keyboard_host_leds_changed(uint8_t leds) {
+}
+```
+
+The `keyboard_host_leds_changed` function is called when the USB host changes
+the keyboard LED state. In USB keyboards, the keyboard does not set things
+like Caps Lock or Num Lock LED by itself, but rather the host (computer) tells
+it which LEDs should be on. This function can be used to do things like
+activate a virtual Num Lock layer based on the Num Lock LED state.
+
 ### Debugging
 
 As tip for debugging what is going on, consider something like the following

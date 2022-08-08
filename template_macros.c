@@ -124,3 +124,7 @@ static inline void handle_reset(void) {
 /// frequently, since this is not an interrupt.
 static inline void handle_tick(uint8_t tick_10ms_count) {
 }
+
+/// Called when USB host LED state changes.
+static inline void keyboard_host_leds_changed(uint8_t leds) {
+}
