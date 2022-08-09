@@ -70,7 +70,7 @@ current_10ms_tick_count (void) {
 #if defined(HAPTIC_ENABLE)
 static void
 process_haptic (uint8_t key, bool pressed) {
-    if (haptic_get_enable() && !(HAPTIC_OFF_IN_LOW_POWER && usb_is_suspended())) {
+    if (haptic_get_enable() && !(HAPTIC_OFF_IN_LOW_POWER && usb_device_state == USB_DEVICE_STATE_CONFIGURED)) {
         if (pressed) {
             if (haptic_get_feedback() < 2) {
                 haptic_play();

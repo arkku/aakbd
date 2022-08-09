@@ -50,15 +50,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #if HAPTIC_ENABLE
 // By default we set up for support of xwhatsit's solenoid driver board.
-// Comment out HAPTIC_ENABLE_PIN if you don't have an enable pin:
+#ifdef HAPTIC_ENABLE_PIN
+#if HAPTIC_ENABLE_PIN == 0
+#undef HAPTIC_ENABLE_PIN
+#endif
+#else
 #define HAPTIC_ENABLE_PIN B7
+#endif
 // We disable haptic feedback during USB low power conditions:
 #define HAPTIC_OFF_IN_LOW_POWER 1
 // Change this if you are using a different pin for the solenoid:
+#ifndef SOLENOID_PIN
 #define SOLENOID_PIN B6
-// If you are not using a solenoid then comment out the above, and also in rules.mk, remove "HAPTIC_ENABLE += SOLENOID"
+#endif
 // You can also tune the following for your solenoid:
+#ifndef  SOLENOID_DEFAULT_DWELL
 #define SOLENOID_DEFAULT_DWELL 4
+#endif
 #define SOLENOID_MIN_DWELL 4
 #define SOLENOID_MAX_DWELL 100
 #ifndef SOLENOID_ENABLE

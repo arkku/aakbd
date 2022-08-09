@@ -40,6 +40,9 @@ DEVICE_FLAGS += -DRIGHT_MODIFIERS_ARE_ARROWS=$(RIGHT_MODIFIERS_ARE_ARROWS)
 
 # To automatically save calibration (by default only via custom macro):
 DEVICE_FLAGS += -DCAPSENSE_CAL_AUTOSAVE=1
+
+# To enable solenoid support (config must be done via custom macros):
+HAPTIC_ENABLE ?= 1
 ```
 
 If `ISO_LAYOUT` is `0`, then ANSI layout is used. If a split is `0`, then that
