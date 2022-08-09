@@ -31,7 +31,7 @@
 bool keyboard_scan_enabled = true;
 
 #if CAPSENSE_CAL_ENABLED
-#define CAPSENSE_CAL_VERSION 1
+#define CAPSENSE_CAL_VERSION 2
 #define EECONFIG_KEYBOARD ((uint32_t *) 15)
 #define EECONFIG_CALIBRATION_DATA ((char *) (EECONFIG_KEYBOARD + 1))
 
@@ -669,19 +669,29 @@ extern matrix_row_t raw_matrix[MATRIX_ROWS];
 void matrix_init_kb(void) {
     matrix_init_user();
 
+    dac_write_threshold(CAPSENSE_HARDCODED_THRESHOLD);
+    dac_write_threshold(CAPSENSE_HARDCODED_THRESHOLD);
+    dac_write_threshold(CAPSENSE_HARDCODED_THRESHOLD);
+
 #if CAPSENSE_CAL_ENABLED
 #if CAPSENSE_CAL_DEBUG
     cal_time = timer_read();
 #endif
 
-    if (load_matrix_calibration()) {
-        (void) matrix_scan_custom(raw_matrix);
-        for (int_fast8_t row = 0; row < MATRIX_ROWS; ++row) {
-            if (raw_matrix[row]) {
-                // Keys pressed, skip calibration
-                cal_flags |= CAPSENSE_CAL_FLAG_SKIPPED;
-            }
-            raw_matrix[row] = 0;
+    (void) load_matrix_calibration();
+
+    (void) matrix_scan_custom(raw_matrix);
+    int_fast8_t active_row_count = 0;
+    for (int_fast8_t row = 0; row < MATRIX_ROWS; ++row) {
+        active_row_count += raw_matrix[row] ?  1 : 0;
+        raw_matrix[row] = 0;
+    }
+    if (active_row_count) {
+        // Keys are down, skip calibration (it will be wrong)
+        cal_flags |= CAPSENSE_CAL_FLAG_SKIPPED;
+        if (active_row_count >= 4 && calibration_loaded) {
+            // Suspiciously many rows active on start, don't trust the save
+            clear_saved_matrix_calibration();
         }
     }
 
@@ -706,9 +716,5 @@ void matrix_init_kb(void) {
         save_matrix_calibration();
     }
 #endif
-#else // ^ CAPSENSE_CAL_ENABLED
-    dac_write_threshold(CAPSENSE_HARDCODED_THRESHOLD);
-    dac_write_threshold(CAPSENSE_HARDCODED_THRESHOLD);
-    dac_write_threshold(CAPSENSE_HARDCODED_THRESHOLD);
-#endif
+#endif // ^ CAPSENSE_CAL_ENABLED
 }
