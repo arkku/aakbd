@@ -33,6 +33,7 @@
 #include "platforms/bootloader.h"
 #include "platforms/timer.h"
 #include "platforms/suspend.h"
+#include "platforms/usb_device_state.h"
 
 #ifdef BACKLIGHT_ENABLE
 #include "backlight.h"
@@ -66,8 +67,34 @@ current_10ms_tick_count (void) {
     return timer_read() / TICKS_PER_10MS;
 }
 
+#if defined(HAPTIC_ENABLE)
+static void
+process_haptic (uint8_t key, bool pressed) {
+    if (haptic_get_enable() && !(HAPTIC_OFF_IN_LOW_POWER && usb_is_suspended())) {
+        if (pressed) {
+            if (haptic_get_feedback() < 2) {
+                haptic_play();
+            }
+        } else {
+            if (haptic_get_feedback() > 0) {
+                haptic_play();
+            }
+        }
+    }
+}
+#endif
+
 static inline void
-switch_events (uint8_t row, uint8_t col, bool pressed) {
+switch_events (uint8_t key, uint8_t row, uint8_t col, bool pressed) {
+#if defined(HAPTIC_ENABLE)
+#if HAPTIC_ONLY_BY_MACRO
+#warning "Haptic feedback is enabled, but must be triggered from macros.c"
+#else
+    if (key) {
+        process_haptic(key, pressed);
+    }
+#endif
+#endif
 #if defined(LED_MATRIX_ENABLE)
     process_led_matrix(row, col, pressed);
 #endif
@@ -100,7 +127,7 @@ kbd_input (void) {
                     if (key) {
                         process_key(key, is_key_release);
                     }
-                    switch_events(row, column, !is_key_release);
+                    switch_events(key, row, column, !is_key_release);
                 }
             }
             previous_matrix[row] = matrix_row;
@@ -112,6 +139,7 @@ kbd_input (void) {
 static void
 protocol_init (void) {
     protocol_pre_init();
+    usb_device_state_init();
     usb_init();
     previous_tick_count = timer_read();
     protocol_post_init();
@@ -120,6 +148,9 @@ protocol_init (void) {
 void
 suspend_power_down_quantum (void) {
     suspend_power_down_kb();
+
+    uint8_t usb_config = usb_is_configured();
+    usb_device_state_set_suspend(usb_config != 0, usb_config);
 
 #ifdef BACKLIGHT_ENABLE
     backlight_set(0);
@@ -141,6 +172,9 @@ suspend_wakeup_init_quantum (void) {
 
     // Restore LED indicators
     led_wakeup();
+
+    uint8_t usb_config = usb_is_configured();
+    usb_device_state_set_resume(usb_config != 0, usb_config);
 
 #if defined(LED_MATRIX_ENABLE)
     led_matrix_set_suspend_state(false);

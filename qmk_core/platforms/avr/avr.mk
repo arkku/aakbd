@@ -13,5 +13,5 @@ $(BUILDDIR)/avr.o: platform_deps.h qmk_port.h
 $(BUILDDIR)/platform.o: platform_deps.h
 $(BUILDDIR)/timer.o: timer.h timer_avr.h
 $(BUILDDIR)/suspend.o: suspend.h timer.h action.h keyboard.h
-$(BUILDDIR)/eeconfig.o: eeconfig.h
+$(BUILDDIR)/eeconfig.o: eeconfig.h $(COMMON_HEADERS)
 $(BUILDDIR)/$(BOOTLOADER_TYPE).o: bootloader.h platform_deps.h $(COMMON_HEADERS)

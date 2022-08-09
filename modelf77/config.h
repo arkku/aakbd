@@ -48,20 +48,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define CAPSENSE_KEYMAP_COL_TO_PHYSICAL_COL(col) (((col) == 10)?15:(col))
 
+#if HAPTIC_ENABLE
 // By default we set up for support of xwhatsit's solenoid driver board.
 // Comment out HAPTIC_ENABLE_PIN if you don't have an enable pin:
-//#define HAPTIC_ENABLE_PIN B7
-// We disable haptic feedbeck during USB low power conditions:
-//#define HAPTIC_OFF_IN_LOW_POWER 1
+#define HAPTIC_ENABLE_PIN B7
+// We disable haptic feedback during USB low power conditions:
+#define HAPTIC_OFF_IN_LOW_POWER 1
 // Change this if you are using a different pin for the solenoid:
-//#define SOLENOID_PIN B6
+#define SOLENOID_PIN B6
 // If you are not using a solenoid then comment out the above, and also in rules.mk, remove "HAPTIC_ENABLE += SOLENOID"
 // You can also tune the following for your solenoid:
-//#define SOLENOID_DEFAULT_DWELL 4
-//#define SOLENOID_MIN_DWELL 4
-//#define SOLENOID_MAX_DWELL 100
-
+#define SOLENOID_DEFAULT_DWELL 4
+#define SOLENOID_MIN_DWELL 4
+#define SOLENOID_MAX_DWELL 100
+#ifndef SOLENOID_ENABLE
+#define SOLENOID_ENABLE
+#endif
+#else
 #define NO_HAPTIC_MOD
+#endif
 
 // If the lock lights are not used, then please don't define the below pins,
 // or leave them set as unused pins:

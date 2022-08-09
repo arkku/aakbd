@@ -27,13 +27,14 @@
 #include <avr/eeprom.h>
 
 #include <qmk_port.h>
+#include <eeconfig.h>
+
+#define EECONFIG_CALIBRATION_DATA ((char *) (EECONFIG_KEYMAP_UPPER_BYTE + 1))
 
 bool keyboard_scan_enabled = true;
 
 #if CAPSENSE_CAL_ENABLED
 #define CAPSENSE_CAL_VERSION 2
-#define EECONFIG_KEYBOARD ((uint32_t *) 15)
-#define EECONFIG_CALIBRATION_DATA ((char *) (EECONFIG_KEYBOARD + 1))
 
 struct calibration_header {
     uint8_t version;

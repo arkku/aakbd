@@ -61,8 +61,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define SOLENOID_DEFAULT_DWELL 4
 #define SOLENOID_MIN_DWELL 4
 //#define SOLENOID_MAX_DWELL 100
+#ifndef SOLENOID_ENABLE
+#define SOLENOID_ENABLE
+#endif
+#else
 #define NO_HAPTIC_MOD
-#error "Solenoid support has not been ported to AAKBD (yet?)."
 #endif
 
 #ifndef LED_NUM_LOCK_PIN
