@@ -76,16 +76,15 @@ switch_events (uint8_t row, uint8_t col, bool pressed) {
 #endif
 }
 
+static matrix_row_t previous_matrix[MATRIX_ROWS] = { 0 };
+
 static bool
 kbd_input (void) {
-    static matrix_row_t previous_matrix[MATRIX_ROWS];
-    matrix_row_t matrix_change = 0;
-
     bool have_changes = matrix_scan();
 
     for (int_fast8_t row = 0; row < MATRIX_ROWS; ++row) {
-        matrix_row_t matrix_row = matrix_get_row(row);
-        matrix_change = matrix_row ^ previous_matrix[row];
+        const matrix_row_t matrix_row = matrix_get_row(row);
+        const matrix_row_t matrix_change = matrix_row ^ previous_matrix[row];
         if (matrix_change) {
 #ifdef MATRIX_HAS_GHOST
             if (has_ghost_in_row(r, matrix_row)) {
@@ -101,10 +100,10 @@ kbd_input (void) {
                     if (key) {
                         process_key(key, is_key_release);
                     }
-                    previous_matrix[row] ^= column_bit;
                     switch_events(row, column, !is_key_release);
                 }
             }
+            previous_matrix[row] = matrix_row;
         }
     }
     return have_changes;
@@ -264,6 +263,9 @@ shutdown_quantum (void) {
 
 void
 keyboard_reset (void) {
+    for (int_fast8_t row = 0; row < MATRIX_ROWS; ++row) {
+        previous_matrix[row] = 0;
+    }
     keyboard_init();
     delay_milliseconds(32);
 }
@@ -297,11 +299,21 @@ encoder_update_kb(uint8_t index, bool clockwise) {
 }
 #endif
 
-uint8_t
-usb_keycode_for_matrix (const int8_t row, const int8_t column) {
-    if (row < MATRIX_ROWS && column < MATRIX_COLS) {
-        return pgm_read_byte(&keymaps[0][row][column]);
-    } else {
-        return KC_NO;
+bool
+matrix_has_keys_pressed (void) {
+    for (int_fast8_t row = 0; row < MATRIX_ROWS; ++row) {
+        matrix_row_t matrix_row = matrix_get_row(row);
+        if (matrix_row) {
+            matrix_row_t column_bit = 1;
+            for (int_fast8_t column = 0; column < MATRIX_COLS; ++column, column_bit <<= 1) {
+                if (matrix_row & column_bit) {
+                    const uint8_t key = usb_keycode_for_matrix(row, column);
+                    if (key) {
+                        return true;
+                    }
+                }
+            }
+        }
     }
+    return false;
 }

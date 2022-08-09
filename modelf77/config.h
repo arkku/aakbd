@@ -17,35 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
-/* key matrix size */
 #define MATRIX_ROWS 8
 #define MATRIX_COLS 11
-// Note: physical column are 16, but only 11 are ever used. Column 0..9 match the physical column. Column 10 is physical column 15.
 
-/*
- * Keyboard Matrix Assignments
- *
- * Change this to how you wired your keyboard
- * COLS: AVR pins used for columns, left to right
- * ROWS: AVR pins used for rows, top to bottom
- * DIODE_DIRECTION: COL2ROW = COL = Anode (+), ROW = Cathode (-, marked on diode)
- *                  ROW2COL = ROW = Anode (+), COL = Cathode (-, marked on diode)
- *
- */
-//#define MATRIX_ROW_PINS { D0, D5 }
-//#define MATRIX_COL_PINS { B2, B1, B0 }
-//#define UNUSED_PINS
-
-/* COL2ROW, ROW2COL*/
-//#define DIODE_DIRECTION COL2ROW
-
-/* Debounce reduces chatter (unintended double-presses) - set 0 if debouncing is not needed */
 #ifndef DEBOUNCE
 #define DEBOUNCE 5
 #endif
-
-/* define if matrix has ghost (lacks anti-ghosting diodes) */
-//#define MATRIX_HAS_GHOST
 
 #define CONTROLLER_IS_XWHATSIT_MODEL_F_OR_WCASS_MODEL_F
 //#define CONTROLLER_IS_XWHATSIT_BEAMSPRING_REV_4
@@ -57,16 +34,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CAPSENSE_HARDCODED_SAMPLE_TIME 4
 
 #define CAPSENSE_CAL_ENABLED 1
-// #define CAPSENSE_CAL_ENABLED 0
-#define CAPSENSE_CAL_DEBUG 0
-// #define CAPSENSE_CAL_DEBUG 0
+#define CAPSENSE_CAL_DEBUG 1
 #define CAPSENSE_CAL_INIT_REPS 16
 #define CAPSENSE_CAL_EACHKEY_REPS 16
-#define CAPSENSE_CAL_BINS 5
+#define CAPSENSE_CAL_BINS 4
 #define CAPSENSE_CAL_THRESHOLD_OFFSET 24
 
+#ifndef CAPSENSE_CAL_AUTOSAVE
+#define CAPSENSE_CAL_AUTOSAVE 0
+#endif
+
 #if !CAPSENSE_CAL_ENABLED
-#define CAPSENSE_HARDCODED_THRESHOLD 142
+#define CAPSENSE_HARDCODED_THRESHOLD 146
 #endif
 
 #define CAPSENSE_KEYMAP_COL_TO_PHYSICAL_COL(col) (((col) == 10)?15:(col))

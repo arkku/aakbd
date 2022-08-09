@@ -17,11 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
-/* key matrix size */
 #define MATRIX_ROWS 8
 #define MATRIX_COLS 9
 
-/* Debounce reduces chatter (unintended double-presses) - set 0 if debouncing is not needed */
 #ifndef DEBOUNCE
 #define DEBOUNCE 5
 #endif
@@ -36,19 +34,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CAPSENSE_HARDCODED_SAMPLE_TIME 4
 
 #define CAPSENSE_CAL_ENABLED 1
-// #define CAPSENSE_CAL_ENABLED 0
-#define CAPSENSE_CAL_DEBUG 0
-// #define CAPSENSE_CAL_DEBUG 0
+#define CAPSENSE_CAL_DEBUG 1
 #define CAPSENSE_CAL_INIT_REPS 16
 #define CAPSENSE_CAL_EACHKEY_REPS 16
-#define CAPSENSE_CAL_BINS 5
+#define CAPSENSE_CAL_BINS 4
 #define CAPSENSE_CAL_THRESHOLD_OFFSET 24
 
-#if !CAPSENSE_CAL_ENABLED
-#define CAPSENSE_HARDCODED_THRESHOLD 142
+#ifndef CAPSENSE_CAL_AUTOSAVE
+#define CAPSENSE_CAL_AUTOSAVE 0
 #endif
 
-#define CAPSENSE_KEYMAP_COL_TO_PHYSICAL_COL(col) (((col) == 8)?15:(col))
+#if !CAPSENSE_CAL_ENABLED
+#define CAPSENSE_HARDCODED_THRESHOLD 146
+#endif
+
+#define CAPSENSE_KEYMAP_COL_TO_PHYSICAL_COL(col) (((col) == 8) ? 15 : (col))
 
 #if HAPTIC_ENABLE
 // By default we set up for support of xwhatsit's solenoid driver board.

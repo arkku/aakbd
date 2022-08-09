@@ -150,27 +150,4 @@ void usb_descriptors_init(void);
 /// If no matching descriptor is found, returns 0.
 uint8_t usb_descriptor_length_and_data(const uint16_t value, const uint16_t index, const char *address[static 1]);
 
-// MARK: - Helper macros
-
-#if defined(__GNUC__) || defined(__clang__)
-#define INLINE inline __attribute__((always_inline))
-#else
-#define INLINE inline
-#endif
-
-/// The least significant byte of `word`.
-#define LSB(word)                   ((word) & 0xFF)
-
-/// The most signifant byte of `word`.
-#define MSB(word)                   ((word) >> 8)
-
-/// The bytes of `word` in little endian order (array construction helper).
-#define WORD_BYTES(word)            LSB(word), MSB(word)
-
-/// Form a 16-bit word from `lsb` and `msb`.
-#define BYTES_WORD(lsb, msb)        (((msb) << 8) | (lsb))
-
-/// Divide `value` by `n` and round up.
-#define DIV_ROUND_BYTE(n, value)    (((value) / (n)) + ((value) & 1))
-
 #endif

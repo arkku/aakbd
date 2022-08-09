@@ -4,6 +4,18 @@ This subdirectory of [AAKBD](https://github.com/arkku/aakbd) contains an
 alternative firmware for the Brand New Model F62 keyboard, ported from
 pandrew's QMK firmware, which (I believe) is based on xwhatit's firmware.
 
+My modifications include:
+
+* Faster scan rate when calibration results in unused pins (less than 0.9 ms
+  to scan the whole keyboard, meaning 1000 Hz polling is feasible).
+* Optional saving of calibration to EEPROM, resulting in faster startup times
+  and recognition of keys held down on start. The theoretical danger here is
+  that the calibration could drift so that the recalibration macro is not
+  accessible. In this case the only solution would be to flash a firmware that
+  disables using saved calibration.
+* More options for configuring the keymap out of the box (e.g., split space
+  and split enter).
+
 ## Configuration
 
 Set `DEVICE` to `modelf62` either in `local.mk` (in the project root directory),
@@ -23,6 +35,9 @@ RIGHT_MODIFIERS_ARE_ARROWS ?= 0 # Only affects layers.c from the template
 
 DEVICE_FLAGS += -DENABLE_DFU_INTERFACE=1
 DEVICE_FLAGS += -DRIGHT_MODIFIERS_ARE_ARROWS=$(RIGHT_MODIFIERS_ARE_ARROWS)
+
+# To automatically save calibration (by default only via custom macro):
+DEVICE_FLAGS += -DCAPSENSE_CAL_AUTOSAVE=1
 ```
 
 If `ISO_LAYOUT` is `0`, then ANSI layout is used. If a split is `0`, then that

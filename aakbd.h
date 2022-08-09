@@ -33,6 +33,31 @@ void keyboard_reset(void);
 /// increments approximately once per 10 milliseconds.
 uint8_t current_10ms_tick_count(void);
 
+// MARK: - Helper macros
+
+#if defined(__GNUC__) || defined(__clang__)
+#define INLINE inline __attribute__((always_inline))
+#else
+#define INLINE inline
+#endif
+
+/// The least significant byte of `word`.
+#define LSB(word)                   ((word) & 0xFF)
+
+/// The most signifant byte of `word`.
+#define MSB(word)                   ((word) >> 8)
+
+/// The bytes of `word` in little endian order (array construction helper).
+#define WORD_BYTES(word)            LSB(word), MSB(word)
+
+/// Form a 16-bit word from `lsb` and `msb`.
+#define BYTES_WORD(lsb, msb)        (((msb) << 8) | (lsb))
+
+/// Divide `value` by `n` and round up.
+#define DIV_ROUND_BYTE(n, value)    (((value) / (n)) + ((value) & 1))
+
+// MARK: - Platform-specific
+
 #ifdef __AVR__
 #include <util/delay.h>
 #include <avr/wdt.h>

@@ -1,4 +1,7 @@
 /* Copyright 2020 Purdea Andrei
+ * Copyright © 2022 Kimmo Kulovesi
+ *
+ * Ported from QMK to AAKBD. Any errors are almost certainly due to that.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,13 +26,39 @@
 // These are defined in matrix.c. This file is not called matrix.h to avoid conflict with qmk-native matrix.h
 
 extern bool keyboard_scan_enabled;
-void matrix_scan_raw(matrix_row_t current_matrix[]);
-extern uint16_t cal_thresholds[CAPSENSE_CAL_BINS];
-extern matrix_row_t assigned_to_threshold[CAPSENSE_CAL_BINS][MATRIX_CAPSENSE_ROWS];
+
 uint16_t measure_middle_keymap_coords(uint8_t col, uint8_t row, uint8_t time, uint8_t reps);
 void shift_data(uint32_t data, int data_idle, int shcp_idle, int stcp_idle);
 void dac_write_threshold(uint16_t value);
 uint8_t test_single(uint8_t col, uint16_t time, uint8_t *interference_ptr);
 
+#if ENABLE_SIMULATED_TYPING
+void tracking_test(void);
 #endif
 
+#if CAPSENSE_CAL_ENABLED
+void clear_saved_matrix_calibration(void);
+void save_matrix_calibration(void);
+void calibrate_matrix(void);
+
+extern uint16_t cal_thresholds[CAPSENSE_CAL_BINS];
+extern matrix_row_t assigned_to_threshold[CAPSENSE_CAL_BINS][MATRIX_CAPSENSE_ROWS];
+extern uint8_t cal_bin_key_count[CAPSENSE_CAL_BINS];
+extern uint16_t cal_tr_all_zero;
+extern uint16_t cal_tr_all_one;
+extern uint8_t cal_flags;
+
+#define CAPSENSE_CAL_FLAG_LOADED  (1 << 0)
+#define CAPSENSE_CAL_FLAG_SAVED   (1 << 1)
+#define CAPSENSE_CAL_FLAG_SKIPPED (1 << 2)
+
+#define calibration_loaded  ((cal_flags & CAPSENSE_CAL_FLAG_LOADED) ? 1 : 0)
+#define calibration_saved   ((cal_flags & CAPSENSE_CAL_FLAG_SAVED) ? 1 : 0)
+#define calibration_skipped ((cal_flags & CAPSENSE_CAL_FLAG_SKIPPED) ? 1 : 0)
+
+#if CAPSENSE_CAL_DEBUG
+extern uint16_t cal_time;
+#endif
+#endif
+
+#endif

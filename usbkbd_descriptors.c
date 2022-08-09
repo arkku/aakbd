@@ -17,6 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "aakbd.h"
 #include "usbkbd_config.h"
 #include "usb.h"
 #include "usbkbd_descriptors.h"

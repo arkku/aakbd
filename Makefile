@@ -87,7 +87,7 @@ OBJECT_FILES = $(OBJS:%.o=$(BUILDDIR)/%.o)
 
 $(BUILDDIR)/avrusb.o: avrusb.h usb_hardware.h usbkbd.h usbkbd_config.h usb.h usbkbd_descriptors.h generic_hid.h progmem.h aakbd.h local.mk
 $(BUILDDIR)/usbkbd.o: usbkbd.h usb_hardware.h usbkbd_config.h usb.h usbkbd_descriptors.h usb_keys.h generic_hid.h aakbd.h progmem.h local.mk
-$(BUILDDIR)/usbkbd_descriptors.o: usbkbd_descriptors.h usbkbd_config.h usb.h usb_keys.h generic_hid.h progmem.h local.mk
+$(BUILDDIR)/usbkbd_descriptors.o: usbkbd_descriptors.h usbkbd_config.h usb.h usb_keys.h generic_hid.h progmem.h aakbd.h local.mk
 $(BUILDDIR)/keys.o: keys.h keycodes.h usbkbd.h usbkbd_config.h aakbd.h usb_keys.h layers.h macros.h progmem.h $(MACROS_C) $(LAYERS_C)
 $(OBJECT_FILES): Makefile $(DEVICE)/$(DEVICE).mk $(wildcard local.mk) $(wildcard $(DEVICE)/local.mk)
 

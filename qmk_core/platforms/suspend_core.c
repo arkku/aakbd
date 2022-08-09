@@ -3,6 +3,7 @@
 
 #include "suspend.h"
 #include "matrix.h"
+#include <qmk_port.h>
 
 // TODO: Move to more correct location
 __attribute__((weak)) void matrix_power_up(void) {}
@@ -44,8 +45,5 @@ bool suspend_wakeup_condition(void) {
     matrix_power_up();
     matrix_scan();
     matrix_power_down();
-    for (uint8_t r = 0; r < MATRIX_ROWS; r++) {
-        if (matrix_get_row(r)) return true;
-    }
-    return false;
+    return matrix_has_keys_pressed();
 }
