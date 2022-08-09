@@ -270,32 +270,6 @@ usb_wake_up_host (void) {
     return true;
 }
 
-void
-usb_tick (void) {
-    if (usb_configuration == 0) {
-        if (usb_status & USB_STATUS_JUMP_TO_BOOTLOADER) {
-            jump_to_bootloader();
-        }
-        if (keyboard_idle_count || !usb_keyboard_updated) {
-            usb_devices_reset();
-        }
-    } else {
-#if ENABLE_GENERIC_HID_ENDPOINT
-#if GENERIC_HID_HANDLE_SYNCHRONOUSLY
-        if (generic_request_pending_id) {
-            const uint8_t request_id = generic_request_pending_id;
-            generic_request_pending_id = 0;
-            generic_request_call_handler(request_id, generic_request_pending);
-            generic_request_pending = 0;
-        }
-#endif
-        if (generic_report_pending) {
-            send_generic_hid_report(0, generic_report_pending, generic_report);
-        }
-#endif
-    }
-}
-
 static INLINE void
 usb_tx_report_header (void) {
 #if USE_MULTIPLE_REPORTS
@@ -501,6 +475,34 @@ generic_request_call_handler (const uint8_t report_id, const uint8_t length) {
     return true;
 }
 #endif // ^ ENABLE_GENERIC_HID_ENDPOINT
+
+// MARK: - Periodically called task
+
+void
+usb_tick (void) {
+    if (usb_configuration == 0) {
+        if (usb_status & USB_STATUS_JUMP_TO_BOOTLOADER) {
+            jump_to_bootloader();
+        }
+        if (keyboard_idle_count || !usb_keyboard_updated) {
+            usb_devices_reset();
+        }
+    } else {
+#if ENABLE_GENERIC_HID_ENDPOINT
+#if GENERIC_HID_HANDLE_SYNCHRONOUSLY
+        if (generic_request_pending_id) {
+            const uint8_t request_id = generic_request_pending_id;
+            generic_request_pending_id = 0;
+            generic_request_call_handler(request_id, generic_request_pending);
+            generic_request_pending = 0;
+        }
+#endif
+        if (generic_report_pending) {
+            send_generic_hid_report(0, generic_report_pending, generic_report);
+        }
+#endif
+    }
+}
 
 // MARK: - Interrupt handlers (this is most of the USB stuff happens)
 
