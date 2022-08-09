@@ -31,18 +31,18 @@
 
 #define EECONFIG_CALIBRATION_DATA ((char *) (EECONFIG_KEYMAP_UPPER_BYTE + 1))
 
+struct calibration_header {
+    uint8_t version;
+    uint8_t cols;
+    uint8_t rows;
+    uint8_t bins;
+    uint16_t keymap_checksum;
+};
+
 bool keyboard_scan_enabled = true;
 
 #if CAPSENSE_CAL_ENABLED
 #define CAPSENSE_CAL_VERSION 2
-
-struct calibration_header {
-    uint8_t version;
-    uint8_t cols;
-uint8_t rows;
-    uint8_t bins;
-    uint16_t keymap_checksum;
-};
 
 uint16_t cal_thresholds[CAPSENSE_CAL_BINS] = { 0 };
 matrix_row_t assigned_to_threshold[CAPSENSE_CAL_BINS][MATRIX_CAPSENSE_ROWS] = { { 0 } };
@@ -478,7 +478,8 @@ static bool load_matrix_calibration(void) {
 }
 
 void clear_saved_matrix_calibration(void) {
-    eeprom_update_byte(EECONFIG_CALIBRATION_DATA, 0);
+    const struct calibration_header header = { 0, 0, 0, 0, 0 };
+    eeprom_update_block(&header, EECONFIG_CALIBRATION_DATA, sizeof(header));
 }
 
 void save_matrix_calibration(void) {
