@@ -48,13 +48,15 @@ extern uint16_t cal_tr_all_zero;
 extern uint16_t cal_tr_all_one;
 extern uint8_t cal_flags;
 
-#define CAPSENSE_CAL_FLAG_LOADED  (1 << 0)
-#define CAPSENSE_CAL_FLAG_SAVED   (1 << 1)
-#define CAPSENSE_CAL_FLAG_SKIPPED (1 << 2)
+#define CAPSENSE_CAL_FLAG_LOADED        (1 << 0)
+#define CAPSENSE_CAL_FLAG_SAVED         (1 << 1)
+#define CAPSENSE_CAL_FLAG_SKIPPED       (1 << 2)
+#define CAPSENSE_CAL_FLAG_UNRELIABLE    (1 << 3)
 
 #define calibration_loaded  ((cal_flags & CAPSENSE_CAL_FLAG_LOADED) ? 1 : 0)
 #define calibration_saved   ((cal_flags & CAPSENSE_CAL_FLAG_SAVED) ? 1 : 0)
 #define calibration_skipped ((cal_flags & CAPSENSE_CAL_FLAG_SKIPPED) ? 1 : 0)
+#define calibration_unreliable  ((cal_flags & CAPSENSE_CAL_FLAG_UNRELIABLE) ? 1 : 0)
 
 #if CAPSENSE_CAL_DEBUG
 extern uint16_t cal_time;

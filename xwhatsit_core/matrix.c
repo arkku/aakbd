@@ -687,10 +687,16 @@ void matrix_init_kb(void) {
         raw_matrix[row] = 0;
     }
     if (active_row_count) {
-        // Keys are down, skip calibration (it will be wrong)
-        cal_flags |= CAPSENSE_CAL_FLAG_SKIPPED;
+        if (calibration_loaded) {
+            // Keys are down, skip calibration (it will be wrong)
+            cal_flags |= CAPSENSE_CAL_FLAG_SKIPPED;
+        } else {
+            // Keys are down but we are not calibrated, so don't trust it
+            cal_flags |= CAPSENSE_CAL_FLAG_UNRELIABLE;
+        }
         if (active_row_count >= 4 && calibration_loaded) {
             // Suspiciously many rows active on start, don't trust the save
+            cal_flags |= CAPSENSE_CAL_FLAG_UNRELIABLE;
             clear_saved_matrix_calibration();
         }
     }
@@ -706,14 +712,17 @@ void matrix_init_kb(void) {
 #endif
 
 #if CAPSENSE_CAL_AUTOSAVE
-    if (!calibration_loaded && !calibration_saved) {
+    if (!(cal_flags & (CAPSENSE_CAL_FLAG_UNRELIABLE | CAPSENSE_CAL_FLAG_LOADED | CAPSENSE_CAL_FLAG_SAVED))) {
         for (int_fast8_t bin = 0; bin < CAPSENSE_CAL_BINS; ++bin) {
             if (cal_bin_key_count[bin] >= 1 && cal_bin_key_count[bin] <= 4) {
-                // Suspicious calibration, could be held keys? Don't save.
-                return;
+                // Suspicious calibration result, maybe held keys or misconfig
+                cal_flags |= CAPSENSE_CAL_FLAG_UNRELIABLE;
+                break;
             }
         }
-        save_matrix_calibration();
+        if (!calibration_unreliable) {
+            save_matrix_calibration();
+        }
     }
 #endif
 #endif // ^ CAPSENSE_CAL_ENABLED

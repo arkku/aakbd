@@ -80,7 +80,7 @@ static void matrix_print_calibration_stats(void) {
 #if CAPSENSE_CAL_DEBUG
     fprintf_P(usb_kbd_type, PSTR("Calibration %u ms\n"), cal_time);
 #endif
-    fprintf_P(usb_kbd_type, PSTR("Load=%d Save=%d Skip=%d\n"), calibration_loaded, calibration_saved, calibration_skipped);
+    fprintf_P(usb_kbd_type, PSTR("Load=%d Save=%d Skip=%d Doubt=%d\n"), calibration_loaded, calibration_saved, calibration_skipped, calibration_unreliable);
     fprintf_P(usb_kbd_type, PSTR("All 0 = %u, All 1 = %u\n"), cal_tr_all_zero, cal_tr_all_one);
 
     for (int_fast8_t bin = 0; bin < CAPSENSE_CAL_BINS; ++bin) {
