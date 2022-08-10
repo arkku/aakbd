@@ -104,17 +104,12 @@
             PORTD |= 0x0F; \
         } while (0)
 
-#if 1
-#define SETUP_UNUSED_PINS() do {} while (0)
-#else
-// TODO ENABLE THIS ONCE TESTED
 #define SETUP_UNUSED_PINS() \
     do { \
         PORTB |= ~(DDRB | 0x07); \
         PORTC |= ~(DDRC | 0xf3); \
         PORTD |= ~(DDRD | 0xff); \
     } while (0)
-#endif
 
 #    define CAPSENSE_READ_ROWS_NUMBER_OF_BYTES_PER_SAMPLE 2
 #    define CAPSENSE_READ_ROWS_PIN_1 _SFR_IO_ADDR(PINC)

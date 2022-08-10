@@ -25,6 +25,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <avr/eeprom.h>
+#include <avr/power.h>
 
 #include <qmk_port.h>
 #include <eeconfig.h>
@@ -103,6 +104,12 @@ static INLINE uint8_t read_rows(void) {
 
 #if defined(CAPSENSE_DAC_MCP4921)
 
+#define nSHDN_BIT 12
+#define MCP_DAC_GAIN_2X 0
+#define MCP_DAC_GAIN_1X 1
+#define nGA_BIT 13
+#define BUF_BIT 14
+
 static void dac_init(void) {
     writePin(CAPSENSE_DAC_NCS, 1);
     setPinOutput(CAPSENSE_DAC_NCS);
@@ -115,13 +122,8 @@ static void dac_init(void) {
 
 void dac_write_threshold(uint16_t value) {
     const uint16_t buffered = 0;
-    #define nSHDN_BIT 12
     value |= 1 << nSHDN_BIT; // nSHDN = 0 -- make sure output is not floating.
-    #define MCP_DAC_GAIN_2X 0
-    #define MCP_DAC_GAIN_1X 1
-#define nGA_BIT 13
     value |= MCP_DAC_GAIN_1X << nGA_BIT;
-    #define BUF_BIT 14;
     value |= buffered << BUF_BIT;
 
     writePin(CAPSENSE_DAC_NCS, 0);
@@ -137,7 +139,6 @@ void dac_write_threshold(uint16_t value) {
 }
 
 #else // ^ CAPSENSE_DAC_MCP4921
-
 static void dac_init(void) {
     setPinOutput(CAPSENSE_DAC_SCLK);
     setPinOutput(CAPSENSE_DAC_DIN);
@@ -623,7 +624,6 @@ end_of_scan:
 }
 
 void matrix_init_custom(void) {
-    SETUP_UNUSED_PINS();
 
 #if defined(CONTROLLER_IS_THROUGH_HOLE_BEAMSPRING) || defined(CONTROLLER_IS_THROUGH_HOLE_MODEL_F)
     // Disable on-board leds
@@ -651,8 +651,31 @@ void matrix_init_custom(void) {
     shift_init();
     dac_init();
     SETUP_ROW_GPIOS();
+    SETUP_UNUSED_PINS();
+
+    // Power reduction
+#if defined(ACSR) && defined(ACD) && !defined(ENABLE_AC)
+    ACSR |= (1 << ACD);
+#endif
+#ifndef ENABLE_USART
+    power_usart1_disable();
+#endif
+    power_timer1_disable();
+#ifdef TIMSK2
+    power_timer2_disable();
+#endif
+#ifdef TIMSK3
+    power_timer3_disable();
+#endif
+#ifndef ENABLE_SPI
+    power_spi_disable();
+#endif
+#if defined(TWIE) && !defined(ENABLE_I2C)
+    power_twi_disable();
+#endif
 
     keyboard_scan_enabled = true;
+
 #if CAPSENSE_CAL_ENABLED
     cal_flags = 0;
     cal_keymap_checksum = keymap_checksum();
