@@ -33,7 +33,6 @@
 #include "platforms/bootloader.h"
 #include "platforms/timer.h"
 #include "platforms/suspend.h"
-#include "platforms/usb_device_state.h"
 
 #ifdef BACKLIGHT_ENABLE
 #include "backlight.h"
@@ -67,10 +66,13 @@ current_10ms_tick_count (void) {
     return timer_read() / TICKS_PER_10MS;
 }
 
-#if defined(HAPTIC_ENABLE)
+#ifdef HAPTIC_ENABLE
+static uint8_t haptic_usb_is_configured = 0;
+#define haptic_is_powered() (!HAPTIC_OFF_IN_LOW_POWER || (haptic_usb_is_configured && !usb_is_suspended()))
+
 static void
 process_haptic (uint8_t key, bool pressed) {
-    if (haptic_get_enable() && !(HAPTIC_OFF_IN_LOW_POWER && usb_device_state == USB_DEVICE_STATE_CONFIGURED)) {
+    if (haptic_get_enable() && haptic_is_powered()) {
         if (pressed) {
             if (haptic_get_feedback() < 2) {
                 haptic_play();
@@ -86,7 +88,7 @@ process_haptic (uint8_t key, bool pressed) {
 
 static inline void
 switch_events (uint8_t key, uint8_t row, uint8_t col, bool pressed) {
-#if defined(HAPTIC_ENABLE)
+#ifdef HAPTIC_ENABLE
 #if HAPTIC_ONLY_BY_MACRO
 #warning "Haptic feedback is enabled, but must be triggered from macros.c"
 #else
@@ -95,10 +97,10 @@ switch_events (uint8_t key, uint8_t row, uint8_t col, bool pressed) {
     }
 #endif
 #endif
-#if defined(LED_MATRIX_ENABLE)
+#ifdef LED_MATRIX_ENABLE
     process_led_matrix(row, col, pressed);
 #endif
-#if defined(RGB_MATRIX_ENABLE)
+#ifdef RGB_MATRIX_ENABLE
     process_rgb_matrix(row, col, pressed);
 #endif
 }
@@ -118,7 +120,6 @@ kbd_input (void) {
                 continue;
             }
 #endif
-
             matrix_row_t column_bit = 1;
             for (int_fast8_t column = 0; column < MATRIX_COLS; ++column, column_bit <<= 1) {
                 if (matrix_change & column_bit) {
@@ -139,9 +140,14 @@ kbd_input (void) {
 static void
 protocol_init (void) {
     protocol_pre_init();
-    usb_device_state_init();
     usb_init();
     previous_tick_count = timer_read();
+
+#ifdef HAPTIC_ENABLE
+    haptic_usb_is_configured = usb_is_configured();
+    haptic_notify_usb_device_state_change();
+#endif
+
     protocol_post_init();
 }
 
@@ -149,18 +155,18 @@ void
 suspend_power_down_quantum (void) {
     suspend_power_down_kb();
 
-    uint8_t usb_config = usb_is_configured();
-    usb_device_state_set_suspend(usb_config != 0, usb_config);
-
 #ifdef BACKLIGHT_ENABLE
     backlight_set(0);
 #endif
     led_suspend();
-#if defined(LED_MATRIX_ENABLE)
+#ifdef LED_MATRIX_ENABLE
     led_matrix_set_suspend_state(true);
 #endif
-#if defined(RGB_MATRIX_ENABLE)
+#ifdef RGB_MATRIX_ENABLE
     rgb_matrix_set_suspend_state(true);
+#endif
+#ifdef HAPTIC_ENABLE
+    haptic_notify_usb_device_state_change();
 #endif
 }
 
@@ -173,14 +179,14 @@ suspend_wakeup_init_quantum (void) {
     // Restore LED indicators
     led_wakeup();
 
-    uint8_t usb_config = usb_is_configured();
-    usb_device_state_set_resume(usb_config != 0, usb_config);
-
-#if defined(LED_MATRIX_ENABLE)
+#ifdef LED_MATRIX_ENABLE
     led_matrix_set_suspend_state(false);
 #endif
-#if defined(RGB_MATRIX_ENABLE)
+#ifdef RGB_MATRIX_ENABLE
     rgb_matrix_set_suspend_state(false);
+#endif
+#ifdef HAPTIC_ENABLE
+    haptic_notify_usb_device_state_change();
 #endif
 
     suspend_wakeup_init_kb();
@@ -192,27 +198,30 @@ keyboard_task (void) {
     if (TIMER_DIFF_FAST(now, previous_tick_count) >= 10) {
         previous_tick_count = now;
         keys_tick(now / TICKS_PER_10MS);
+
+#ifdef HAPTIC_ENABLE
+        bool configuration = usb_is_configured();
+        if (haptic_usb_is_configured != configuration) {
+            haptic_usb_is_configured = configuration;
+            haptic_notify_usb_device_state_change();
+        }
+#endif
     }
 
     (void) kbd_input();
 
-#if defined(RGBLIGHT_ENABLE)
+#ifdef RGBLIGHT_ENABLE
     rgblight_task();
 #endif
-
 #ifdef LED_MATRIX_ENABLE
     led_matrix_task();
 #endif
 #ifdef RGB_MATRIX_ENABLE
     rgb_matrix_task();
 #endif
-
-#if defined(BACKLIGHT_ENABLE)
-#if defined(BACKLIGHT_PIN) || defined(BACKLIGHT_PINS)
+#if defined(BACKLIGHT_ENABLE) && (defined(BACKLIGHT_PIN) || defined(BACKLIGHT_PINS))
     backlight_task();
 #endif
-#endif
-
 #ifdef ENCODER_ENABLE
     (void) encoder_read();
 #endif
@@ -291,6 +300,9 @@ shutdown_quantum (void) {
     delay_milliseconds(32);
 
 #ifdef HAPTIC_ENABLE
+    haptic_usb_is_configured = usb_is_configured();
+    haptic_notify_usb_device_state_change();
+
     haptic_shutdown();
 #endif
 }

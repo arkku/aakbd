@@ -19,8 +19,9 @@
 #include "solenoid.h"
 #include "haptic.h"
 #include "gpio.h"
-#include "usb_device_state.h"
 #include <stdlib.h>
+
+#include <usb_hardware.h>
 
 uint8_t      solenoid_dwell  = SOLENOID_DEFAULT_DWELL;
 static pin_t solenoid_pads[] = SOLENOID_PINS;
@@ -158,7 +159,7 @@ void solenoid_setup(void) {
 #endif
         writePin(solenoid_pads[i], !solenoid_active_state[i]);
         setPinOutput(solenoid_pads[i]);
-        if ((!HAPTIC_OFF_IN_LOW_POWER) || (usb_device_state == USB_DEVICE_STATE_CONFIGURED)) {
+        if (!HAPTIC_OFF_IN_LOW_POWER || (usb_is_configured() && !usb_is_suspended())) {
             solenoid_fire(i);
         }
     }

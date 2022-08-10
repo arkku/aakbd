@@ -25,9 +25,9 @@ KEYMAP_FILE = keymap
 endif
 endif
 
-QMK_CORE_OBJS = keyboard.o led.o $(QMK_PLATFORM).o qmk_main.o $(KEYMAP_FILE).o matrix_common.o matrix.o timer.o bitwise.o suspend.o suspend_core.o $(BOOTLOADER_TYPE).o $(DEBOUNCE_TYPE).o platform.o usb_device_state.o
+QMK_CORE_OBJS = keyboard.o led.o $(QMK_PLATFORM).o qmk_main.o $(KEYMAP_FILE).o matrix_common.o matrix.o timer.o bitwise.o suspend.o suspend_core.o $(BOOTLOADER_TYPE).o $(DEBOUNCE_TYPE).o platform.o
 
-$(BUILDDIR)/qmk_main.o: keys.h led.h aakbd.h usb_hardware.h usbkbd.h usbkbd_config.h keyboard.h keymap.h qmk_port.h progmem.h suspend.h timer.h usb_device_state.h $(COMMON_HEADERS)
+$(BUILDDIR)/qmk_main.o: keys.h led.h aakbd.h usb_hardware.h usbkbd.h usbkbd_config.h keyboard.h keymap.h qmk_port.h progmem.h suspend.h timer.h haptic.h $(COMMON_HEADERS)
 
 $(BUILDDIR)/$(KEYMAP_FILE).o: keymap.h
 $(BUILDDIR)/keyboard.o: keyboard.h led.h $(COMMON_HEADERS)
@@ -37,9 +37,8 @@ $(BUILDDIR)/matrix_common.o: $(COMMON_HEADERS)
 $(BUILDDIR)/i2c_master.o: i2c_master.h $(COMMON_HEADERS)
 $(BUILDDIR)/bitwise.o: bitwise.h util.h
 $(BUILDDIR)/suspend_core.o: suspend.h matrix.h
-$(BUILDDIR)/usb_device_state.o: usb_device_state.h haptic.h
-$(BUILDDIR)/haptic.o: haptic.h solenoid.h usb_device_state.h debug.h $(COMMON_HEADERS)
-$(BUILDDIR)/solenoid.o: solenoid.h haptic.h $(COMMON_HEADERS)
+$(BUILDDIR)/haptic.o: haptic.h solenoid.h usb_hardware.h debug.h $(COMMON_HEADERS)
+$(BUILDDIR)/solenoid.o: solenoid.h haptic.h usb_hardware.h $(COMMON_HEADERS)
 
 $(BUILDDIR)/sym_eager_pk.o: debounce.h $(COMMON_HEADERS)
 $(BUILDDIR)/sym_eager_pr.o: debounce.h $(COMMON_HEADERS)

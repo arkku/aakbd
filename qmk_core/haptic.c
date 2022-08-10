@@ -17,7 +17,6 @@
 #include "haptic.h"
 #include "eeconfig.h"
 #include "debug.h"
-#include "usb_device_state.h"
 #include "gpio.h"
 #ifdef DRV2605L
 #    include "DRV2605L.h"
@@ -26,10 +25,12 @@
 #    include "solenoid.h"
 #endif
 
+#include <usb_hardware.h>
+
 haptic_config_t haptic_config;
 
 static void update_haptic_enable_gpios(void) {
-    if (haptic_config.enable && ((!HAPTIC_OFF_IN_LOW_POWER) || (usb_device_state == USB_DEVICE_STATE_CONFIGURED))) {
+    if (haptic_config.enable && (!HAPTIC_OFF_IN_LOW_POWER || (usb_is_configured() && !usb_is_suspended()))) {
 #if defined(HAPTIC_ENABLE_PIN)
         HAPTIC_ENABLE_PIN_WRITE_ACTIVE();
 #endif
