@@ -12,7 +12,8 @@ My modifications include:
   and recognition of keys held down on start. The theoretical danger here is
   that the calibration could drift so that the recalibration macro is not
   accessible. In this case the only solution would be to flash a firmware that
-  disables using saved calibration.
+  disables using saved calibration (you can run `make ERASE_CALIBRATION=1` to
+  build a firmware that erases the calibration on start).
 * More options for configuring the keymap out of the box (e.g., split space
   and split enter).
 

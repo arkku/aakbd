@@ -43,7 +43,9 @@ struct calibration_header {
 bool keyboard_scan_enabled = true;
 
 #if CAPSENSE_CAL_ENABLED
+#ifndef CAPSENSE_CAL_VERSION
 #define CAPSENSE_CAL_VERSION 2
+#endif
 
 uint16_t cal_thresholds[CAPSENSE_CAL_BINS] = { 0 };
 matrix_row_t assigned_to_threshold[CAPSENSE_CAL_BINS][MATRIX_CAPSENSE_ROWS] = { { 0 } };
@@ -698,12 +700,20 @@ void matrix_init_kb(void) {
     dac_write_threshold(CAPSENSE_HARDCODED_THRESHOLD);
     dac_write_threshold(CAPSENSE_HARDCODED_THRESHOLD);
 
+#ifdef ERASE_CALIBRATION_ON_START
+    (void) clear_saved_matrix_calibration();
+#endif
+
 #if CAPSENSE_CAL_ENABLED
 #if CAPSENSE_CAL_DEBUG
     cal_time = timer_read();
 #endif
 
+#ifdef ERASE_CALIBRATION_ON_START
+    cal_flags |= CAPSENSE_CAL_FLAG_UNRELIABLE;
+#else
     (void) load_matrix_calibration();
+#endif
 
     (void) matrix_scan_custom(raw_matrix);
     int_fast8_t active_row_count = 0;
