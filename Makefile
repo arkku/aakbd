@@ -7,7 +7,7 @@
 CC=avr-gcc
 OPTIMIZATION=s
 CC_FLAGS=-I$(DEVICE) -I. $(AVR_FLAGS)
-CFLAGS=-O$(OPTIMIZATION) -Wall -std=c11 -pedantic -Wextra -Wno-unused-parameter $(CC_FLAGS) $(DEVICE_FLAGS) $(CONFIG_FLAGS)
+CFLAGS=-O$(OPTIMIZATION) -Wall -std=c11 -pedantic -Wextra -Wno-unused-parameter $(CUSTOM_FLAGS) $(CC_FLAGS) $(DEVICE_FLAGS) $(CONFIG_FLAGS)
 LD_FLAGS=$(AVR_FLAGS)
 LDFLAGS=-O$(OPTIMIZATION) $(LD_FLAGS)
 AR=avr-ar
@@ -24,35 +24,40 @@ DEVICE ?= ps2usb
 TARGET = $(DEVICE)
 endif
 
-HEX = $(DEVICE:=.hex)
+HEX ?= $(DEVICE:=.hex)
 BIN = $(HEX:.hex=.bin)
-OBJ = $(BIN:.bin=.o)
+OBJ = $(DEVICE:=.o)
 
 OBJS = $(OBJ) usbkbd_descriptors.o usbkbd.o keys.o $(DEVICE_OBJS)
-
-vpath %.c . $(DEVICE)
-vpath %.h . $(DEVICE)
 
 BUILDDIR ?= $(DEVICE)/build
 
 all: $(HEX)
 
--include $(DEVICE)/local.mk
-include $(DEVICE)/$(DEVICE).mk
+vpath %.c . $(DEVICE)
+vpath %.h . $(DEVICE)
 
+ifneq (,$(CUSTOM_DIR))
+CUSTOM_FLAGS += -I$(CUSTOM_DIR)
+MACROS_C = $(CUSTOM_DIR)/macros.c
+LAYERS_C = $(CUSTOM_DIR)/layers.c
+else # ^ CUSTOM_DIR
 ifneq (,$(wildcard $(DEVICE)/macros.c))
 MACROS_C = $(DEVICE)/macros.c
 else
 MACROS_C = macros.c
 endif
-
 ifneq (,$(wildcard $(DEVICE)/layers.c))
 LAYERS_C = $(DEVICE)/layers.c
 else
 LAYERS_C = layers.c
 endif
+endif
 
 BOARD = NONE
+
+-include $(DEVICE)/local.mk
+include $(DEVICE)/$(DEVICE).mk
 
 ### AVR MCU ###################################################################
 

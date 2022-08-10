@@ -17,6 +17,10 @@
 #include <qmk_core/matrix.h>
 #include <xwhatsit_core/matrix_manipulate.h>
 
+#if HAPTIC_ENABLE
+#include <qmk_core/haptic.h>
+#endif
+
 #ifndef KK_LAYERS_H
 // Note that the the `enum macro` is defined in `layers.c`. This is to ensure
 // that `layers.c` and `macros.c` agree on the macro names/numbers.
@@ -54,7 +58,7 @@ static inline bool release_weak_apple_fn(void) {
 /// in `execute_macro` and for the release `postprocess_release`.
 static inline keycode_t preprocess_press(keycode_t keycode, uint8_t physical_key, uint8_t * restrict data) {
 #if ENABLE_APPLE_FN_KEY
-    if (is_layer_active(APPLE_FN_LAYER) && !is_layer_active(WINDOWS_FN_LAYER) && keycode >= KEY(F1) && keycode <= KEY(F12) && physical_key >= KEY(F1)) {
+    if (is_layer_active(APPLE_FN_LAYER) && keycode >= KEY(F1) && keycode <= KEY(F12) && physical_key >= KEY(F1)) {
         // Combine real F-keys with Apple Fn on the virtual Fn layer
         press_weak_apple_fn();
     } else if (keycode == KEY_APPLE_FN) {
@@ -80,7 +84,7 @@ static void matrix_print_calibration_stats(void) {
 #if CAPSENSE_CAL_DEBUG
     fprintf_P(usb_kbd_type, PSTR("Calibration %u ms\n"), cal_time);
 #endif
-    fprintf_P(usb_kbd_type, PSTR("Load=%d Save=%d Skip=%d Doubt=%d\n"), calibration_loaded, calibration_saved, calibration_skipped, calibration_unreliable);
+    fprintf_P(usb_kbd_type, PSTR("Load=%d Save=%d Skip=%d Weird=%d\n"), calibration_loaded, calibration_saved, calibration_skipped, calibration_unreliable);
     fprintf_P(usb_kbd_type, PSTR("All 0 = %u, All 1 = %u\n"), cal_tr_all_zero, cal_tr_all_one);
 
     for (int_fast8_t bin = 0; bin < CAPSENSE_CAL_BINS; ++bin) {
@@ -146,11 +150,16 @@ static void execute_macro(uint8_t macro_number, bool is_release, uint8_t physica
         }
         break;
 
+    case MACRO_TOGGLE_SOLENOID:
+#if HAPTIC_ENABLE
+        haptic_toggle();
+#endif
+        break;
+
     default:
         break;
     }
 }
-
 
 /// Called after enabling or disabling a layer.
 /// This can be used to do things like add/remove modifiers based on the state
@@ -160,14 +169,11 @@ static inline void layer_state_changed(uint8_t layer, bool is_enabled) {
         switch (layer) {
 #ifdef NUM_LOCK_LAYER
         case NUM_LOCK_LAYER:
-            add_override_leds_on(LED_NUM_LOCK_BIT);
+            add_override_leds_off(LED_NUM_LOCK_BIT);
             break;
 #endif
         case APPLE_FN_LAYER:
             add_override_leds_on(LED_SCROLL_LOCK_BIT);
-            break;
-        case WINDOWS_FN_LAYER:
-            enable_layer(APPLE_FN_LAYER);
             break;
         default:
             break;
@@ -176,15 +182,12 @@ static inline void layer_state_changed(uint8_t layer, bool is_enabled) {
         switch (layer) {
 #ifdef NUM_LOCK_LAYER
         case NUM_LOCK_LAYER:
-            remove_override_leds_on(LED_NUM_LOCK_BIT);
+            remove_override_leds_off(LED_NUM_LOCK_BIT);
             break;
 #endif
         case APPLE_FN_LAYER:
             remove_override_leds_on(LED_SCROLL_LOCK_BIT);
             (void) release_weak_apple_fn(); // Make sure it gets released
-            break;
-        case WINDOWS_FN_LAYER:
-            disable_layer(APPLE_FN_LAYER);
             break;
         default:
             break;
@@ -196,9 +199,10 @@ static inline void layer_state_changed(uint8_t layer, bool is_enabled) {
 /// default initial state, e.g., set custom layers mask, load configuration
 /// from EEPROM, etc.
 static inline void handle_reset(void) {
+#if ENABLE_APPLE_FN_KEY
     is_weak_apple_fn_pressed = false;
+#endif
     clear_override_leds();
-    add_override_leds_off(LED_NUM_LOCK_BIT); // Capture Num Lock LED
 }
 
 /// Called approximately once every 10 milliseconds with an 8-bit time value.
