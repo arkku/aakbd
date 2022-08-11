@@ -3,6 +3,6 @@
 
 #include <quantum.h>
 
-#define clear_keyboard() reset_keyboard()
+#define clear_keyboard() keyboard_reset()
 
 #endif

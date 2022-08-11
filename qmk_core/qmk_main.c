@@ -287,7 +287,8 @@ main (void) {
 
 static void
 shutdown_quantum (void) {
-    keyboard_init();
+    keyboard_reset();
+    usb_keyboard_send_report();
 
     // Tear down USB
     usb_deinit();
@@ -312,7 +313,8 @@ keyboard_reset (void) {
     for (int_fast8_t row = 0; row < MATRIX_ROWS; ++row) {
         previous_matrix[row] = 0;
     }
-    keyboard_init();
+    usb_keyboard_reset();
+    reset_keys();
     delay_milliseconds(32);
 }
 

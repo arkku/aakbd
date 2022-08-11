@@ -480,6 +480,8 @@ void calibrate_matrix(void) {
         }
         cal_thresholds[bin] = bin_signal_level;
     }
+
+    cal_flags |= CAPSENSE_CAL_FLAG_CALIBRATED;
 }
 #endif
 
@@ -521,8 +523,9 @@ static bool load_matrix_calibration(void) {
 }
 
 void clear_saved_matrix_calibration(void) {
-    const struct calibration_header header = { 0, 0, 0, 0, 0 };
-    eeprom_update_block(&header, EECONFIG_CALIBRATION_DATA, sizeof(header));
+    const struct calibration_header header = { .version = 0, .cols = 0, .rows = 0, .bins = 1, .keymap_checksum = 0xDEADU };
+    char *p = EECONFIG_CALIBRATION_DATA;
+    eeprom_update_block(&header, p, sizeof(header));
 }
 
 void save_matrix_calibration(void) {
@@ -576,6 +579,8 @@ static uint16_t keymap_checksum(void) {
 }
 #endif
 
+#define MASK_TO_ROW_CASE(x) (1 << (x)): row = CAPSENSE_PHYSICAL_ROW_TO_KEYMAP_ROW((x)); break
+
 bool matrix_scan_custom(matrix_row_t current_matrix[]) {
     bool changed = false;
 
@@ -600,54 +605,6 @@ bool matrix_scan_custom(matrix_row_t current_matrix[]) {
 
         const matrix_row_t bin_columns_mask = assigned_to_threshold[bin][ASSIGNED_KEYMAP_COLS_MASK_INDEX];
 
-#ifdef CAPSENSE_CAL_TRADITIONAL_LOOP
-        // A more traditional loop implementation for scanning
-        // In my tests this performs pretty much identically to the bitwise
-        // version below, so I can't make a final decision between the two.
-
-        matrix_row_t col_mask = 1;
-        for (int_fast8_t col = 0; col < MATRIX_COLS; ++col, col_mask <<= 1) {
-            const int_fast8_t physical_col = CAPSENSE_KEYMAP_COL_TO_PHYSICAL_COL(col);
-
-            uint8_t active_rows_in_col = 0, interference;
-            if (bin_columns_mask & col_mask) {
-                // This column has keys assigned to this bin
-                active_rows_in_col = scan_physical_col(physical_col, &interference);
-                // Mask out rows that are not in this bin
-                active_rows_in_col &= bin_physical_rows_mask;
-            }
-
-            if (active_rows_in_col == 0) {
-                // No key is on in this column (or column not in bin)
-                continue;
-            }
-
-            for (int_fast8_t row = 0; row < MATRIX_CAPSENSE_ROWS; ++row) {
-                if (!(assigned_to_threshold[bin][row] & col_mask)) {
-                    // This key is not in this bin
-                    continue;
-                }
-
-                const uint8_t physical_row_mask = (1 << CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(row));
-                const uint8_t key_is_on = active_rows_in_col & physical_row_mask;
-
-                if (key_is_on) {
-                    if (!(interference & physical_row_mask)) {
-                        current_matrix[row] |= col_mask;
-                    }
-
-                    active_rows_in_col &= ~physical_row_mask;
-                    if (active_rows_in_col == 0) {
-                        // Column has no more keys pressed
-                        break;
-                    }
-                }
-            }
-        }
-#else
-#define MASK_TO_ROW_CASE(x) (1 << (x)): row = CAPSENSE_PHYSICAL_ROW_TO_KEYMAP_ROW((x)); break
-        // Bitwise loop
-
         matrix_row_t col_mask = 1;
         for (int_fast8_t col = 0; col < MATRIX_COLS; ++col, col_mask <<= 1) {
             const int_fast8_t physical_col = CAPSENSE_KEYMAP_COL_TO_PHYSICAL_COL(col);
@@ -661,9 +618,11 @@ bool matrix_scan_custom(matrix_row_t current_matrix[]) {
                 active_rows_in_col &= bin_physical_rows_mask;
             }
 
-            // Iterate over each key that's on in this column
+            // Iterate over each row that's on in this column
             while (active_rows_in_col) {
+                // Isolate the lowest 1 bit
                 const uint8_t physical_row_mask = active_rows_in_col & -active_rows_in_col;
+                // Turn it off (for loop condition)
                 active_rows_in_col ^= physical_row_mask;
 
                 uint8_t row;
@@ -689,7 +648,6 @@ bool matrix_scan_custom(matrix_row_t current_matrix[]) {
                 }
             }
         }
-#endif
     }
 #else // ^ CAPSENSE_CAL_ENABLED
     for (int_fast8_t col = 0; col < MATRIX_COLS; ++col) {
@@ -818,7 +776,9 @@ void matrix_init_kb(void) {
 #ifdef ERASE_CALIBRATION_ON_START
     cal_flags |= CAPSENSE_CAL_FLAG_UNRELIABLE;
 #else
-    (void) load_matrix_calibration();
+    if (!calibration_done) {
+        load_matrix_calibration();
+    }
 #endif
 
     (void) matrix_scan_custom(raw_matrix);
@@ -854,6 +814,7 @@ void matrix_init_kb(void) {
 
 #if CAPSENSE_CAL_AUTOSAVE
     if (!(cal_flags & (CAPSENSE_CAL_FLAG_UNRELIABLE | CAPSENSE_CAL_FLAG_LOADED | CAPSENSE_CAL_FLAG_SAVED))) {
+    cal_flags = 0;
         for (int_fast8_t bin = 0; bin < CAPSENSE_CAL_BINS; ++bin) {
             if (cal_bin_key_count[bin] >= 1 && cal_bin_key_count[bin] <= 4) {
                 // Suspicious calibration result, maybe held keys or misconfig
@@ -861,7 +822,7 @@ void matrix_init_kb(void) {
                 break;
             }
         }
-        if (!calibration_unreliable) {
+        if (calibration_done && !calibration_unreliable) {
             save_matrix_calibration();
         }
     }

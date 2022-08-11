@@ -84,8 +84,15 @@ static void matrix_print_calibration_stats(void) {
 #if CAPSENSE_CAL_DEBUG
     fprintf_P(usb_kbd_type, PSTR("Calibration %u ms\n"), cal_time);
 #endif
-    fprintf_P(usb_kbd_type, PSTR("Load=%d Save=%d Skip=%d Weird=%d\n"), calibration_loaded, calibration_saved, calibration_skipped, calibration_unreliable);
+    fprintf_P(usb_kbd_type, PSTR("Cal=%d Load=%d Save=%d Skip=%d Doubt=%d flags=%02X\n"), calibration_done, calibration_loaded, calibration_saved, calibration_skipped, calibration_unreliable, cal_flags);
     fprintf_P(usb_kbd_type, PSTR("All 0 = %u, All 1 = %u\n"), cal_tr_all_zero, cal_tr_all_one);
+
+    uint16_t scan_time = timer_read();
+    for (int_fast8_t i = 100; i; --i) {
+        (void) matrix_scan();
+    }
+    scan_time = timer_elapsed(scan_time);
+    fprintf_P(usb_kbd_type, PSTR("Scan time %u.%02u ms\n"), scan_time / 100, scan_time % 100);
 
     for (int_fast8_t bin = 0; bin < CAPSENSE_CAL_BINS; ++bin) {
         fprintf_P(usb_kbd_type, PSTR("Bin %u, threshold=%u keys=%u\n"), bin, cal_thresholds[bin], cal_bin_key_count[bin]);
@@ -93,13 +100,6 @@ static void matrix_print_calibration_stats(void) {
             fprintf_P(usb_kbd_type, PSTR("Row %u 0x%04X\n"), row, assigned_to_threshold[bin][row]);
         }
     }
-
-    uint16_t scan_time = timer_read();
-    for (int_fast8_t i = 100; i; --i) {
-        (void) matrix_scan();
-    }
-    scan_time = timer_elapsed(scan_time);
-    fprintf_P(usb_kbd_type, PSTR("Scan %u.%02u ms\n"), scan_time / 100, scan_time % 100);
 }
 #endif
 
