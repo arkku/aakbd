@@ -814,7 +814,6 @@ void matrix_init_kb(void) {
 
 #if CAPSENSE_CAL_AUTOSAVE
     if (!(cal_flags & (CAPSENSE_CAL_FLAG_UNRELIABLE | CAPSENSE_CAL_FLAG_LOADED | CAPSENSE_CAL_FLAG_SAVED))) {
-    cal_flags = 0;
         for (int_fast8_t bin = 0; bin < CAPSENSE_CAL_BINS; ++bin) {
             if (cal_bin_key_count[bin] >= 1 && cal_bin_key_count[bin] <= 4) {
                 // Suspicious calibration result, maybe held keys or misconfig
