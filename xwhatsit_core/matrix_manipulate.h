@@ -41,8 +41,9 @@ void clear_saved_matrix_calibration(void);
 void save_matrix_calibration(void);
 void calibrate_matrix(void);
 
+extern matrix_row_t assigned_to_threshold[CAPSENSE_CAL_BINS][MATRIX_CAPSENSE_ROWS + 1];
 extern uint16_t cal_thresholds[CAPSENSE_CAL_BINS];
-extern matrix_row_t assigned_to_threshold[CAPSENSE_CAL_BINS][MATRIX_CAPSENSE_ROWS];
+extern uint8_t cal_bin_rows_mask[CAPSENSE_CAL_BINS];
 extern uint8_t cal_bin_key_count[CAPSENSE_CAL_BINS];
 extern uint16_t cal_tr_all_zero;
 extern uint16_t cal_tr_all_one;

@@ -44,11 +44,14 @@ bool keyboard_scan_enabled = true;
 
 #if CAPSENSE_CAL_ENABLED
 #ifndef CAPSENSE_CAL_VERSION
-#define CAPSENSE_CAL_VERSION 2
+#define CAPSENSE_CAL_VERSION 3
 #endif
 
+#define ASSIGNED_KEYMAP_COLS_MASK_INDEX     (MATRIX_CAPSENSE_ROWS)
+
+matrix_row_t assigned_to_threshold[CAPSENSE_CAL_BINS][MATRIX_CAPSENSE_ROWS + 1] = { { 0 } };
 uint16_t cal_thresholds[CAPSENSE_CAL_BINS] = { 0 };
-matrix_row_t assigned_to_threshold[CAPSENSE_CAL_BINS][MATRIX_CAPSENSE_ROWS] = { { 0 } };
+uint8_t cal_bin_rows_mask[CAPSENSE_CAL_BINS] = { 0 };
 uint8_t cal_bin_key_count[CAPSENSE_CAL_BINS] = { 0 };
 uint16_t cal_tr_all_zero = 0xFFFFU;
 uint16_t cal_tr_all_one = 0x0000U;
@@ -71,7 +74,9 @@ static pin_t extra_direct_pins[MATRIX_EXTRA_DIRECT_ROWS][MATRIX_COLS] = MATRIX_E
 #define scan_col_raw(col, interference) test_single((col), CAPSENSE_HARDCODED_SAMPLE_TIME, (interference))
 
 #ifdef CAPSENSE_CONDUCTIVE_PLASTIC_IS_PULLED_UP_ON_KEYPRESS
-#define scan_physical_col(col, interference) (~scan_col_raw((col), (interference)))
+#ifdef MATRIX_ROWS_MASK
+#define scan_physical_col(col, interference) ((~scan_col_raw((col), (interference))) & MATRIX_ROWS_MASK)
+#endif
 #else
 #define scan_physical_col(col, interference) scan_col_raw((col), (interference))
 #endif
@@ -104,8 +109,10 @@ static INLINE uint8_t read_rows(void) {
     return CAPSENSE_READ_ROWS_VALUE;
 }
 
-#if defined(CAPSENSE_DAC_MCP4921)
+/// The current threshold written to the DAC.
+static uint16_t current_threshold;
 
+#if defined(CAPSENSE_DAC_MCP4921)
 #define nSHDN_BIT 12
 #define MCP_DAC_GAIN_2X 0
 #define MCP_DAC_GAIN_1X 1
@@ -113,6 +120,7 @@ static INLINE uint8_t read_rows(void) {
 #define BUF_BIT 14
 
 static void dac_init(void) {
+    current_threshold = 0;
     writePin(CAPSENSE_DAC_NCS, 1);
     setPinOutput(CAPSENSE_DAC_NCS);
     setPinOutput(CAPSENSE_DAC_SCK);
@@ -123,6 +131,11 @@ static void dac_init(void) {
 }
 
 void dac_write_threshold(uint16_t value) {
+    if (current_threshold == value) {
+        return;
+    }
+    current_threshold = value;
+
     const uint16_t buffered = 0;
     value |= 1 << nSHDN_BIT; // nSHDN = 0 -- make sure output is not floating.
     value |= MCP_DAC_GAIN_1X << nGA_BIT;
@@ -152,6 +165,11 @@ static void dac_init(void) {
 }
 
 void dac_write_threshold(uint16_t value) {
+    if (current_threshold == value) {
+        return;
+    }
+
+    current_threshold = value;
     value <<= 2; // The two LSB bits of this DAC are don't care.
     writePin(CAPSENSE_DAC_SYNC_N, 0);
     for (int_fast8_t i = 16; i; --i) {
@@ -188,7 +206,7 @@ void shift_data(uint32_t data, int data_idle, int shcp_idle, int stcp_idle) {
         if (!((i == 1) && (shcp_idle))) {
             writePin(CAPSENSE_SHIFT_SHCP, 0);
         }
-        data <<= 1;
+data <<= 1;
     }
     writePin(CAPSENSE_SHIFT_STCP, 1);
     if (!stcp_idle) {
@@ -338,6 +356,18 @@ static uint16_t calibration_measure_all_valid_keys(uint8_t time, int_fast8_t sam
 }
 
 void calibrate_matrix(void) {
+    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(0) < 8);
+    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(1) < 8);
+    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(2) < 8);
+    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(3) < 8);
+#if MATRIX_CAPSENSE_ROWS > 4
+    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(4) < 8);
+    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(5) < 8);
+    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(6) < 8);
+    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(7) < 8);
+#endif
+    _Static_assert(MATRIX_CAPSENSE_ROWS <= 8);
+
     uint16_t cal_thresholds_max[CAPSENSE_CAL_BINS];
     uint16_t cal_thresholds_min[CAPSENSE_CAL_BINS];
 
@@ -354,7 +384,7 @@ void calibrate_matrix(void) {
     const uint16_t delta = max - min;
 
     for (int_fast8_t bin = 0; bin < CAPSENSE_CAL_BINS; ++bin) {
-        for (int_fast8_t row = 0; row < MATRIX_CAPSENSE_ROWS; row++) {
+        for (int_fast8_t row = 0; row <= MATRIX_CAPSENSE_ROWS; row++) {
             assigned_to_threshold[bin][row] = 0;
         }
         cal_bin_key_count[bin] = 0;
@@ -369,10 +399,12 @@ void calibrate_matrix(void) {
     matrix_row_t col_mask = 1;
     for (int_fast8_t col = 0; col < MATRIX_COLS; col++, col_mask <<= 1) {
         const uint8_t physical_col = CAPSENSE_KEYMAP_COL_TO_PHYSICAL_COL(col);
+
         for (int_fast8_t row = 0; row < MATRIX_CAPSENSE_ROWS; row++) {
             const uint8_t physical_row = CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(row);
 
             if (usb_keycode_for_matrix(row, col)) { // Mapped keys only
+                const uint8_t physical_row_mask = (1 << CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(row));
                 uint16_t threshold = measure_middle(physical_col, physical_row, CAPSENSE_HARDCODED_SAMPLE_TIME, CAPSENSE_CAL_EACHKEY_REPS);
 
                 // Find the bin closest to this threshold
@@ -390,8 +422,14 @@ void calibrate_matrix(void) {
                 }
 
                 // Assign to the best fitting bin
-                assigned_to_threshold[best_bin][row] |= col_mask;
                 cal_bin_key_count[best_bin] += 1;
+                assigned_to_threshold[best_bin][row] |= col_mask;
+
+                // Combined mask of all columns in this bin
+                assigned_to_threshold[best_bin][ASSIGNED_KEYMAP_COLS_MASK_INDEX] |= col_mask;
+
+                // Combined mask of all rows in this bin
+                cal_bin_rows_mask[best_bin] |= physical_row_mask;
 
                 // Track the bin threshold range
                 if (cal_thresholds_max[best_bin] < threshold) {
@@ -459,6 +497,8 @@ static bool load_matrix_calibration(void) {
     p += sizeof(header);
     eeprom_read_block(cal_thresholds, p, sizeof(cal_thresholds));
     p += sizeof(cal_thresholds);
+    eeprom_read_block(cal_bin_rows_mask, p, sizeof(cal_bin_rows_mask));
+    p += sizeof(cal_bin_rows_mask);
     eeprom_read_block(assigned_to_threshold, p, sizeof(assigned_to_threshold));
     p += sizeof(assigned_to_threshold);
     eeprom_read_block(cal_bin_key_count, p, sizeof(cal_bin_key_count));
@@ -500,6 +540,8 @@ void save_matrix_calibration(void) {
     p += sizeof(header);
     eeprom_update_block(cal_thresholds, p, sizeof(cal_thresholds));
     p += sizeof(cal_thresholds);
+    eeprom_update_block(cal_bin_rows_mask, p, sizeof(cal_bin_rows_mask));
+    p += sizeof(cal_bin_rows_mask);
     eeprom_update_block(assigned_to_threshold, p, sizeof(assigned_to_threshold));
     p += sizeof(assigned_to_threshold);
     eeprom_update_block(cal_bin_key_count, p, sizeof(cal_bin_key_count));
@@ -547,53 +589,116 @@ bool matrix_scan_custom(matrix_row_t current_matrix[]) {
 
 #if CAPSENSE_CAL_ENABLED
     for (int_fast8_t bin = 0; bin < CAPSENSE_CAL_BINS; ++bin) {
-        uint8_t remaining_keys = cal_bin_key_count[bin];
-
-        if (remaining_keys == 0) {
-            goto no_more_keys_in_bin;
+        const uint8_t bin_physical_rows_mask = cal_bin_rows_mask[bin];
+        if (bin_physical_rows_mask == 0) {
+            // No keys in this bin, we can skip it
+            continue;
         }
 
         // Set the threshold of this bin and then scan all keys in the bin
         dac_write_threshold(cal_thresholds[bin]);
 
+        const matrix_row_t bin_columns_mask = assigned_to_threshold[bin][ASSIGNED_KEYMAP_COLS_MASK_INDEX];
+
+#ifdef CAPSENSE_CAL_TRADITIONAL_LOOP
+        // A more traditional loop implementation for scanning
+        // In my tests this performs pretty much identically to the bitwise
+        // version below, so I can't make a final decision between the two.
+
         matrix_row_t col_mask = 1;
         for (int_fast8_t col = 0; col < MATRIX_COLS; ++col, col_mask <<= 1) {
             const int_fast8_t physical_col = CAPSENSE_KEYMAP_COL_TO_PHYSICAL_COL(col);
-            uint8_t col_data, interference;
-            bool col_scanned = false;
+
+            uint8_t active_rows_in_col = 0, interference;
+            if (bin_columns_mask & col_mask) {
+                // This column has keys assigned to this bin
+                active_rows_in_col = scan_physical_col(physical_col, &interference);
+                // Mask out rows that are not in this bin
+                active_rows_in_col &= bin_physical_rows_mask;
+            }
+
+            if (active_rows_in_col == 0) {
+                // No key is on in this column (or column not in bin)
+                continue;
+            }
 
             for (int_fast8_t row = 0; row < MATRIX_CAPSENSE_ROWS; ++row) {
-                if (assigned_to_threshold[bin][row] & col_mask) {
-                    if (!col_scanned) {
-                        col_scanned = true;
-                        col_data = scan_physical_col(physical_col, &interference);
-                    }
+                if (!(assigned_to_threshold[bin][row] & col_mask)) {
+                    // This key is not in this bin
+                    continue;
+                }
 
-                    const int_fast8_t physical_row = CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(row);
-                    const uint8_t physical_row_mask = (1 << physical_row);
-                    const uint8_t key_is_on = col_data & physical_row_mask;
+                const uint8_t physical_row_mask = (1 << CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(row));
+                const uint8_t key_is_on = active_rows_in_col & physical_row_mask;
 
-                    if (key_is_on && !(interference & physical_row_mask)) {
+                if (key_is_on) {
+                    if (!(interference & physical_row_mask)) {
                         current_matrix[row] |= col_mask;
                     }
 
-                    if (--remaining_keys == 0) {
-                        goto no_more_keys_in_bin;
+                    active_rows_in_col &= ~physical_row_mask;
+                    if (active_rows_in_col == 0) {
+                        // Column has no more keys pressed
+                        break;
                     }
                 }
             }
         }
-        no_more_keys_in_bin:
-            ;
+#else
+#define MASK_TO_ROW_CASE(x) (1 << (x)): row = CAPSENSE_PHYSICAL_ROW_TO_KEYMAP_ROW((x)); break
+        // Bitwise loop
+
+        matrix_row_t col_mask = 1;
+        for (int_fast8_t col = 0; col < MATRIX_COLS; ++col, col_mask <<= 1) {
+            const int_fast8_t physical_col = CAPSENSE_KEYMAP_COL_TO_PHYSICAL_COL(col);
+
+            uint8_t active_rows_in_col = 0, interference;
+
+            if (bin_columns_mask & col_mask) {
+                // This column has keys assigned to this bin
+                active_rows_in_col = scan_physical_col(physical_col, &interference);
+                // Mask out rows that are not in this bin
+                active_rows_in_col &= bin_physical_rows_mask;
+            }
+
+            // Iterate over each key that's on in this column
+            while (active_rows_in_col) {
+                const uint8_t physical_row_mask = active_rows_in_col & -active_rows_in_col;
+                active_rows_in_col ^= physical_row_mask;
+
+                uint8_t row;
+                switch (physical_row_mask) {
+                    default:
+                    case MASK_TO_ROW_CASE(0);
+                    case MASK_TO_ROW_CASE(1);
+                    case MASK_TO_ROW_CASE(2);
+                    case MASK_TO_ROW_CASE(3);
+#if MATRIX_CAPSENSE_ROWS > 4
+                    case MASK_TO_ROW_CASE(4);
+                    case MASK_TO_ROW_CASE(5);
+                    case MASK_TO_ROW_CASE(6);
+                    case MASK_TO_ROW_CASE(7);
+#endif
+                }
+
+                if (assigned_to_threshold[bin][row] & col_mask) {
+                    // The key is assigned to this bin
+                    if (!(interference & physical_row_mask)) {
+                        current_matrix[row] |= col_mask;
+                    }
+                }
+            }
+        }
+#endif
     }
 #else // ^ CAPSENSE_CAL_ENABLED
     for (int_fast8_t col = 0; col < MATRIX_COLS; ++col) {
         int_fast8_t real_col = CAPSENSE_KEYMAP_COL_TO_PHYSICAL_COL(col);
         uint8_t interference;
-        uint8_t col_data = scan_physical_col(physical_col, &interference);
+        uint8_t active_rows_in_col = scan_physical_col(physical_col, &interference);
         for (int_fast8_t row = 0; row < MATRIX_CAPSENSE_ROWS; ++row) {
-            current_matrix[CAPSENSE_PHYSICAL_ROW_TO_KEYMAP_ROW(row)] |= (((matrix_row_t)(col_data & 1)) << col);
-            col_data >>= 1;
+            current_matrix[CAPSENSE_PHYSICAL_ROW_TO_KEYMAP_ROW(row)] |= (((matrix_row_t)(active_rows_in_col & 1)) << col);
+            active_rows_in_col >>= 1;
         }
     }
 #endif
@@ -626,12 +731,11 @@ end_of_scan:
 }
 
 void matrix_init_custom(void) {
-
 #if defined(CONTROLLER_IS_THROUGH_HOLE_BEAMSPRING) || defined(CONTROLLER_IS_THROUGH_HOLE_MODEL_F)
     // Disable on-board leds
     setPinOutput(D5);
     writePin(D5, 1);
-    setPinOutput(B0);
+setPinOutput(B0);
     writePin(B0, 1);
 #endif
 
@@ -697,7 +801,9 @@ void matrix_init_kb(void) {
     matrix_init_user();
 
     dac_write_threshold(CAPSENSE_HARDCODED_THRESHOLD);
+    current_threshold = 0;
     dac_write_threshold(CAPSENSE_HARDCODED_THRESHOLD);
+    current_threshold = 0;
     dac_write_threshold(CAPSENSE_HARDCODED_THRESHOLD);
 
 #ifdef ERASE_CALIBRATION_ON_START
