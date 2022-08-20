@@ -24,9 +24,14 @@
 #include "avr/eeprom.h"
 #include "generic_hid.h"
 
+bool matrix_scan_custom(matrix_row_t current_matrix[]);
+
 #if GENERIC_HID_REPORT_SIZE < 32
 #error "GENERIC_HID_REPORT_SIZE is too small, see util_comm.c"
 #endif
+
+#undef RAW_EPSIZE
+#define RAW_EPSIZE GENERIC_HID_REPORT_SIZE
 
 #define min(x, y) (((x) < (y))?(x):(y))
 
@@ -36,7 +41,6 @@
 #ifdef KEYBOARD_NAME
 static const char PROGMEM KEYBOARD_FILENAME[] = STR(KEYBOARD_NAME)".c";
 #endif
-extern matrix_row_t raw_matrix[MATRIX_ROWS];
 
 static const uint8_t magic[] = UTIL_COMM_MAGIC;
 
@@ -74,15 +78,18 @@ uint8_t handle_generic_hid_report(uint8_t report_id, uint8_t count, uint8_t data
         case UTIL_COMM_GET_KEYSTATE:
             response[2] = UTIL_COMM_RESPONSE_OK;
             {
-                char *current_matrix_ptr = (char *) raw_matrix;
+                matrix_row_t current_matrix[MATRIX_ROWS];
+                (void) matrix_scan_custom(current_matrix);
+                char *current_matrix_ptr = (char *)current_matrix;
                 int offset = 0;
-                if ((uint8_t) sizeof(raw_matrix) > *response_length - 3) {
+                if (sizeof(current_matrix) > *response_length - 3)
+                {
                     offset = data[3];
                     current_matrix_ptr += offset;
                 }
-                *response_length = min(*response_length - 3, (uint8_t) sizeof(raw_matrix) - offset);
-                memcpy(&response[3], current_matrix_ptr, *response_length);
-                *response_length += 3;
+                const uint8_t count = min(*response_length - 3, sizeof(current_matrix) - offset);
+                memcpy(&response[3], current_matrix_ptr, count);
+                *response_length = 3 + count;
             }
             break;
         case UTIL_COMM_GET_THRESHOLDS:
@@ -99,9 +106,9 @@ uint8_t handle_generic_hid_report(uint8_t report_id, uint8_t count, uint8_t data
                     offset = data[4];
                     assigned_to_threshold_ptr += offset;
                 }
-                *response_length = min(*response_length - 6, (uint8_t) sizeof(assigned_to_threshold[cal_bin]) - offset);
-                memcpy(&response[6], assigned_to_threshold_ptr, *response_length);
-                *response_length += 6;
+                const uint8_t count = min(*response_length - 6, sizeof(assigned_to_threshold) - offset);
+                memcpy(&response[6], assigned_to_threshold_ptr, count);
+                *response_length = count + 6;
             }
             #else
             response[3] = 0;
@@ -113,16 +120,19 @@ uint8_t handle_generic_hid_report(uint8_t report_id, uint8_t count, uint8_t data
         case UTIL_COMM_GET_KEYBOARD_FILENAME:
             {
                 int string_length = sizeof(KEYBOARD_FILENAME);
+                const uint8_t offset = data[3];
                 response[2] = UTIL_COMM_RESPONSE_OK;
-                if (data[3] >= string_length) {
+                if (offset >= string_length) {
                     response[3] = 0;
                     *response_length = 4;
                 } else {
-                    const char *substring = KEYBOARD_FILENAME + data[3];
-                    string_length -= data[3];
-                    *response_length = min(*response_length - 3, string_length);
+                    const char *substring = KEYBOARD_FILENAME + offset;
+                    string_length -= offset;
+                    if (string_length > *response_length - 3) {
+                        string_length = *response_length - 3;
+                    }
                     memcpy_P(&response[3], substring, string_length);
-                    *response_length += 3;
+                    *response_length = string_length + 3;
                 }
                 break;
             }
@@ -149,11 +159,13 @@ uint8_t handle_generic_hid_report(uint8_t report_id, uint8_t count, uint8_t data
                     uint16_t value = measure_middle_keymap_coords(col, row, CAPSENSE_HARDCODED_SAMPLE_TIME, 8);
                     response[3 + i*2] = value & 0xff;
                     response[3 + i*2 + 1] = (value >> 8) & 0xff;
-                    if (++col >= MATRIX_COLS) {
+                    ++col;
+                    if (col >= MATRIX_COLS) {
                         col -= MATRIX_COLS;
-                        if (++row >= MATRIX_CAPSENSE_ROWS) {
-                            break;
-                        }
+                        ++row;
+                    }
+                    if (row >= MATRIX_CAPSENSE_ROWS) {
+                        break;
                     }
                 }
                 break;
