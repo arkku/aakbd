@@ -383,13 +383,26 @@ void calibrate_matrix(void) {
 
     uint16_t max = (cal_tr_all_zero == 0) ? 0 : (cal_tr_all_zero - 1);
     uint16_t min = cal_tr_all_one + 1;
+
     if (max < min) {
         max = min;
     }
 
-    const uint16_t delta = max - min;
+    // Sanity check range
+    if (min < CAPSENSE_CAL_THRESHOLD_OFFSET) {
+        cal_flags |= CAPSENSE_CAL_FLAG_UNRELIABLE;
+        min = CAPSENSE_CAL_THRESHOLD_OFFSET;
+    }
+    if (min + CAPSENSE_CAL_THRESHOLD_OFFSET > max) {
+        cal_flags |= CAPSENSE_CAL_FLAG_UNRELIABLE;
+        max = min + CAPSENSE_CAL_THRESHOLD_OFFSET;
+    } else if (max > CAPSENSE_DAC_MAX - CAPSENSE_CAL_THRESHOLD_OFFSET) {
+        cal_flags |= CAPSENSE_CAL_FLAG_UNRELIABLE;
+        max = CAPSENSE_DAC_MAX - CAPSENSE_CAL_THRESHOLD_OFFSET;
+    }
 
     // Spread the initial bin thresholds across the active range
+    const uint16_t delta = max - min;
     uint16_t bin_step = (delta + CAPSENSE_CAL_THRESHOLD_OFFSET) / CAPSENSE_CAL_BINS;
     if (bin_step < CAPSENSE_CAL_THRESHOLD_OFFSET) {
         // Avoid very narrow bins (it will just slow down scanning)
@@ -403,7 +416,7 @@ void calibrate_matrix(void) {
         cal_bin_key_count[bin] = 0;
         cal_thresholds_max[bin] = 0U;
         cal_thresholds_min[bin] = 0xFFFFU;
-        cal_thresholds[bin] = (min - (CAPSENSE_CAL_THRESHOLD_OFFSET / 2)) + (bin * (bin_step + 1));
+        cal_thresholds[bin] = (min - CAPSENSE_CAL_THRESHOLD_OFFSET) + ((bin + 1) * bin_step);
     }
 
     // Measure each key and assign it to a bin
@@ -474,6 +487,11 @@ void calibrate_matrix(void) {
             bin_signal_level += 1;
             #endif
             bin_signal_level /= 2;
+        }
+
+        if (cal_bin_key_count[bin] == 1) {
+            // Suspicious outlier
+            cal_flags |= CAPSENSE_CAL_FLAG_UNRELIABLE;
         }
 
         // Offset the level so as to be more lenient with the signal
