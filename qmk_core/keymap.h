@@ -91,7 +91,8 @@
 #define KC_F10  USB_KEY_F10
 #define KC_F11  USB_KEY_F11
 #define KC_F12  USB_KEY_F12
-#define KC_APFN USB_KEY_VIRTUAL_APPLE_FN
+#define KC_PAUS     USB_KEY_PAUSE_BREAK
+#define KC_PSCR     USB_KEY_PRINT_SCREEN
 #define KC_P1       USB_KEY_KP_1
 #define KC_P2       USB_KEY_KP_2
 #define KC_P3       USB_KEY_KP_3
@@ -102,6 +103,11 @@
 #define KC_P8       USB_KEY_KP_8
 #define KC_P9       USB_KEY_KP_9
 #define KC_P0       USB_KEY_KP_0
+#define KC_PPLS     USB_KEY_KP_PLUS
+#define KC_PMNS     USB_KEY_KP_MINUS
+#define KC_PAST     USB_KEY_KP_MULTIPLY
+#define KC_PSLS     USB_KEY_KP_DIVIDE
+#define KC_PENT     USB_KEY_KP_ENTER
 #define KC_PDOT     USB_KEY_KP_DOT
 #define KC_LCTRL    USB_KEY_LEFT_CTRL
 #define KC_LCTL     USB_KEY_LEFT_CTRL
@@ -113,5 +119,6 @@
 #define KC_INT3     USB_KEY_INT_LEFT_OF_BACKSPACE
 #define KC_INT4     USB_KEY_KANJI
 #define KC_INT5     USB_KEY_HIRAGANA
+#define KC_APFN USB_KEY_VIRTUAL_APPLE_FN
 
 #endif
