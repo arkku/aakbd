@@ -777,7 +777,7 @@ void matrix_init_custom(void) {
     // Disable on-board leds
     setPinOutput(D5);
     writePin(D5, 1);
-setPinOutput(B0);
+    setPinOutput(B0);
     writePin(B0, 1);
 #endif
 
