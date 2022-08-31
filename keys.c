@@ -922,7 +922,9 @@ keys_led_state (void) {
     uint8_t leds = usb_keyboard_led_state();
     if (leds != previous_usb_led_state) {
         previous_usb_led_state = leds;
+#if LAYER_COUNT > 0
         keyboard_host_leds_changed(leds);
+#endif
     }
     leds &= ~(override_leds >> 4);
     leds |= override_leds & 0x0FU;
