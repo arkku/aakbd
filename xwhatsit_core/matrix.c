@@ -402,14 +402,25 @@ void calibrate_matrix(void) {
     }
 
     if (bin_spacing > (cal_threshold_max - cal_threshold_min)) {
+        // Bin spacing seems excessive
         bin_spacing = cal_threshold_max - cal_threshold_min;
         if (bin_spacing < CAPSENSE_CAL_THRESHOLD_OFFSET / 2) {
             bin_spacing = CAPSENSE_CAL_THRESHOLD_OFFSET / 2;
         }
     }
 
-    if (cal_threshold_max < (cal_threshold_min + CAPSENSE_CAL_THRESHOLD_OFFSET)) {
-        cal_threshold_max = cal_threshold_min + CAPSENSE_CAL_THRESHOLD_OFFSET;
+    if ((cal_threshold_max - cal_threshold_min) < CAPSENSE_CAL_THRESHOLD_OFFSET) {
+        // The min-max range is very close, spread it out a bit
+        const uint16_t offset = (CAPSENSE_CAL_THRESHOLD_OFFSET - (cal_threshold_max - cal_threshold_min)) / 2;
+        if (cal_threshold_min >= offset) {
+            cal_threshold_min -= offset;
+            cal_threshold_max += offset + ((offset * 2) < CAPSENSE_CAL_THRESHOLD_OFFSET ? 1 : 0);
+        } else {
+            cal_threshold_max = cal_threshold_min + CAPSENSE_CAL_THRESHOLD_OFFSET;
+        }
+        if (cal_threshold_max > CAPSENSE_DAC_MAX) {
+            cal_threshold_max = CAPSENSE_DAC_MAX;
+        }
     }
 
     // Measure each column and assign its rows to bins
@@ -468,9 +479,9 @@ void calibrate_matrix(void) {
                 for (int_fast8_t row = 0; row < MATRIX_CAPSENSE_ROWS; ++row) {
                     #ifdef CAPSENSE_CONDUCTIVE_PLASTIC_IS_PUSHED_DOWN_ON_KEYPRESS
                         if (seen_rows & (1 << CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(row))) {
-                            row_min[row] = mid + 1;
+                            row_min[row] = mid + 1; // mid is not correct
                         } else {
-                            row_max[row] = mid;
+                            row_max[row] = mid; // mid might be correct
                         }
                     #else
                         if (seen_rows & (1 << CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(row))) {
