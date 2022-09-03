@@ -403,6 +403,9 @@ void calibrate_matrix(void) {
 
     if (bin_spacing > (cal_threshold_max - cal_threshold_min)) {
         bin_spacing = cal_threshold_max - cal_threshold_min;
+        if (bin_spacing < CAPSENSE_CAL_THRESHOLD_OFFSET / 2) {
+            bin_spacing = CAPSENSE_CAL_THRESHOLD_OFFSET / 2;
+        }
     }
 
     if (cal_threshold_max < (cal_threshold_min + CAPSENSE_CAL_THRESHOLD_OFFSET)) {
