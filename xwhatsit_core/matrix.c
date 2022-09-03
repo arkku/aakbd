@@ -368,7 +368,7 @@ static uint16_t calibration_measure_all_valid_keys(uint8_t time, int_fast8_t sam
 void calibrate_matrix(void) {
     uint16_t cal_thresholds_max[CAPSENSE_CAL_BINS];
     uint16_t cal_thresholds_min[CAPSENSE_CAL_BINS];
-    const uint16_t bin_spacing = CAPSENSE_CAL_THRESHOLD_OFFSET;
+    uint16_t bin_spacing = CAPSENSE_CAL_THRESHOLD_OFFSET;
 
     _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(0) < 8);
     _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(1) < 8);
@@ -399,6 +399,10 @@ void calibrate_matrix(void) {
         const uint16_t tmp = cal_threshold_min;
         cal_threshold_min = cal_threshold_max;
         cal_threshold_max = tmp;
+    }
+
+    if (bin_spacing > (cal_threshold_max - cal_threshold_min)) {
+        bin_spacing = cal_threshold_max - cal_threshold_min;
     }
 
     if (cal_threshold_max < (cal_threshold_min + CAPSENSE_CAL_THRESHOLD_OFFSET)) {
