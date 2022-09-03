@@ -54,7 +54,7 @@ bool keyboard_scan_enabled = true;
 // If this this number, or fewer (but non-zero), keys appear to be suspiciously
 // close to the threshold values, try to move them to another bin.
 #ifndef CAPSENSE_CAL_SUSPICIOUS_KEY_COUNT_MAX
-#define CAPSENSE_CAL_SUSPICIOUS_KEY_COUNT_MAX 5
+#define CAPSENSE_CAL_SUSPICIOUS_KEY_COUNT_MAX 4
 #endif
 
 #define ASSIGNED_KEYMAP_COLS_MASK_INDEX     (MATRIX_CAPSENSE_ROWS)
@@ -769,9 +769,18 @@ bool matrix_scan_custom(matrix_row_t current_matrix[]) {
     }
 
 #if CAPSENSE_CAL_ENABLED
-    for (int_fast8_t bin = 0; bin < CAPSENSE_CAL_BINS; ++bin) {
-        scan_bin(bin, current_matrix);
+    static bool scan_ascending = true;
+
+    if (scan_ascending) {
+        for (int_fast8_t bin = 0; bin < CAPSENSE_CAL_BINS; ++bin) {
+            scan_bin(bin, current_matrix);
+        }
+    } else {
+        for (int_fast8_t bin = CAPSENSE_CAL_BINS; bin; ) {
+            scan_bin(--bin, current_matrix);
+        }
     }
+    scan_ascending = !scan_ascending;
 #else // ^ CAPSENSE_CAL_ENABLED
     for (int_fast8_t col = 0; col < MATRIX_COLS; ++col) {
         int_fast8_t real_col = CAPSENSE_KEYMAP_COL_TO_PHYSICAL_COL(col);
