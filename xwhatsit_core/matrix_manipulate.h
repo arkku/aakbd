@@ -30,7 +30,7 @@ extern bool keyboard_scan_enabled;
 uint16_t measure_middle_keymap_coords(uint8_t col, uint8_t row, uint8_t time, uint8_t reps);
 void shift_data(uint32_t data, int data_idle, int shcp_idle, int stcp_idle);
 void dac_write_threshold(uint16_t value);
-uint8_t test_single(uint8_t col, uint16_t time, uint8_t *interference_ptr);
+uint8_t scan_physical_column(uint8_t col, uint16_t time, uint8_t *interference_ptr);
 
 #if ENABLE_SIMULATED_TYPING
 void tracking_test(void);
@@ -45,8 +45,7 @@ extern matrix_row_t assigned_to_threshold[CAPSENSE_CAL_BINS][MATRIX_CAPSENSE_ROW
 extern uint16_t cal_thresholds[CAPSENSE_CAL_BINS];
 extern uint8_t cal_bin_rows_mask[CAPSENSE_CAL_BINS];
 extern uint8_t cal_bin_key_count[CAPSENSE_CAL_BINS];
-extern uint16_t cal_tr_all_zero;
-extern uint16_t cal_tr_all_one;
+extern uint16_t cal_threshold_min, cal_threshold_max;
 extern uint8_t cal_flags;
 
 #define CAPSENSE_CAL_FLAG_CALIBRATED    (1 << 0)

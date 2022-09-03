@@ -85,7 +85,7 @@ static void matrix_print_calibration_stats(void) {
     fprintf_P(usb_kbd_type, PSTR("Calibration %u ms\n"), cal_time);
 #endif
     fprintf_P(usb_kbd_type, PSTR("Cal=%d Load=%d Save=%d Skip=%d Doubt=%d flags=%02X\n"), calibration_done, calibration_loaded, calibration_saved, calibration_skipped, calibration_unreliable, cal_flags);
-    fprintf_P(usb_kbd_type, PSTR("All 0 = %u, All 1 = %u\n"), cal_tr_all_zero, cal_tr_all_one);
+    fprintf_P(usb_kbd_type, PSTR("Min = %u, Max = %u\n"), cal_threshold_min, cal_threshold_max);
 
     uint16_t scan_time = timer_read();
     for (int_fast8_t i = 100; i; --i) {

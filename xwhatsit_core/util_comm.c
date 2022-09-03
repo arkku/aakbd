@@ -234,7 +234,7 @@ uint8_t handle_generic_hid_report(uint8_t report_id, uint8_t count, uint8_t data
         case UTIL_COMM_GET_ROW_STATE:
             {
                 response[2] = UTIL_COMM_RESPONSE_OK;
-                response[3] = test_single(255, 0, NULL);
+                response[3] = scan_physical_column(255, 0, NULL);
                 *response_length = 4;
                 break;
             }
