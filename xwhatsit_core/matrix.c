@@ -31,10 +31,30 @@
 #include <avr/eeprom.h>
 #include <avr/power.h>
 
-#include <qmk_port.h>
 #include <eeconfig.h>
 
 #define EECONFIG_CALIBRATION_DATA ((char *) (EECONFIG_KEYMAP_UPPER_BYTE + 1))
+
+#ifndef QMK_KEYMAP
+
+// AAKBD firmware, QMK compatibility - https://github.com/arkku/aakbd
+#include <qmk_port.h>
+
+#else 
+
+// Backported from AAKBD to QMK - helpers
+#define INLINE inline __attribute__((always_inline))
+#define usb_keycode_for_matrix(row, col) pgm_read_word(&keymaps[0][(row)][(col)])
+
+#ifndef CAPSENSE_HARDCODED_THRESHOLD
+#if CAPSENSE_DAC_MAX <= 1024
+#define CAPSENSE_HARDCODED_THRESHOLD 143
+#else
+#define CAPSENSE_HARDCODED_THRESHOLD 568
+#endif
+#endif
+
+#endif
 
 struct calibration_header {
     uint8_t version;
