@@ -47,6 +47,7 @@ extern uint16_t cal_thresholds[CAPSENSE_CAL_BINS];
 extern uint8_t cal_bin_rows_mask[CAPSENSE_CAL_BINS];
 extern uint8_t cal_bin_key_count[CAPSENSE_CAL_BINS];
 extern uint16_t cal_threshold_min, cal_threshold_max;
+extern uint16_t cal_threshold_offset;
 extern uint8_t cal_flags;
 
 #define CAPSENSE_CAL_FLAG_CALIBRATED    (1 << 0)
