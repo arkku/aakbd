@@ -38,10 +38,6 @@
 #include <avr/eeprom.h>
 #include <avr/power.h>
 
-#include <eeconfig.h>
-
-#define EECONFIG_CALIBRATION_DATA ((char *) (EECONFIG_KEYMAP_UPPER_BYTE + 1))
-
 #ifndef QMK_KEYMAP
 // AAKBD firmware, QMK compatibility - https://github.com/arkku/aakbd
 #include <qmk_port.h>
@@ -72,6 +68,9 @@ struct calibration_header {
 };
 
 bool keyboard_scan_enabled = true;
+
+_Static_assert(CAPSENSE_CAL_SAVE_HEADER_SIZE == sizeof(struct calibration_header), "calibration_header size mismatch");
+_Static_assert(MATRIX_ROW_T_SIZE == sizeof(matrix_row_t), "matrix_row_t size mismatch");
 
 #if CAPSENSE_CAL_ENABLED
 #ifndef CAPSENSE_CAL_VERSION
@@ -524,10 +523,10 @@ void calibrate_matrix(void) {
 
         max += range_extend_amount;
 
-        if (min >= range_extend_amount) {
+        if (min > range_extend_amount) {
             min -= range_extend_amount;
         } else {
-            min = 0;
+            min = 1;
         }
         if (max > CAPSENSE_DAC_MAX){
             max = CAPSENSE_DAC_MAX;
@@ -565,12 +564,12 @@ void calibrate_matrix(void) {
             const uint8_t uncalibrated_row_mask = uncalibrated_rows_mask & -uncalibrated_rows_mask;
             const int_fast8_t uncalibrated_row = physical_bit_to_keymap_row(uncalibrated_row_mask);
 
-            uint16_t lower_bound = row_min[uncalibrated_row];
-            uint16_t upper_bound = row_max[uncalibrated_row];
+            uint16_t next_min = row_min[uncalibrated_row];
+            uint16_t next_max = row_max[uncalibrated_row];
 
-            if (lower_bound < upper_bound) {
+            if (next_min < next_max) {
                 // The search has not yet completed for this row
-                uint16_t mid = lower_bound + upper_bound;
+                uint16_t mid = next_min + next_max;
                 #ifdef CAPSENSE_CONDUCTIVE_PLASTIC_IS_PUSHED_DOWN_ON_KEYPRESS
                     mid -= 1;
                 #else
@@ -579,6 +578,12 @@ void calibrate_matrix(void) {
                 mid /= 2;
 
                 dac_write_threshold(mid);
+
+                #ifdef CAPSENSE_CONDUCTIVE_PLASTIC_IS_PUSHED_DOWN_ON_KEYPRESS
+                    next_min = (mid < max) ? mid + 1 : max;
+                #else
+                    next_max = (mid > min) ? mid - 1 : min;
+                #endif
 
                 // Sample all rows in this column in parallel
                 uint8_t seen_rows = 0;
@@ -596,14 +601,26 @@ void calibrate_matrix(void) {
                     if (physical_rows_mask & row_mask) {
                         #ifdef CAPSENSE_CONDUCTIVE_PLASTIC_IS_PUSHED_DOWN_ON_KEYPRESS
                             if (seen_rows & row_mask) {
-                                row_min[row] = mid + 1; // mid is not correct
-                            } else if (row_max[row] > mid) {
-                                row_max[row] = mid; // mid might be correct
+                                // mid is too low
+                                row_min[row] = next_min;
+                                if (row_max[row] <= mid) {
+                                    // row_max has a false result (unlikely, but possible)
+                                    row_max[row] = next_min + 1;
+                                }
+                            } else if (row_max[row] > mid && row_min[row] <= mid) {
+                                // mid _may_ be correct
+                                row_max[row] = mid;
                             }
                         #else
                             if (seen_rows & row_mask) {
-                                row_max[row] = mid - 1;
-                            } else if (row_min[row] < mid) {
+                                // mid is too high
+                                row_max[row] = next_max;
+                                if (row_min[row] >= mid) {
+                                    // row_min has a false result
+                                    row_min[row] = next_max - 1;
+                                }
+                            } else if (row_min[row] < mid && row_max[row] >= mid) {
+                                // mid _may_ be correct
                                 row_min[row] = mid;
                             }
                         #endif

@@ -20,7 +20,8 @@
 #ifndef MATRIX_MANIPULATE_H
 #define MATRIX_MANIPULATE_H
 
-#include "quantum.h"
+#include <quantum.h>
+#include <eeconfig.h>
 
 // Contains stuff used to manipulate the matrix using the util.
 // These are defined in matrix.c. This file is not called matrix.h to avoid conflict with qmk-native matrix.h
@@ -66,5 +67,14 @@ extern uint8_t cal_flags;
 extern uint16_t cal_time;
 #endif
 #endif
+
+#ifndef MATRIX_ROW_T_SIZE
+#define MATRIX_ROW_T_SIZE 2
+#endif
+
+#define CAPSENSE_CAL_SAVE_HEADER_SIZE 6
+#define CAPSENSE_CAL_SAVE_TOTAL_SIZE ((CAPSENSE_CAL_SAVE_HEADER_SIZE * 2) + (CAPSENSE_CAL_BINS * (((MATRIX_CAPSENSE_ROWS + 1) * MATRIX_ROW_T_SIZE) + 2)) + 2 + 2 + 2)
+
+#define EECONFIG_CALIBRATION_DATA ((char *) (EECONFIG_KEYMAP_UPPER_BYTE + 1))
 
 #endif
