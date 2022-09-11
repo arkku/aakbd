@@ -301,3 +301,5 @@
 #if (!defined(CAPSENSE_CONDUCTIVE_PLASTIC_IS_PULLED_UP_ON_KEYPRESS)) && (!defined(CAPSENSE_CONDUCTIVE_PLASTIC_IS_PUSHED_DOWN_ON_KEYPRESS))
 #    error "Please specify whether the flyplate is pushed down or pulled up on keypress!"
 #endif
+
+#include "matrix_manipulate.h"

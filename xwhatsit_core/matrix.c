@@ -31,7 +31,7 @@
  */
 
 #include <quantum.h>
-#include "matrix_manipulate.h"
+//#include "matrix_manipulate.h" // <- included from post_config.h
 #include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -876,6 +876,8 @@ static bool load_matrix_calibration(void) {
 #if CAPSENSE_CAL_ENABLED
     const char *p = EECONFIG_CALIBRATION_DATA;
     struct calibration_header header;
+
+    _Static_assert((((char * )EECONFIG_CALIBRATION_DATA) + CAPSENSE_CAL_SAVE_TOTAL_SIZE) <= (((char *) EECONFIG_MAGIC) + EECONFIG_SIZE), "EECONFIG_SIZE is wrong");
 
     // Check that the saved calibration matches this configuration
     eeprom_read_block(&header, p, sizeof(header));

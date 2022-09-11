@@ -2,6 +2,7 @@
  * Copyright © 2022 Kimmo Kulovesi
  *
  * Ported from QMK to AAKBD. Any errors are almost certainly due to that.
+ * This file must be included from post_config.h.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,7 +21,7 @@
 #ifndef MATRIX_MANIPULATE_H
 #define MATRIX_MANIPULATE_H
 
-#include <quantum.h>
+#include <matrix.h>
 #include <eeconfig.h>
 
 // Contains stuff used to manipulate the matrix using the util.
@@ -66,7 +67,6 @@ extern uint8_t cal_flags;
 #if CAPSENSE_CAL_DEBUG
 extern uint16_t cal_time;
 #endif
-#endif
 
 #ifndef MATRIX_ROW_T_SIZE
 #define MATRIX_ROW_T_SIZE 2
@@ -76,5 +76,16 @@ extern uint16_t cal_time;
 #define CAPSENSE_CAL_SAVE_TOTAL_SIZE ((CAPSENSE_CAL_SAVE_HEADER_SIZE * 2) + (CAPSENSE_CAL_BINS * (((MATRIX_CAPSENSE_ROWS + 1) * MATRIX_ROW_T_SIZE) + 2)) + 2 + 2 + 2)
 
 #define EECONFIG_CALIBRATION_DATA ((char *) (EECONFIG_KEYMAP_UPPER_BYTE + 1))
+
+#define QMK_EECONFIG_SIZE 35
+
+#if EECONFIG_SIZE != QMK_EECONFIG_SIZE
+#error "Update QMK_EECONFIG_SIZE to match EECONFIG_SIZE in eeconfig.h"
+#endif
+
+#undef EECONFIG_SIZE
+#define EECONFIG_SIZE (QMK_EECONFIG_SIZE + CAPSENSE_CAL_SAVE_TOTAL_SIZE)
+
+#endif // ^ CAPSENSE_CAL_ENABLED
 
 #endif

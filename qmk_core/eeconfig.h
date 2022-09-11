@@ -21,6 +21,8 @@
 #define EECONFIG_RGB_MATRIX_EXTENDED ((uint16_t *) 32)
 #define EECONFIG_KEYMAP_UPPER_BYTE ((uint8_t *) 34)
 
+#define EECONFIG_SIZE 35
+
 uint32_t eeconfig_read_kb(void);
 void eeconfig_update_kb(uint32_t val);
 
