@@ -69,9 +69,6 @@ struct calibration_header {
 
 bool keyboard_scan_enabled = true;
 
-_Static_assert(CAPSENSE_CAL_SAVE_HEADER_SIZE == sizeof(struct calibration_header), "calibration_header size mismatch");
-_Static_assert(MATRIX_ROW_T_SIZE == sizeof(matrix_row_t), "matrix_row_t size mismatch");
-
 #if CAPSENSE_CAL_ENABLED
 #ifndef CAPSENSE_CAL_VERSION
 #define CAPSENSE_CAL_VERSION 4
@@ -82,6 +79,9 @@ _Static_assert(MATRIX_ROW_T_SIZE == sizeof(matrix_row_t), "matrix_row_t size mis
 #ifndef CAPSENSE_CAL_SUSPICIOUS_KEY_COUNT_MAX
 #define CAPSENSE_CAL_SUSPICIOUS_KEY_COUNT_MAX 4
 #endif
+
+_Static_assert(CAPSENSE_CAL_SAVE_HEADER_SIZE == sizeof(struct calibration_header), "calibration_header size mismatch");
+_Static_assert(MATRIX_ROW_T_SIZE == sizeof(matrix_row_t), "matrix_row_t size mismatch");
 
 #define ASSIGNED_KEYMAP_COLS_MASK_INDEX     (MATRIX_CAPSENSE_ROWS)
 
@@ -872,8 +872,8 @@ void calibrate_matrix(void) {
 }
 #endif
 
-static bool load_matrix_calibration(void) {
 #if CAPSENSE_CAL_ENABLED
+static bool load_matrix_calibration(void) {
     const char *p = EECONFIG_CALIBRATION_DATA;
     struct calibration_header header;
 
@@ -908,15 +908,11 @@ static bool load_matrix_calibration(void) {
 
     cal_flags |= CAPSENSE_CAL_FLAG_LOADED;
     return true;
-#else
-    return false;
-#endif
 }
+#endif
 
 void clear_saved_matrix_calibration(void) {
-    const struct calibration_header header = { .version = 0, .cols = 0, .rows = 0, .bins = 1, .keymap_checksum = 0xDEADU };
-    char *p = EECONFIG_CALIBRATION_DATA;
-    eeprom_update_block(&header, p, sizeof(header));
+    eeprom_update_byte((uint8_t *) EECONFIG_CALIBRATION_DATA, 0xFFU);
 }
 
 void save_matrix_calibration(void) {
@@ -1044,7 +1040,7 @@ bool matrix_scan_custom(matrix_row_t current_matrix[]) {
     scan_ascending = !scan_ascending;
 #else // ^ CAPSENSE_CAL_ENABLED
     for (int_fast8_t col = 0; col < MATRIX_COLS; ++col) {
-        int_fast8_t real_col = CAPSENSE_KEYMAP_COL_TO_PHYSICAL_COL(col);
+        int_fast8_t physical_col = CAPSENSE_KEYMAP_COL_TO_PHYSICAL_COL(col);
         uint8_t interference;
         uint8_t active_rows_in_col = scan_physical_col(physical_col, &interference);
         for (int_fast8_t row = 0; row < MATRIX_CAPSENSE_ROWS; ++row) {
@@ -1139,12 +1135,14 @@ void matrix_init_custom(void) {
 #endif
 }
 
+#if CAPSENSE_CAL_ENABLED
 static void clear_matrix(void) {
     bool was_enabled = keyboard_scan_enabled;
     keyboard_scan_enabled = false;
     (void) matrix_scan(); // This clears the matrix when scan is disabled
     keyboard_scan_enabled = was_enabled;
 }
+#endif
 
 extern matrix_row_t raw_matrix[MATRIX_ROWS];
 
