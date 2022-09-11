@@ -83,10 +83,10 @@ static volatile uint8_t generic_report_pending = 0;
 static volatile int_fast8_t generic_report_busy = 0;
 
 #define generic_report_wait_lock()  do { while (generic_report_locked); generic_report_lock(); } while (0)
-#define generic_report_lock()       do { ++generic_report_busy; } while (0)
-#define generic_report_unlock()     do { --generic_report_busy; } while (0)
+#define generic_report_lock()       do { generic_report_busy = 1; } while (0)
+#define generic_report_unlock()     do { generic_report_busy = 0; } while (0)
 #define generic_report_reset()      do { generic_report_busy = 0; } while (0)
-#define generic_report_locked       (generic_report_busy > 0)
+#define generic_report_locked       (generic_report_busy)
 #else
 #define generic_report_wait_lock()  do { } while (0)
 #define generic_report_lock()       do { } while (0)
