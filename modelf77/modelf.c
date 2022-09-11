@@ -26,6 +26,6 @@ extern bool keyboard_scan_enabled;
 #if ENABLE_GENERIC_HID_ENDPOINT
 bool
 make_generic_hid_report (uint8_t report_id, uint8_t count, uint8_t report[static count]) {
-    return true;
+    return false;
 }
 #endif
