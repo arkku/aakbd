@@ -53,10 +53,6 @@
 #define STRIFY(a)           #a
 #define STR(a)              STRIFY(a)
 
-#ifdef KEYBOARD_NAME
-const char KEYBOARD_FILENAME[] = STR(KEYBOARD_NAME)".c";
-#endif
-
 #define TICKS_PER_10MS      10
 
 static uint16_t previous_tick_count;
