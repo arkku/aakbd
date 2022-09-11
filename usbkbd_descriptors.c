@@ -180,12 +180,14 @@ static const uint8_t PROGMEM generic_hid_descriptor[] = {
     HID_INPUT,              HID_IO_VARIABLE,
 #endif
 
+#if ENABLE_GENERIC_HID_OUTPUT && GENERIC_HID_FEATURE_SIZE != 0
     HID_USAGE,              GENERIC_HID_OUTPUT_USAGE,
     HID_REPORT_SIZE,        8,
     HID_LOGICAL_MINIMUM,    0x00,
     HID_LOGICAL_MAXIMUM,    0xFF,
     HID_REPORT_COUNT,       GENERIC_HID_FEATURE_SIZE,
     HID_FEATURE,            HID_IO_VARIABLE,
+#endif
 
     HID_END_COLLECTION
 };
