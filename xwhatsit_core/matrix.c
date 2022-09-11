@@ -414,17 +414,17 @@ void calibrate_matrix(void) {
     uint16_t cal_thresholds_max[CAPSENSE_CAL_BINS];
     uint16_t cal_thresholds_min[CAPSENSE_CAL_BINS];
 
-    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(0) < 8);
-    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(1) < 8);
-    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(2) < 8);
-    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(3) < 8);
+    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(0) < 8, "more than 8 physical rows?");
+    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(1) < 8, "more than 8 physical rows?");
+    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(2) < 8, "more than 8 physical rows?");
+    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(3) < 8, "more than 8 physical rows?");
 #if MATRIX_CAPSENSE_ROWS > 4
-    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(4) < 8);
-    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(5) < 8);
-    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(6) < 8);
-    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(7) < 8);
+    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(4) < 8, "more than 8 physical rows?");
+    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(5) < 8, "more than 8 physical rows?");
+    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(6) < 8, "more than 8 physical rows?");
+    _Static_assert(CAPSENSE_KEYMAP_ROW_TO_PHYSICAL_ROW(7) < 8, "more than 8 physical rows?");
 #endif
-    _Static_assert(MATRIX_CAPSENSE_ROWS <= 8);
+    _Static_assert(MATRIX_CAPSENSE_ROWS <= 8, "more than 8 matrix rows?");
 
     for (int_fast8_t bin = 0; bin < CAPSENSE_CAL_BINS; ++bin) {
         for (int_fast8_t row = 0; row <= MATRIX_CAPSENSE_ROWS; row++) {
