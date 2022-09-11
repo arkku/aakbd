@@ -41,7 +41,7 @@
 /// Every extra key past 7 costs 1 byte of report size. I don't think there are
 /// (m)any realistic scenarios where even 6 is needed since any of the
 /// modifiers (Shift, Ctrl, Alt, Cmd/Win) don't count towards this limit.
-#define USB_MAX_KEY_ROLLOVER        7
+#define USB_MAX_KEY_ROLLOVER        10
 #endif
 #ifndef MAX_KEY_ROLLOVER
 /// The internal maximum key rollover to keep track of. This can be higher than
