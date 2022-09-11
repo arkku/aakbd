@@ -273,7 +273,7 @@ static const uint8_t PROGMEM configuration_descriptor[] = {
     DESCRIPTOR_TYPE_INTERFACE,              // bDescriptorType
     GENERIC_INTERFACE_INDEX,                // bInterfaceNumber
     0,                                      // bAlternateSetting
-    1,                                      // bNumEndpoints
+    1 + ENABLE_GENERIC_HID_OUTPUT,          // bNumEndpoints
     INTERFACE_CLASS_HID,                    // bInterfaceClass
     INTERFACE_NO_SPECIFIC_SUBCLASS,         // bInterfaceSubClass
     INTERFACE_NO_SPECIFIC_PROTOCOL,         // bInterfaceProtocol
@@ -291,10 +291,19 @@ static const uint8_t PROGMEM configuration_descriptor[] = {
     // Endpoint
     DESCRIPTOR_SIZE_ENDPOINT,               // bLength
     DESCRIPTOR_TYPE_ENDPOINT,               // bDescriptorType
-    GENERIC_ENDPOINT_ADDRESS,               // bEndpointAddress
+    GENERIC_ENDPOINT_ADDRESS_IN,            // bEndpointAddress
     ENDPOINT_ATTRIBUTES_INTERRUPT,          // bmAttributes
     WORD_BYTES(GENERIC_ENDPOINT_SIZE),      // iwMaxPacketSize
     GENERIC_HID_POLL_INTERVAL_MS,           // bInterval
+
+#if ENABLE_GENERIC_HID_OUTPUT
+    DESCRIPTOR_SIZE_ENDPOINT,               // bLength
+    DESCRIPTOR_TYPE_ENDPOINT,               // bDescriptorType
+    GENERIC_ENDPOINT_ADDRESS_OUT,           // bEndpointAddress
+    ENDPOINT_ATTRIBUTES_INTERRUPT,          // bmAttributes
+    WORD_BYTES(GENERIC_ENDPOINT_SIZE),      // iwMaxPacketSize
+    GENERIC_HID_POLL_INTERVAL_MS,           // bInterval
+#endif
 #endif
 
 #if ENABLE_DFU_INTERFACE

@@ -146,8 +146,8 @@
 
 #define usb_tx(byte)                (UEDATX = (byte))
 #define usb_rx()                    (UEDATX)
-#define usb_ack_rx_out()            (UEINTX = ~(1 << RXOUTI))
-#define usb_flush_tx_in()           (UEINTX = ~(1 << TXINI))
+#define usb_ack_rx_out()            (UEINTX = (uint8_t) ~(((1 << RXOUTI) | (1 << FIFOCON))))
+#define usb_flush_tx_in()           (UEINTX = (uint8_t) ~(((1 << TXINI) | (1 << FIFOCON))))
 
 #define pll_enable()                do { \
     PLLCSR = PLL_DIV_FLAG; \

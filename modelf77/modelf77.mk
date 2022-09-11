@@ -1,4 +1,4 @@
-KEYBOARD_NAME = "keyboards/brand_new_model_f/f77/wcass/wcass"
+KEYBOARD_NAME = "keyboards/xwhatsit/brand_new_model_f/f77/wcass/wcass"
 PRODUCT ?= "F77 Keyboard"
 DEBOUNCE ?= 5
 

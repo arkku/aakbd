@@ -1,4 +1,4 @@
-KEYBOARD_NAME = "keyboards/ibm/fext/universal/universal"
+KEYBOARD_NAME = "keyboards/xwhatsit/ibm/fext/universal/universal"
 MANUFACTURER ?= "IBM Corp."
 PRODUCT ?= "Model FEXT Keyboard"
 DEBOUNCE ?= 5

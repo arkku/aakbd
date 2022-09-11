@@ -33,16 +33,20 @@ bool matrix_scan_custom(matrix_row_t current_matrix[]);
 #undef RAW_EPSIZE
 #define RAW_EPSIZE GENERIC_HID_REPORT_SIZE
 
-#define min(x, y) (((x) < (y))?(x):(y))
+#define MIN(x, y) (((x) < (y))?(x):(y))
 
 #define STRIFY(a)           #a
 #define STR(a)              STRIFY(a)
 
 #ifdef KEYBOARD_NAME
 static const char PROGMEM KEYBOARD_FILENAME[] = STR(KEYBOARD_NAME)".c";
+#else
+extern const char *KEYBOARD_FILENAME;
 #endif
 
 static const uint8_t magic[] = UTIL_COMM_MAGIC;
+
+_Static_assert(sizeof(magic) == 2, "UTIL_COMM_MAGIC should be 2 bytes");
 
 uint8_t handle_generic_hid_report(uint8_t report_id, uint8_t count, uint8_t data[static count], uint8_t response_length[static 1], uint8_t response[static *response_length]) {
     if (0 != memcmp(data, magic, sizeof(magic))) {
@@ -79,15 +83,18 @@ uint8_t handle_generic_hid_report(uint8_t report_id, uint8_t count, uint8_t data
             response[2] = UTIL_COMM_RESPONSE_OK;
             {
                 matrix_row_t current_matrix[MATRIX_ROWS];
+                uint8_t matrix_size = sizeof(current_matrix);
+                uint8_t count = *response_length - 3;
+
                 (void) matrix_scan_custom(current_matrix);
                 char *current_matrix_ptr = (char *)current_matrix;
-                int offset = 0;
-                if (sizeof(current_matrix) > *response_length - 3)
-                {
+                uint8_t offset = 0;
+                if (matrix_size > count) {
                     offset = data[3];
                     current_matrix_ptr += offset;
                 }
-                const uint8_t count = min(*response_length - 3, sizeof(current_matrix) - offset);
+                matrix_size -= offset;
+                count = MIN(count, matrix_size);
                 memcpy(&response[3], current_matrix_ptr, count);
                 *response_length = 3 + count;
             }
@@ -97,16 +104,19 @@ uint8_t handle_generic_hid_report(uint8_t report_id, uint8_t count, uint8_t data
             #if CAPSENSE_CAL_ENABLED
             response[3] = CAPSENSE_CAL_BINS;
             {
-                const uint8_t cal_bin = data[3];
+                const uint8_t cal_bin = MIN(CAPSENSE_CAL_BINS, data[3]);
                 response[4] = cal_thresholds[cal_bin] & 0xff;
                 response[5] = (cal_thresholds[cal_bin] >> 8) & 0xff;
                 char *assigned_to_threshold_ptr = (char *)assigned_to_threshold[cal_bin];
-                int offset = 0;
-                if ((uint8_t) sizeof(assigned_to_threshold[cal_bin]) > *response_length - 6) {
+                uint8_t count = *response_length - 6;
+                uint8_t offset = 0;
+                uint8_t bin_size = MATRIX_ROW_T_SIZE * MATRIX_CAPSENSE_ROWS;
+                if (bin_size > count) {
                     offset = data[4];
                     assigned_to_threshold_ptr += offset;
                 }
-                const uint8_t count = min(*response_length - 6, sizeof(assigned_to_threshold) - offset);
+                bin_size -= offset;
+                count = MIN(count, bin_size);
                 memcpy(&response[6], assigned_to_threshold_ptr, count);
                 *response_length = count + 6;
             }

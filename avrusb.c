@@ -51,7 +51,8 @@
 #endif
 #define KEYBOARD_ENDPOINT_TYPE      EP_TYPE_INTERRUPT_IN
 #define GENERIC_ENDPOINT_FLAGS      EP_SINGLE_BUFFER
-#define GENERIC_ENDPOINT_TYPE       EP_TYPE_INTERRUPT_IN
+#define GENERIC_ENDPOINT_IN_TYPE    EP_TYPE_INTERRUPT_IN
+#define GENERIC_ENDPOINT_OUT_TYPE   EP_TYPE_INTERRUPT_OUT
 
 // MARK: - USB Variables
 
@@ -78,11 +79,6 @@ static volatile uint8_t generic_update_on_idle_count = GENERIC_HID_UPDATE_IDLE_M
 static volatile uint8_t generic_idle_count = 0;
 static volatile uint8_t generic_report_pending = 0;
 
-#if GENERIC_HID_HANDLE_SYNCHRONOUSLY
-static volatile uint8_t generic_request_pending = 0;
-static volatile uint8_t generic_request_pending_id = 0;
-#endif
-
 #if GENERIC_HID_REPORT_SIZE != 0
 static uint8_t generic_report[GENERIC_HID_REPORT_SIZE] = { 0 };
 #else
@@ -106,7 +102,7 @@ static volatile uint8_t usb_request_detach = 0;
 
 #define is_boot_protocol usb_keyboard_is_in_boot_protocol
 
-static INLINE bool usb_wait_to_send(uint8_t * const sregptr, const int_fast8_t endpoint);
+static INLINE bool usb_wait_for_rw(uint8_t * const sregptr, const int_fast8_t endpoint);
 
 static void
 usb_devices_reset (void) {
@@ -116,10 +112,6 @@ usb_devices_reset (void) {
 #if ENABLE_GENERIC_HID_ENDPOINT
     generic_update_on_idle_count = DIV_ROUND_BYTE(IDLE_COUNT_FRAME_DIVIDER, GENERIC_HID_POLL_INTERVAL_MS);
     generic_report_pending = 0;
-#if GENERIC_HID_HANDLE_SYNCHRONOUSLY
-    generic_request_pending = 0;
-    generic_request_pending_id = 0;
-#endif
 #endif
 }
 
@@ -199,7 +191,10 @@ usb_init_endpoints (void) {
 
 #if ENABLE_GENERIC_HID_ENDPOINT
     _Static_assert(IS_ENDPOINT_SIZE_VALID(GENERIC_ENDPOINT_SIZE), "Invalid Generic HID endpoint size");
-    usb_init_endpoint(GENERIC_HID_ENDPOINT_NUM, GENERIC_ENDPOINT_TYPE, GENERIC_ENDPOINT_SIZE, GENERIC_ENDPOINT_FLAGS);
+    usb_init_endpoint(GENERIC_HID_ENDPOINT_IN_NUM, GENERIC_ENDPOINT_IN_TYPE, GENERIC_ENDPOINT_SIZE, GENERIC_ENDPOINT_FLAGS);
+#if ENABLE_GENERIC_HID_OUTPUT
+    usb_init_endpoint(GENERIC_HID_ENDPOINT_OUT_NUM, GENERIC_ENDPOINT_OUT_TYPE, GENERIC_ENDPOINT_SIZE, GENERIC_ENDPOINT_FLAGS);
+#endif
 #endif
 
     //usb_reset_endpoints_1to(USB_MAX_ENDPOINT);
@@ -322,7 +317,7 @@ usb_tx_keys_state (void) {
 }
 
 static INLINE bool
-usb_wait_to_send (uint8_t * const sregptr, const int_fast8_t endpoint) {
+usb_wait_for_rw (uint8_t * const sregptr, const int_fast8_t endpoint) {
     const uint8_t timeout = usb_frame_count + 50U;
 
     uint8_t old_sreg = SREG;
@@ -359,7 +354,7 @@ usb_keyboard_send_report (void) {
 
     uint8_t old_sreg;
 
-    if (!usb_wait_to_send(&old_sreg, KEYBOARD_ENDPOINT_NUM)) {
+    if (!usb_wait_for_rw(&old_sreg, KEYBOARD_ENDPOINT_NUM)) {
         usb_error = 'T';
         return false;
     }
@@ -415,13 +410,13 @@ send_generic_hid_report (uint8_t report_id, uint8_t count, const uint8_t report[
     }
 
     uint8_t old_sreg;
-    if (!usb_keyboard_wait_to_send(&old_sreg, GENERIC_HID_ENDPOINT_NUM)) {
+    if (!usb_keyboard_wait_to_send(&old_sreg, GENERIC_HID_ENDPOINT_IN_NUM)) {
         return false;
     }
 
     generic_report_pending = false;
 
-    usb_set_endpoint(GENERIC_HID_ENDPOINT_NUM);
+    usb_set_endpoint(GENERIC_HID_ENDPOINT_IN_NUM);
     usb_wake_up_if_suspended();
 
     if (report_id) {
@@ -474,6 +469,25 @@ generic_request_call_handler (const uint8_t report_id, const uint8_t length) {
     }
     return true;
 }
+
+#if ENABLE_GENERIC_HID_OUTPUT
+static void
+receive_generic_hid_report (void) {
+    uint8_t bytes = 0;
+    usb_set_endpoint(GENERIC_HID_ENDPOINT_OUT_NUM);
+
+    if (is_usb_rx_out_ready) {
+        while (is_usb_rw_allowed && bytes < sizeof(generic_request)) {
+            generic_request[bytes++] = usb_rx();
+        }
+        usb_ack_rx_out();
+    }
+
+    if (bytes) {
+        generic_request_call_handler(0, bytes);
+    }
+}
+#endif
 #endif // ^ ENABLE_GENERIC_HID_ENDPOINT
 
 // MARK: - Periodically called task
@@ -489,18 +503,13 @@ usb_tick (void) {
         }
     } else {
 #if ENABLE_GENERIC_HID_ENDPOINT
-#if GENERIC_HID_HANDLE_SYNCHRONOUSLY
-        if (generic_request_pending_id) {
-            const uint8_t request_id = generic_request_pending_id;
-            generic_request_pending_id = 0;
-            generic_request_call_handler(request_id, generic_request_pending);
-            generic_request_pending = 0;
-        }
+#if ENABLE_GENERIC_HID_OUTPUT
+        receive_generic_hid_report();
 #endif
         if (generic_report_pending) {
             send_generic_hid_report(0, generic_report_pending, generic_report);
         }
-#endif
+#endif // ^ ENABLE_GENERIC_HID_ENDPOINT
     }
 }
 
@@ -556,7 +565,7 @@ ISR(USB_GEN_vect) {
 #endif
 #if ENABLE_GENERIC_HID_ENDPOINT
             if (generic_update_on_idle_count) {
-                usb_set_endpoint(GENERIC_HID_ENDPOINT_NUM);
+                usb_set_endpoint(GENERIC_HID_ENDPOINT_IN_NUM);
                 if (is_usb_rw_allowed) {
                     if (++generic_idle_count == generic_update_on_idle_count) {
                         if (generic_report_pending) {
@@ -827,29 +836,21 @@ ISR(USB_COM_vect) {
             }
         } else if (type == USB_REQUEST_HOST_TO_DEVICE_CLASS_INTERFACE) {
             if (request == HID_REQUEST_SET_REPORT) {
+#if ENABLE_GENERIC_HID_OUTPUT
+                // The request should come through the output endpoint
+                success = false;
+#else
                 if (length > GENERIC_HID_FEATURE_SIZE) {
                     length = GENERIC_HID_FEATURE_SIZE;
                 }
 
-#if GENERIC_HID_HANDLE_SYNCHRONOUSLY
-                if (generic_request_pending) {
-                    success = false;
-                } else {
-                    generic_request_pending_id = value & 0xFFU;
-#else
-                {
-#endif
-                    usb_wait_rx_out();
-                    for (i = 0; i < length; ++i) {
-                        generic_request[i] = usb_rx();
-                    }
-                    usb_ack_rx_out();
-#if GENERIC_HID_HANDLE_SYNCHRONOUSLY
-                    generic_request_pending = length;
-#else
-                    success = generic_request_call_handler(value & 0xFFU, length);
-#endif
+                usb_wait_rx_out();
+                for (i = 0; i < length; ++i) {
+                    generic_request[i] = usb_rx();
                 }
+                usb_ack_rx_out();
+                success = generic_request_call_handler(value & 0xFFU, length);
+#endif
             } else if (request == HID_REQUEST_SET_IDLE) {
                 generic_idle_count = 0;
 #if GENERIC_HID_UPDATE_IDLE_MS
