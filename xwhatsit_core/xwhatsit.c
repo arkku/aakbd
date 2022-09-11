@@ -1,7 +1,8 @@
 /**
- * modelf.c: An alternative firmware for Brand New Model F keyboards.
+ * xwhatsit.c: An alternative firmware for xwhatsit-based keyboards, such as
+ * the brand new model F keyboards.
  *
- * Copyright (c) 2021 Kimmo Kulovesi, https://arkku.dev/
+ * Copyright (c) 2022 Kimmo Kulovesi, https://arkku.dev/
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,7 +23,8 @@
 
 extern bool keyboard_scan_enabled;
 
-#include "generic_hid.h"
+#include <generic_hid.h>
+
 #if ENABLE_GENERIC_HID_ENDPOINT
 bool
 make_generic_hid_report (uint8_t report_id, uint8_t count, uint8_t report[static count]) {

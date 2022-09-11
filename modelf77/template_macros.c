@@ -15,6 +15,7 @@
 
 #include "config.h"
 #include <qmk_core/matrix.h>
+#include <qmk_core/platforms/timer.h>
 #include <xwhatsit_core/matrix_manipulate.h>
 
 #if HAPTIC_ENABLE
