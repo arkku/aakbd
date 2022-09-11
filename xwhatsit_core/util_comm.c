@@ -1,7 +1,8 @@
 /* Copyright 2020 Purdea Andrei
- * Copyright 2021 Kimmo Kulovesi <https://arkku.dev/>
  *
+ * Copyright 2022 Kimmo Kulovesi:
  * Ported from QMK to AAKBD. Any errors are almost certainly due to that.
+ * Then backported to QMK, to avoid confusing it due to calibration changes.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,13 +17,56 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
+#include <quantum.h>
+
+#ifndef QMK_KEYMAP
+// AAKBD, https://github.com/arkku/aakbd
+
+#include "avr/eeprom.h"
+#include "generic_hid.h"
+
+#undef RAW_EPSIZE
+#define RAW_EPSIZE GENERIC_HID_REPORT_SIZE
+
+#define MIN(x, y) (((x) < (y))?(x):(y))
+#define STRIFY(a) #a
+#define STR(a) STRIFY(a)
+
+#else
+// QMK compatibility backport
+
+#ifdef RAW_ENABLE
+#define ENABLE_GENERIC_HID_ENDPOINT 1
+#else
+#define ENABLE_GENERIC_HID_ENDPOINT 0
+#endif
+
+#include "raw_hid.h"
+#include <platforms/eeprom.h>
+
+#if defined(KEYBOARD_SHARED_EP) && defined(RAW_ENABLE)
+#error "Enabling the KEYBOARD_SHARED_EP will make the util be unable to communicate with the firmware, because due to hidapi limiations, the util can't figure out which interface to talk to, so it hardcodes interface zero."
+#endif
+
+bool matrix_scan_custom(matrix_row_t current_matrix[]);
+
+#ifndef RAW_EPSIZE
+#define RAW_EPSIZE 32
+#endif
+
+#define GENERIC_HID_REPORT_SIZE RAW_EPSIZE
+
+#define RESPONSE_OK                 (0)
+#define RESPONSE_SEND_REPLY         (1)
+#define RESPONSE_JUMP_TO_BOOTLOADER (2)
+#define RESPONSE_ERROR              (3)
+#endif
+
 #if ENABLE_GENERIC_HID_ENDPOINT
-#include "quantum.h"
 #include "util_comm.h"
 #include "matrix_manipulate.h"
 #include <string.h>
-#include "avr/eeprom.h"
-#include "generic_hid.h"
 
 bool matrix_scan_custom(matrix_row_t current_matrix[]);
 
@@ -30,18 +74,10 @@ bool matrix_scan_custom(matrix_row_t current_matrix[]);
 #error "GENERIC_HID_REPORT_SIZE is too small, see util_comm.c"
 #endif
 
-#undef RAW_EPSIZE
-#define RAW_EPSIZE GENERIC_HID_REPORT_SIZE
-
-#define MIN(x, y) (((x) < (y))?(x):(y))
-
-#define STRIFY(a)           #a
-#define STR(a)              STRIFY(a)
-
 #ifdef KEYBOARD_NAME
 static const char PROGMEM KEYBOARD_FILENAME[] = STR(KEYBOARD_NAME)".c";
 #else
-extern const char *KEYBOARD_FILENAME;
+extern const char PROGMEM KEYBOARD_FILENAME[];
 #endif
 
 static const uint8_t magic[] = UTIL_COMM_MAGIC;
@@ -129,7 +165,7 @@ uint8_t handle_generic_hid_report(uint8_t report_id, uint8_t count, uint8_t data
             break;
         case UTIL_COMM_GET_KEYBOARD_FILENAME:
             {
-                int string_length = sizeof(KEYBOARD_FILENAME);
+                int string_length = strlen_P(KEYBOARD_FILENAME) + 1;
                 const uint8_t offset = data[3];
                 response[2] = UTIL_COMM_RESPONSE_OK;
                 if (offset >= string_length) {
@@ -253,4 +289,30 @@ uint8_t handle_generic_hid_report(uint8_t report_id, uint8_t count, uint8_t data
     }
     return RESPONSE_SEND_REPLY;
 }
-#endif
+
+#ifdef QMK_KEYMAP
+void raw_hid_receive(uint8_t *data, uint8_t length) {
+    uint8_t generic_report[RAW_EPSIZE];
+    uint8_t response_length = RAW_EPSIZE;
+    const uint8_t response = handle_generic_hid_report(0, length, data, &response_length, generic_report);
+
+    switch (response) {
+    case RESPONSE_OK:
+        break;
+    case RESPONSE_SEND_REPLY:
+        raw_hid_send(generic_report, sizeof(generic_report));
+        break;
+    case RESPONSE_JUMP_TO_BOOTLOADER:
+        keyboard_scan_enabled = 0;
+        wait_ms(10);
+        bootloader_jump();
+        break;
+    case RESPONSE_ERROR:
+        break;
+    default:
+        break;
+    }
+}
+#endif // ^ QMK
+
+#endif // ^ ENABLE_GENERIC_HID_ENDPOINT
