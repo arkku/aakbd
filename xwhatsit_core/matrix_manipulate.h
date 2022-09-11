@@ -79,7 +79,6 @@ extern uint16_t cal_time;
 #define CAPSENSE_CAL_SAVE_TOTAL_SIZE 1
 #endif
 
-
 #define EECONFIG_CALIBRATION_DATA ((char *) (EECONFIG_KEYMAP_UPPER_BYTE + 1))
 
 #define QMK_EECONFIG_SIZE 35
