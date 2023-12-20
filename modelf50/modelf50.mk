@@ -1,0 +1,13 @@
+KEYBOARD_NAME = "keyboards/xwhatsit/brand_new_model_f/f50/wcass/wcass"
+PRODUCT ?= "F50 Keyboard"
+DEBOUNCE ?= 5
+
+include modelf77/modelf-common.mk
+
+SPLIT_PAD_ENTER ?= 0
+SPLIT_PAD_PLUS ?= 0
+SPLIT_PAD_ZERO ?= 0
+
+DEVICE_FLAGS += -DSPLIT_PAD_ENTER=$(SPLIT_PAD_ENTER) -DSPLIT_PAD_PLUS=$(SPLIT_PAD_PLUS) -DSPLIT_PAD_ZERO=$(SPLIT_PAD_ZERO) -DMATRIX_ROW_T_SIZE=1
+
+DEVICE_FLAGS += -DMODELF=50

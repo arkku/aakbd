@@ -90,4 +90,8 @@ extern uint16_t cal_time;
 #undef EECONFIG_SIZE
 #define EECONFIG_SIZE (QMK_EECONFIG_SIZE + CAPSENSE_CAL_SAVE_TOTAL_SIZE)
 
+#if EECONFIG_SIZE > 512
+#warning "The configuration might not fit in EEPROM"
+#endif
+
 #endif
