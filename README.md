@@ -57,7 +57,7 @@ Currently this repository contains three implementations:
   (which I happen to have from an old job, and decided to port as a proof of
   concept that this engine is reusable)
 * An alternative firmware for the [Brand New Model F Keyboards](https://www.modelfkeyboards.com/)
-  (F77 and F62), split into the `modelf77` and `modelf62` directories
+  (F77, F62, and F50), split into the `modelf77`, `modelf62`, and `modelf50` directories
 
 ~ [Kimmo Kulovesi](https://arkku.dev/), 2021-10-10
 
@@ -84,7 +84,7 @@ after compiling with `DEVICE=ergodox`. See the
 [ErgoDox Ez firmware README](ergodox/README.md) for details.
 
 For Model F keyboards, this has only been tested with the last USB-C versions
-of the keyboards (both F77 and F62).
+of the keyboards.
 <kbd>Fn</kbd>+<kbd>Space</kbd>+<kbd>R</kbd> may work to reset the keyboard,
 or you can power it up while shorting the programming pads (but they are
 inconviently located on the "inner" side of the PCB, so you probably need to
