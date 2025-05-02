@@ -80,7 +80,7 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
     HID_REPORT_COUNT,       MODIFIER_COUNT - APPLE_FN_IS_MODIFIER,
     HID_INPUT,              HID_IO_VARIABLE,
 
-#if RESERVE_BOOT_PROTOCOL_RESERVED_BYTE
+#if RESERVE_BOOT_PROTOCOL_RESERVED_BYTE && !APPLE_FN_IS_MODIFIER
     // Reserved byte of the boot protocol
     // Note: In boot protocol mode this descriptor will be ignored, so our
     // actual report does not have to conform to the boot protocol, nor do we
@@ -95,6 +95,10 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
     HID_REPORT_COUNT,       1,
     HID_REPORT_SIZE,        16 - MODIFIER_COUNT,
     HID_INPUT,              HID_IO_CONSTANT,
+
+#if ENABLE_EXTRA_APPLE_KEYS
+#error "RESERVE_BOOT_PROTOCOL_RESERVED_BYTE is incompatible with ENABLE_EXTRA_APPLE_KEYS"
+#endif
 #endif
 
 #if ENABLE_APPLE_FN_KEY
@@ -131,7 +135,13 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
     HID_INPUT,              HID_IO_VARIABLE,
     HID_USAGE,              HID_USAGE_APPLE_EXPOSE_DESKTOP,
     HID_INPUT,              HID_IO_VARIABLE,
-#endif // ENABLE_EXTRA_APPLE_KEYS
+#else // ^ ENABLE_EXTRA_APPLE_KEYS
+#if RESERVE_BOOT_PROTOCOL_RESERVED_BYTE && APPLE_FN_IS_MODIFIER
+    HID_REPORT_COUNT,       1,
+    HID_REPORT_SIZE,        8,
+    HID_INPUT,              HID_IO_CONSTANT,
+#endif
+#endif // ^ !ENABLE_EXTRA_APPLE_KEYS
 #endif // ^ ENABLE_APPLE_FN_KEY
 
 #if ENABLE_MEDIA_KEYS
@@ -161,6 +171,7 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
 #error "MEDIA_KEYS_COUNT must be <= 8"
 #endif
 #elif APPLE_KEYS_EXTRA_BITS != 1
+#warning "Unused padding for media keys, increase MEDIA_KEYS_COUNT?"
     HID_REPORT_COUNT,       8 - MEDIA_KEYS_COUNT,
     HID_REPORT_SIZE,        1,
     HID_INPUT,              HID_IO_CONSTANT,
@@ -518,7 +529,4 @@ usb_descriptor_length_and_data (const uint16_t value, const uint16_t index, cons
 #endif
 #if ENABLE_APPLE_FN_KEY && USB_VENDOR_ID != USB_VENDOR_ID_APPLE
 #error "USB_VENDOR_ID must be USB_VENDOR_ID_APPLE for ENABLE_APPLE_FN_KEY"
-#endif
-#if APPLE_FN_IS_MODIFIER && RESERVE_BOOT_PROTOCOL_RESERVED_BYTE
-#error "APPLE_FN_IS_MODIFIER is not compatible with RESERVE_BOOT_PROTOCOL_RESERVED_BYTE"
 #endif

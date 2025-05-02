@@ -331,7 +331,12 @@ enum keycode_usb {
 
     // Requires the use of Apple's vendor id and a separate byte in the
     // report descriptor (usage page 0xFF, usage 0x03, 1 = pressed).
+#if APPLE_FN_IS_MODIFIER
+    // If Apple Fn is a modifier, then it replaces right cmd
+    USB_KEY_VIRTUAL_APPLE_FN = USB_KEY_RIGHT_CMD,
+#else
     USB_KEY_VIRTUAL_APPLE_FN = (USB_KEY_RIGHT_CMD + 1),
+#endif
     USB_KEY_VIRTUAL_APPLE_BRIGHTNESS_UP,
     USB_KEY_VIRTUAL_APPLE_BRIGHTNESS_DOWN,
     USB_KEY_VIRTUAL_APPLE_SPOTLIGHT,
@@ -363,7 +368,7 @@ enum keycode_usb {
 #endif
 #ifndef CC_MEDIA_KEY_3
 #define CC_MEDIA_KEY_3 CC_KEY_MEDIA_PLAY_PAUSE
-#define USB_KEY_VIRTUAL_ USB_KEY_VIRTUAL_MEDIA_3
+#define USB_KEY_VIRTUAL_PLAY_PAUSE USB_KEY_VIRTUAL_MEDIA_3
 #endif
 #ifndef CC_MEDIA_KEY_4
 #define CC_MEDIA_KEY_4 CC_KEY_MEDIA_MUTE

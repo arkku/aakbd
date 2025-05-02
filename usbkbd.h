@@ -196,7 +196,7 @@ extern volatile uint8_t key_error;
 #define IS_VIRTUAL_KEY(key)     ((key) >= VIRTUAL_KEYS_START && (key) <= VIRTUAL_KEYS_END)
 
 #if ENABLE_MEDIA_KEYS && APPLE_KEYS_EXTRA_BITS <= 1 && ENABLE_APPLE_FN_KEY
-#define VIRTUAL_KEY_BIT(key)    ((key) < USB_KEY_VIRTUAL_MEDIA_1 ? APPLE_KEYS_EXTRA_BITS : ((usb_keys_extended_flags_t) 1 << (((key) - USB_KEY_VIRTUAL_MEDIA_1) + APPLE_KEYS_EXTRA_BITS)))
+#define VIRTUAL_KEY_BIT(key)    (((key) < USB_KEY_VIRTUAL_MEDIA_1) ? APPLE_KEYS_EXTRA_BITS : ((usb_keys_extended_flags_t) 1 << (((key) - USB_KEY_VIRTUAL_MEDIA_1) + APPLE_KEYS_EXTRA_BITS)))
 #else
 #define VIRTUAL_KEY_BIT(key)    ((usb_keys_extended_flags_t) 1 << ((key) - VIRTUAL_KEYS_START))
 #endif
