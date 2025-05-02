@@ -46,24 +46,28 @@
 #endif
 
 #if SPLIT_PAD_PLUS
+#define KC_PPLS1    KC_PPLS
 #define KC_PPLS2    KC_BSPC
 #else
+#define KC_PPLS1    KC_PPLS
 #define KC_PPLS2    KC_NO
 #endif
 
 #if SPLIT_PAD_ZERO
-#define KC_BMID     KC_P00
+#define KC_P0L      KC_P0
+#define KC_P0R      KC_P00
 #else
-#define KC_BMID     KC_NO
+#define KC_P0L      KC_NO
+#define KC_P0R      KC_P0
 #endif
 
 const uint8_t PROGMEM keymaps[1][MATRIX_ROWS][MATRIX_COLS] = {
     [_BASE] = LAYOUT_all(
         KC_F1,   KC_F5,   KC_F9,    KC_F13,  KC_F17,  KC_F21,     KC_NLCK, KC_PSLS, KC_PAST, KC_PMNS,
-        KC_F2,   KC_F6,   KC_F10,   KC_F14,  KC_F18,  KC_F22,     KC_P7,   KC_P8,   KC_P9,   KC_PPLS,
+        KC_F2,   KC_F6,   KC_F10,   KC_F14,  KC_F18,  KC_F22,     KC_P7,   KC_P8,   KC_P9,   KC_PPLS1,
         KC_F3,   KC_F7,   KC_F11,   KC_F15,  KC_F19,  KC_F23,     KC_P4,   KC_P5,   KC_P6,   KC_PPLS2,
         KC_F4,   KC_F8,   KC_F12,   KC_F16,  KC_F20,  KC_F24,     KC_P1,   KC_P2,   KC_P3,   KC_PENT1,
-        KC_PA,   KC_PB,   KC_PC,    KC_PD,   KC_PE,   KC_PF,      KC_P0,   KC_BMID, KC_PDOT, KC_PENT2
+        KC_PA,   KC_PB,   KC_PC,    KC_PD,   KC_PE,   KC_PF,      KC_P0L,  KC_P0R,  KC_PDOT, KC_PENT2
     )
 };
 
