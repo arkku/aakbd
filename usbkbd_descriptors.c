@@ -100,25 +100,22 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
 #if ENABLE_APPLE_FN_KEY
     HID_LOGICAL_MINIMUM,    0,
     HID_LOGICAL_MAXIMUM,    1,
-#if ENABLE_EXTRA_APPLE_KEYS || APPLE_FN_IS_MODIFIER
-    HID_REPORT_SIZE,        1,
-#else
+#if APPLE_KEYS_EXTRA_BITS == 1 && !ENABLE_MEDIA_KEYS
     HID_REPORT_SIZE,        8,
+#else
+    HID_REPORT_SIZE,        1,
 #endif
     HID_REPORT_COUNT,       1,
     HID_USAGE_PAGE,         HID_USAGE_PAGE_VENDOR_APPLE_TOP_COVER,
     HID_USAGE,              HID_USAGE_APPLE_FN_KEY,
     HID_INPUT,              HID_IO_VARIABLE,
 #if ENABLE_EXTRA_APPLE_KEYS
-#if APPLE_FN_IS_MODIFIER
-    HID_REPORT_COUNT,       1,
-    HID_REPORT_SIZE,        1,
-    HID_INPUT,              HID_IO_CONSTANT,
-#endif
     HID_LOGICAL_MINIMUM,    0,
     HID_LOGICAL_MAXIMUM,    1,
-    HID_REPORT_SIZE,        1,
-    HID_REPORT_COUNT,       1,
+#if APPLE_FN_IS_MODIFIER
+#warning "APPLE_FN_IS_MODIFIER is pointless with ENABLE_EXTRA_APPLE_KEYS"
+    HID_INPUT,              HID_IO_CONSTANT,
+#endif
     HID_USAGE_PAGE_WORD,    WORD_BYTES(HID_USAGE_PAGE_VENDOR_APPLE_KEYBOARD),
     HID_USAGE,              HID_USAGE_APPLE_BRIGHTNESS_UP,
     HID_INPUT,              HID_IO_VARIABLE,
@@ -136,6 +133,39 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
     HID_INPUT,              HID_IO_VARIABLE,
 #endif // ENABLE_EXTRA_APPLE_KEYS
 #endif // ^ ENABLE_APPLE_FN_KEY
+
+#if ENABLE_MEDIA_KEYS
+    HID_LOGICAL_MINIMUM,    0,
+    HID_LOGICAL_MAXIMUM,    1,
+    HID_REPORT_SIZE,        1,
+    HID_REPORT_COUNT,       1,
+    HID_USAGE_PAGE,         HID_USAGE_PAGE_CONSUMER,
+    HID_USAGE,              CC_MEDIA_KEY_1,
+    HID_INPUT,              HID_IO_VARIABLE,
+    HID_USAGE,              CC_MEDIA_KEY_2,
+    HID_INPUT,              HID_IO_VARIABLE,
+    HID_USAGE,              CC_MEDIA_KEY_3,
+    HID_INPUT,              HID_IO_VARIABLE,
+    HID_USAGE,              CC_MEDIA_KEY_4,
+    HID_INPUT,              HID_IO_VARIABLE,
+    HID_USAGE,              CC_MEDIA_KEY_5,
+    HID_INPUT,              HID_IO_VARIABLE,
+    HID_USAGE,              CC_MEDIA_KEY_6,
+    HID_INPUT,              HID_IO_VARIABLE,
+    HID_USAGE,              CC_MEDIA_KEY_7,
+    HID_INPUT,              HID_IO_VARIABLE,
+#if MEDIA_KEYS_COUNT > 7
+    HID_USAGE,              CC_MEDIA_KEY_8,
+    HID_INPUT,              HID_IO_VARIABLE,
+#if MEDIA_KEYS_COUNT > 8
+#error "MEDIA_KEYS_COUNT must be <= 8"
+#endif
+#elif APPLE_KEYS_EXTRA_BITS != 1
+    HID_REPORT_COUNT,       8 - MEDIA_KEYS_COUNT,
+    HID_REPORT_SIZE,        1,
+    HID_INPUT,              HID_IO_CONSTANT,
+#endif
+#endif // ^ ENABLE_MEDIA_KEYS
 
     // LEDs
     HID_REPORT_COUNT,       LED_COUNT,
@@ -480,8 +510,8 @@ usb_descriptor_length_and_data (const uint16_t value, const uint16_t index, cons
     return 0;
 }
 
-#if (USB_MAX_KEY_ROLLOVER + APPLE_BYTES_IN_REPORT) < USB_BOOT_PROTOCOL_ROLLOVER
-#error "USB_MAX_KEY_ROLLOVER must be at least 6 (or 5 with ENABLE_APPLE_FN_KEY)"
+#if (USB_MAX_KEY_ROLLOVER + VIRTUAL_KEY_BYTES_IN_REPORT) < USB_BOOT_PROTOCOL_ROLLOVER
+#error "USB_MAX_KEY_ROLLOVER must be at least 6 minus Apple and/or media keys"
 #endif
 #if MAX_KEY_ROLLOVER < USB_MAX_KEY_ROLLOVER
 #error "MAX_KEY_ROLLOVER must be at least equal to USB_MAX_KEY_ROLLOVER"
