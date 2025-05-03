@@ -31,6 +31,7 @@ ISO_LAYOUT ?= 1
 SPLIT_RIGHT_SHIFT ?= 1
 SPLIT_BACKSPACE ?= 0
 SHORT_SPACE ?= 0
+SPLIT_ENTER ?= 1
 RIGHT_BLOCK_TYPE ?= 1           # Only affects the template_layers.c
 RIGHT_MODIFIERS_ARE_ARROWS ?= 0 # "
 
@@ -68,6 +69,8 @@ use `dfu-util` and `dfu-programmer` to automate further:
 dfu-util -e && sleep 2 && dfu-programmer atmega32u2 erase && dfu-programmer atmega32u2 flash modelf77.hex && dfu-programmer atmega32u2 launch
 ```
 
+The above is also doable with `make dfu`.
+
 ## Note
 
 This is a work in progress. Any problems are very likely to be my fault, and
@@ -75,3 +78,8 @@ not that of QMK or original firmware authors.
 
 I recommend not setting `ENABLE_GENERIC_HID_ENDPOINT` for now if you use
 Windows OS, it doesn't seem to work there at the moment.
+
+I got tired of maintaining a separate `template_layers.c` that no-one uses,
+so the template is now actually my own `layers.c`. It is complicated, so
+you will probably want to tweak it unless you are primarily a Mac user who
+also uses Windows and also the Dvorak layout with Finnish additions.
