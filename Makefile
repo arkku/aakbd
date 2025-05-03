@@ -136,6 +136,16 @@ upload: $(HEX)
 	stty -f $(if $(PORT),$(PORT),/dev/ttyUSB0) 1200
 	$(AVRDUDE) -c $(UPLOAD_PROTOCOL) $(if $(PORT),-P $(PORT),-P /dev/ttyUSB0) $(if $(BPS),-b $(BPS),) -p $(MCU) -U flash:w:$< -v
 
+reset:
+	dfu-util -e
+
+dfu: $(HEX)
+	dfu-util -e || true
+	@sleep 2
+	dfu-programmer $(MCU) erase
+	dfu-programmer $(MCU) flash $<
+	dfu-programmer $(MCU) launch
+
 fuses:
 	$(AVRDUDE) -c $(BURNER) $(if $(PORT),-P $(PORT) ,)$(if $(BPS),-b (BPS) ,)-p $(MCU) -U efuse:w:0x$(EFUSE):m -U hfuse:w:0x$(HFUSE):m $(if $(LFUSE),-U lfuse:w:0x$(LFUSE):m,)
 
@@ -172,4 +182,4 @@ backup:
 	cp $(MACROS_C) $(MACROS_C)~
 	cp $(LAYERS_C) $(LAYERS_C)~
 
-.PHONY: all clean distclean burn fuses upload lock unlock bootloader backup
+.PHONY: all clean distclean burn fuses upload lock unlock bootloader backup dfu reset
