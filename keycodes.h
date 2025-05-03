@@ -659,8 +659,10 @@ enum extended_keycode {
 #define APPLE_FN(key)                   (MODS_APPLE_FN | KEY(key))
 #endif
 
+#ifndef PASTE
 #define PASTE_(a, b)        a##b
 #define PASTE(a, b)         PASTE_(a, b)
+#endif
 
 // Keycode bit patterns:
 // 0000 0000 0000 0000 - pass through (`PASS`)

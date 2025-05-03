@@ -188,7 +188,7 @@ extern volatile uint8_t key_error;
 #endif
 
 #if ENABLE_MEDIA_KEYS
-#define VIRTUAL_KEYS_END        USB_KEY_VIRTUAL_MEDIA_8
+#define VIRTUAL_KEYS_END        (USB_KEY_VIRTUAL_MEDIA_1 + (MEDIA_KEYS_COUNT - 1))
 #else
 #define VIRTUAL_KEYS_END        USB_KEY_VIRTUAL_APPLE_EXPOSE_DESKTOP
 #endif

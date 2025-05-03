@@ -12,6 +12,11 @@
 #ifndef KK_USB_KEYS_H
 #define KK_USB_KEYS_H
 
+#ifndef PASTE
+#define _PASTE(a,b) a##b
+#define PASTE(a,b)  _PASTE(a,b)
+#endif
+
 enum keycode_usb {
     // MARK: - Error codes
 
@@ -178,12 +183,12 @@ enum keycode_usb {
     USB_KEY_PASTE = 0x7D,
     USB_KEY_FIND = 0x7E,
 
-    USB_KEY_MUTE = 0x7F,
+    USB_KEY_PLAIN_MUTE = 0x7F, // unlikely to work
 
     // - MARK: - 8-bit keycodes
 
-    USB_KEY_VOLUME_UP = 0x80,
-    USB_KEY_VOLUME_DOWN = 0x81,
+    USB_KEY_PLAIN_VOLUME_UP = 0x80, // unlikely to work
+    USB_KEY_PLAIN_VOLUME_DOWN = 0x81, // unlikely to work
 
     USB_KEY_LOCKING_CAPS_LOCK = 0x82,
     USB_KEY_LOCKING_NUM_LOCK = 0x83,
@@ -327,12 +332,36 @@ enum keycode_usb {
     USB_KEY_DVORAK_V = USB_KEY_PERIOD,
     USB_KEY_DVORAK_Z = USB_KEY_SLASH,
 
+    // MARK: - Media Keys
+    // Note that these are in a different usage page and can't be used
+    // directly as keycodes. 7 or 8 can be selected at a time for use
+    // as virtual keys. (If you need more, I would recommend mapping
+    // F13–F24 keys and using software to remap those.)
+
+    CC_KEY_MEDIA_PLAY = 0xB0,
+    CC_KEY_MEDIA_PAUSE = 0xB1,
+    CC_KEY_MEDIA_RECORD = 0xB2,
+    CC_KEY_MEDIA_FAST_FORWARD = 0xB3,
+    CC_KEY_MEDIA_REWIND = 0xB4,
+    CC_KEY_MEDIA_NEXT_TRACK = 0xB5,
+    CC_KEY_MEDIA_PREVIOUS_TRACK = 0xB6,
+    CC_KEY_MEDIA_STOP_PLAYING = 0xB7,
+    CC_KEY_MEDIA_EJECT = 0xB8,
+    CC_KEY_MEDIA_RANDOM_PLAY = 0xB9,
+    CC_KEY_MEDIA_REPEAT = 0xBC,
+    CC_KEY_MEDIA_STOP_EJECT = 0xCC,
+    CC_KEY_MEDIA_PLAY_PAUSE = 0xCD,
+    CC_KEY_MEDIA_PLAY_SKIP = 0xCE,
+    CC_KEY_MEDIA_VOLUME_MUTE = 0xE2,
+    CC_KEY_MEDIA_VOLUME_UP = 0xE9,
+    CC_KEY_MEDIA_VOLUME_DOWN = 0xEA,
+
     // MARK: - Virtual keys (these need special support)
 
     // Requires the use of Apple's vendor id and a separate byte in the
     // report descriptor (usage page 0xFF, usage 0x03, 1 = pressed).
 #if APPLE_FN_IS_MODIFIER
-    // If Apple Fn is a modifier, then it replaces right cmd
+    // If Apple Fn is a modifier, it replaces right cmd
     USB_KEY_VIRTUAL_APPLE_FN = USB_KEY_RIGHT_CMD,
 #else
     USB_KEY_VIRTUAL_APPLE_FN = (USB_KEY_RIGHT_CMD + 1),
@@ -345,70 +374,25 @@ enum keycode_usb {
     USB_KEY_VIRTUAL_APPLE_EXPOSE,
     USB_KEY_VIRTUAL_APPLE_EXPOSE_DESKTOP,
 
-    // Consumer control media keys
-    USB_KEY_VIRTUAL_MEDIA_1,
-    USB_KEY_VIRTUAL_MEDIA_2,
-    USB_KEY_VIRTUAL_MEDIA_3,
-    USB_KEY_VIRTUAL_MEDIA_4,
-    USB_KEY_VIRTUAL_MEDIA_5,
-    USB_KEY_VIRTUAL_MEDIA_6,
-    USB_KEY_VIRTUAL_MEDIA_7,
-    USB_KEY_VIRTUAL_MEDIA_8,
-};
+    // Media keys
 
-// MARK: - Media Keys (max 7 or 8 depending on settings)
+#define MEDIA_KEY_ENUM(name, idx)                                   \
+    PASTE(USB_KEY_VIRTUAL_MEDIA_,idx),                              \
+    PASTE(CC_MEDIA_KEY_,idx)   = PASTE(CC_KEY_MEDIA_,name),         \
+    PASTE(USB_KEY_,name)       = PASTE(USB_KEY_VIRTUAL_MEDIA_,idx)
 
-#ifndef CC_MEDIA_KEY_1
-#define CC_MEDIA_KEY_1 CC_KEY_MEDIA_NEXT_TRACK
-#define USB_KEY_VIRTUAL_NEXT_TRACK USB_KEY_VIRTUAL_MEDIA_1
+#if !defined(ENABLE_MEDIA_KEYS) || ENABLE_MEDIA_KEYS
+    MEDIA_KEY_ENUM(REWIND,         1),
+    MEDIA_KEY_ENUM(FAST_FORWARD,   2),
+    MEDIA_KEY_ENUM(PLAY_PAUSE,     3),
+    MEDIA_KEY_ENUM(VOLUME_MUTE,    4),
+    MEDIA_KEY_ENUM(VOLUME_UP,      5),
+    MEDIA_KEY_ENUM(VOLUME_DOWN,    6),
+    MEDIA_KEY_ENUM(PREVIOUS_TRACK, 7),
+#if !defined(MEDIA_KEYS_COUNT) || MEDIA_KEYS_COUNT >= 8
+    MEDIA_KEY_ENUM(NEXT_TRACK,     8),
 #endif
-#ifndef CC_MEDIA_KEY_2
-#define CC_MEDIA_KEY_2 CC_KEY_MEDIA_PREVIOUS_TRACK
-#define USB_KEY_VIRTUAL_PREVIOUS_TRACK USB_KEY_VIRTUAL_MEDIA_2
 #endif
-#ifndef CC_MEDIA_KEY_3
-#define CC_MEDIA_KEY_3 CC_KEY_MEDIA_PLAY_PAUSE
-#define USB_KEY_VIRTUAL_PLAY_PAUSE USB_KEY_VIRTUAL_MEDIA_3
-#endif
-#ifndef CC_MEDIA_KEY_4
-#define CC_MEDIA_KEY_4 CC_KEY_MEDIA_MUTE
-#define USB_KEY_VIRTUAL_MUTE USB_KEY_VIRTUAL_MEDIA_4
-#endif
-#ifndef CC_MEDIA_KEY_5
-#define CC_MEDIA_KEY_5 CC_KEY_MEDIA_VOLUME_UP
-#define USB_KEY_VIRTUAL_VOLUME_UP USB_KEY_VIRTUAL_MEDIA_5
-#endif
-#ifndef CC_MEDIA_KEY_6
-#define CC_MEDIA_KEY_6 CC_KEY_MEDIA_VOLUME_DOWN
-#define USB_KEY_VIRTUAL_VOLUME_DOWN USB_KEY_VIRTUAL_MEDIA_6
-#endif
-#ifndef CC_MEDIA_KEY_7
-#define CC_MEDIA_KEY_7 CC_KEY_MEDIA_REWIND
-#define USB_KEY_VIRTUAL_VOLUME_REWIND USB_KEY_VIRTUAL_MEDIA_7
-#endif
-#ifndef CC_MEDIA_KEY_8
-#define CC_MEDIA_KEY_8 CC_KEY_MEDIA_FAST_FORWARD
-#define USB_KEY_VIRTUAL_FAST_FORWARD USB_KEY_VIRTUAL_MEDIA_8
-#endif
-
-enum usb_consumer_control {
-    CC_KEY_MEDIA_PLAY = 0xB0,
-    CC_KEY_MEDIA_PAUSE = 0xB1,
-    CC_KEY_MEDIA_RECORD = 0xB2,
-    CC_KEY_MEDIA_FAST_FORWARD = 0xB3,
-    CC_KEY_MEDIA_REWIND = 0xB4,
-    CC_KEY_MEDIA_NEXT_TRACK = 0xB5,
-    CC_KEY_MEDIA_PREVIOUS_TRACK = 0xB6,
-    CC_KEY_MEDIA_STOP = 0xB7,
-    CC_KEY_MEDIA_EJECT = 0xB8,
-    CC_KEY_MEDIA_RANDOM_PLAY = 0xB9,
-    CC_KEY_MEDIA_REPEAT = 0xBC,
-    CC_KEY_MEDIA_STOP_EJECT = 0xCC,
-    CC_KEY_MEDIA_PLAY_PAUSE = 0xCD,
-    CC_KEY_MEDIA_PLAY_SKIP = 0xCE,
-    CC_KEY_MEDIA_MUTE = 0xE2,
-    CC_KEY_MEDIA_VOLUME_UP = 0xE9,
-    CC_KEY_MEDIA_VOLUME_DOWN = 0xEA,
 };
 
 // MARK: - Modifiers

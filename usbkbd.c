@@ -144,13 +144,12 @@ usb_keyboard_release (const uint8_t key) {
 void
 press_virtual (const uint8_t key) {
     if (IS_VIRTUAL_KEY(key)) {
-        usb_keyboard_updated = true;
 #if APPLE_FN_IS_MODIFIER
         if (key == USB_KEY_VIRTUAL_APPLE_FN) {
             usb_keyboard_add_modifiers(APPLE_FN_BIT);
-            return;
         }
 #endif
+        usb_keyboard_updated = true;
         usb_keys_extended_flags |= VIRTUAL_KEY_BIT(key);
     }
 }
@@ -158,15 +157,13 @@ press_virtual (const uint8_t key) {
 void
 release_virtual (const uint8_t key) {
     if (IS_VIRTUAL_KEY(key)) {
-        usb_keyboard_updated = true;
 #if APPLE_FN_IS_MODIFIER
         if (key == USB_KEY_VIRTUAL_APPLE_FN) {
             usb_keyboard_remove_modifiers(APPLE_FN_BIT);
-            return;
         }
 #endif
+        usb_keyboard_updated = true;
         usb_keys_extended_flags &= ~VIRTUAL_KEY_BIT(key);
-        return;
     }
 }
 
