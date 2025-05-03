@@ -1,13 +1,23 @@
 #include <layers.h>
 #include "keymap.h"
 
+/// The default base layer. Layers with a number lower than base layer are
+/// ignored.
 #define DEFAULT_BASE_LAYER 1
 #define NUM_LOCK_LAYER 2
 #define APPLE_FN_LAYER 3
 #define FN_SPACE_LAYER 4
 
+/// The number of layers to make active. The layer numbering starts from 1,
+/// so this is also the number of the highest layer. Any layer with a number
+/// higher than this will be unused, i.e., setting `LAYER_COUNT 0` will
+/// ignore all layers defined below. The maximum layer count is 31.
 #define LAYER_COUNT FN_SPACE_LAYER
 
+/// Recognised macro names, see `macros.c`. To define a macro, add the name
+/// here, e.g., `MACRO_MY_MACRO`, and then map `MACRO(MACRO_MY_MACRO)` to a
+/// key. Remember to use the `MACRO()` wrapper, do not use the macro name
+/// directly as a keycode! You can have up to 127 macros.
 enum macro {
     MACRO_NOP,
     MACRO_FALLTHROUGH,
@@ -54,19 +64,23 @@ enum macro {
 #endif
 #endif
 
+#ifndef ESC_IS_BACKTICK
+#define ESC_IS_BACKTICK 0
+#endif
+
 // MARK: - Layer 1
 
 #if LAYER_COUNT >= 1
 /// Layer 1 is the default base layer. Only the differences to the default
 /// mapping need to be defined here.
 DEFINE_LAYER(1) {
+#if ESC_IS_BACKTICK
+    [KEY(ESC)] = KEY(BACKTICK),
+#endif
+
 #if APPLE_ARRANGEMENT
     [KEY(LEFT_WIN)] = KEY(ALT),
     [KEY(LEFT_ALT)] = KEY(LEFT_CMD),
-#endif
-
-#if ENABLE_APPLE_FN_KEY
-    [KEY(INT_NEXT_TO_LEFT_SHIFT)] = KEY(BACKTICK),
 #endif
 
 #if ISO_ENTER && SPLIT_ENTER
@@ -82,21 +96,26 @@ DEFINE_LAYER(1) {
     [KEY(RIGHT_CMD)] = LAYER_TOGGLE(NUM_LOCK_LAYER),
 #endif
 #else // ^ RIGHT_MODIFIERS_ARE_ARROWS
-#if RIGHT_BLOCK_TYPE != 2
-    [KEY(NUM_LOCK)] = KEY(RIGHT_CMD),
+    [KEY(NUM_LOCK)] = LAYER_TOGGLE(NUM_LOCK_LAYER),
 #endif
-#if !SPLIT_RIGHT_SHIFT
+
+#if SPLIT_RIGHT_SHIFT
+#if ENABLE_APPLE_FN_KEY
+    [KEY_APPLE_FN] = MACRO(MACRO_WEAK_APPLE_FN),
+#else
+    [KEY_APPLE_FN] = LAYER_ON_HOLD(APPLE_FN_LAYER),
+#endif
+#else // ^ SPLIT_RIGHT_SHIFT
 #if ENABLE_APPLE_FN_KEY
     [KEY(RIGHT_CTRL)] = MACRO(MACRO_WEAK_APPLE_FN),
 #else
     [KEY(RIGHT_CTRL)] = LAYER_ON_HOLD(APPLE_FN_LAYER),
 #endif
-#endif
-#endif
+#endif // ^ !SPLIT_RIGHT_SHIFT
 
 #if RIGHT_BLOCK_TYPE == 0
     [NUM_ROW_1_COL_1] = KEY(DELETE),
-    [NUM_ROW_1_COL_2] = KEY(F8),
+    [NUM_ROW_1_COL_2] = KEY(PAUSE_BREAK),
     [NUM_ROW_1_COL_3] = KEY(PAGE_UP),
 
     [NUM_ROW_2_COL_1] = KEY(INSERT),
@@ -117,7 +136,7 @@ DEFINE_LAYER(1) {
 #elif RIGHT_BLOCK_TYPE == 1
     [NUM_ROW_1_COL_1] = KEY(PRINT_SCREEN),
     [NUM_ROW_1_COL_2] = KEY(SCROLL_LOCK),
-    [NUM_ROW_1_COL_3] = KEY(PAUSE),
+    [NUM_ROW_1_COL_3] = KEY(PAUSE_BREAK),
 
     [NUM_ROW_2_COL_1] = KEY(INSERT),
     [NUM_ROW_2_COL_2] = KEY(HOME),
@@ -134,9 +153,9 @@ DEFINE_LAYER(1) {
     [NUM_ROW_5_COL_1] = KEY(LEFT_ARROW),
     [NUM_ROW_5_COL_2] = KEY(DOWN_ARROW),
     [NUM_ROW_5_COL_3] = KEY(RIGHT_ARROW),
-#elif RIGHT_BLOCK_TYPE == 2
+#elif RIGHT_BLOCK_TYPE == 2 || RIGHT_BLOCK_TYPE == 5
     // This is the default
-#elif RIGHT_BLOCK_TYPE == 3
+#elif RIGHT_BLOCK_TYPE == 3 || RIGHT_BLOCK_TYPE == 4
     [NUM_ROW_1_COL_1] = LAYER_TOGGLE(NUM_LOCK_LAYER),
     [NUM_ROW_1_COL_2] = KEY(KP_MINUS),
     [NUM_ROW_1_COL_3] = KEY(KP_PLUS),
@@ -154,8 +173,35 @@ DEFINE_LAYER(1) {
     [NUM_ROW_4_COL_3] = KEY(KP_3_PAGE_DOWN),
 
     [NUM_ROW_5_COL_1] = KEY(KP_0_INSERT),
+#if RIGHT_BLOCK_TYPE == 3
     [NUM_ROW_5_COL_2] = KEY(KP_COMMA_DEL),
     [NUM_ROW_5_COL_3] = KEY(KP_ENTER),
+#else
+    [NUM_ROW_5_COL_2] = KEY(KP_00), // Almost certainly doesn't work
+    [NUM_ROW_5_COL_3] = KEY(KP_COMMA_DEL),
+#endif
+#elif RIGHT_BLOCK_TYPE == 6
+    [NUM_ROW_1_COL_1] = KEY(DELETE),
+    [NUM_ROW_1_COL_2] = KEY(PRINT_SCREEN),
+    [NUM_ROW_1_COL_3] = KEY(PAUSE_BREAK),
+
+    [NUM_ROW_2_COL_1] = KEY(KP_7_HOME),
+    [NUM_ROW_2_COL_2] = KEY(KP_8_UP),
+    [NUM_ROW_2_COL_3] = KEY(KP_9_PAGE_UP),
+
+    [NUM_ROW_3_COL_1] = KEY(KP_4_LEFT),
+    [NUM_ROW_3_COL_2] = KEY(KP_5),
+    [NUM_ROW_3_COL_3] = KEY(KP_6_RIGHT),
+
+    [NUM_ROW_4_COL_1] = KEY(KP_1_END),
+    [NUM_ROW_4_COL_2] = KEY(KP_2_DOWN),
+    [NUM_ROW_4_COL_3] = KEY(KP_3_PAGE_DOWN),
+
+    [NUM_ROW_5_COL_1] = KEY(KP_0_INSERT),
+    [NUM_ROW_5_COL_2] = KEY(KP_COMMA_DEL),
+    [NUM_ROW_5_COL_3] = KEY(KP_ENTER),
+#else
+#error "Unknown RIGHT_BLOCK_TYPE"
 #endif
 
 #if ENABLE_APPLE_FN_KEY
@@ -220,6 +266,64 @@ DEFINE_LAYER(NUM_LOCK_LAYER) {
 
     [NUM_ROW_5_COL_1] = KEY(INSERT),
     [NUM_ROW_5_COL_2] = KEY(DELETE),
+    [NUM_ROW_5_COL_3] = KEY(KP_ENTER),
+#elif RIGHT_BLOCK_TYPE == 4
+    [NUM_ROW_1_COL_2] = KEY(PRINT_SCREEN),
+    [NUM_ROW_1_COL_3] = KEY(PAUSE),
+
+    [NUM_ROW_2_COL_1] = KEY(INSERT),
+    [NUM_ROW_2_COL_2] = KEY(HOME),
+    [NUM_ROW_2_COL_3] = KEY(PAGE_UP),
+
+    [NUM_ROW_3_COL_1] = KEY(DELETE),
+    [NUM_ROW_3_COL_2] = KEY(END),
+    [NUM_ROW_3_COL_3] = KEY(PAGE_DOWN),
+
+    [NUM_ROW_4_COL_1] = KEY(HOME),
+    [NUM_ROW_4_COL_2] = KEY(UP_ARROW),
+    [NUM_ROW_4_COL_3] = KEY(PAGE_UP),
+
+    [NUM_ROW_5_COL_1] = KEY(LEFT_ARROW),
+    [NUM_ROW_5_COL_2] = KEY(DOWN_ARROW),
+    [NUM_ROW_5_COL_3] = KEY(RIGHT_ARROW),
+#elif RIGHT_BLOCK_TYPE == 5
+    [NUM_ROW_1_COL_1] = KEY(INSERT),
+    [NUM_ROW_1_COL_2] = KEY(HOME),
+    [NUM_ROW_1_COL_3] = KEY(PAGE_UP),
+
+    [NUM_ROW_2_COL_1] = KEY(DELETE),
+    [NUM_ROW_2_COL_2] = KEY(END),
+    [NUM_ROW_2_COL_3] = KEY(PAGE_DOWN),
+
+    [NUM_ROW_3_COL_1] = KEY(F10),
+    [NUM_ROW_3_COL_2] = KEY(F11),
+    [NUM_ROW_3_COL_3] = KEY(F12),
+
+    [NUM_ROW_4_COL_1] = KEY(HOME),
+    [NUM_ROW_4_COL_2] = KEY(UP_ARROW),
+    [NUM_ROW_4_COL_3] = KEY(PAGE_UP),
+
+    [NUM_ROW_5_COL_1] = KEY(LEFT_ARROW),
+    [NUM_ROW_5_COL_2] = KEY(DOWN_ARROW),
+    [NUM_ROW_5_COL_3] = KEY(RIGHT_ARROW),
+#elif RIGHT_BLOCK_TYPE == 6
+    [NUM_ROW_2_COL_1] = KEY(HOME),
+    [NUM_ROW_2_COL_2] = KEY(UP_ARROW),
+    [NUM_ROW_2_COL_3] = KEY(PAGE_UP),
+
+    [NUM_ROW_3_COL_1] = KEY(LEFT_ARROW),
+    [NUM_ROW_3_COL_2] = KEY(DOWN_ARROW),
+    [NUM_ROW_3_COL_3] = KEY(RIGHT_ARROW),
+
+    [NUM_ROW_4_COL_1] = KEY(END),
+    [NUM_ROW_4_COL_2] = KEY(DOWN_ARROW),
+    [NUM_ROW_4_COL_3] = KEY(PAGE_DOWN),
+
+    [NUM_ROW_5_COL_1] = KEY(INSERT),
+    [NUM_ROW_5_COL_2] = KEY(DELETE),
+    [NUM_ROW_5_COL_3] = KEY(KP_ENTER),
+#else
+#error "Unknown RIGHT_BLOCK_TYPE"
 #endif
 };
 #endif
@@ -236,12 +340,10 @@ DEFINE_LAYER(APPLE_FN_LAYER) {
 
     [KEY(SPACE)] = LAYER_ON_HOLD(FN_SPACE_LAYER),
 
-#if ENABLE_APPLE_FN_KEY
-    [KEY(ESC)] = KEY(INT_NEXT_TO_LEFT_SHIFT),
-    [KEY(INT_NEXT_TO_LEFT_SHIFT)] = KEY(INT_NEXT_TO_LEFT_SHIFT),
+#if ESC_IS_BACKTICK
+    [KEY(ESC)] = KEY(ESC),
 #else
     [KEY(ESC)] = KEY(BACKTICK),
-    [KEY(INT_NEXT_TO_LEFT_SHIFT)] = KEY(BACKTICK),
 #endif
 
     [KEY(LEFT_SHIFT)] = KEY(LEFT_SHIFT),
@@ -270,12 +372,24 @@ DEFINE_LAYER(APPLE_FN_LAYER) {
     [KEY(EQUALS)] = KEY(F12),
 
     // Convenience shortcuts
+#if SPLIT_BACKSPACE
+    [KEY(BACKSPACE)] = KEY(BACKSPACE),
+    [KEY(BACKTICK)] = KEY(DELETE),
+#else
     [KEY(BACKSPACE)] = KEY(DELETE),
+#endif
 
     [KEY(Q)] = KEY(HOME),
     [KEY(W)] = KEY(UP_ARROW),
     [KEY(E)] = KEY(END),
     [KEY(R)] = KEY(PAGE_UP),
+#if DVORAK_MAPPINGS
+    [KEY(T)] = CMD(DVORAK_OPEN_BRACKET),
+    [KEY(Y)] = CMD(DVORAK_CLOSE_BRACKET),
+#else
+    [KEY(T)] = CMD(OPEN_BRACKET),
+    [KEY(Y)] = CMD(CLOSE_BRACKET),
+#endif
     [KEY(O)] = KEY(PRINT_SCREEN),
     [KEY(P)] = KEY(SCROLL_LOCK),
     [KEY(OPEN_BRACKET)] = KEY(F11),
@@ -323,7 +437,7 @@ DEFINE_LAYER(APPLE_FN_LAYER) {
 #else
     [KEY(RETURN)] = KEY(KP_ENTER),
 #endif
-#else
+#else // ^ RIGHT_MODIFIERS_ARE_ARROWS
     [KEY(NUM_LOCK)] = KEY(NUM_LOCK),
 #if ENABLE_APPLE_FN_KEY
     [KEY(RIGHT_SHIFT)] = KEY_APPLE_FN,
@@ -331,8 +445,11 @@ DEFINE_LAYER(APPLE_FN_LAYER) {
     [KEY(RETURN)] = KEY(KP_ENTER),
 #endif
 
-#if RIGHT_BLOCK_TYPE == 1
+#if RIGHT_BLOCK_TYPE == 1 || RIGHT_BLOCK_TYPE == 0
+    [NUM_ROW_4_COL_1] = SHIFT(TAB),
     [NUM_ROW_4_COL_2] = KEY(PAGE_UP),
+    [NUM_ROW_4_COL_3] = KEY(TAB),
+
     [NUM_ROW_5_COL_1] = KEY(HOME),
     [NUM_ROW_5_COL_2] = KEY(PAGE_DOWN),
     [NUM_ROW_5_COL_3] = KEY(END),
@@ -372,22 +489,32 @@ DEFINE_LAYER(APPLE_FN_LAYER) {
     [NUM_ROW_5_COL_1] = KEY(INSERT),
     [NUM_ROW_5_COL_2] = KEY(DELETE),
     [NUM_ROW_5_COL_3] = KEY(KP_ENTER),
-#else
-    [NUM_ROW_1_COL_1] = KEY(NUM_LOCK),
-    [NUM_ROW_1_COL_2] = KEY(F8),
-    [NUM_ROW_1_COL_3] = KEY(HOME),
-
+#elif RIGHT_BLOCK_TYPE == 4
     [NUM_ROW_2_COL_1] = KEY(INSERT),
-    [NUM_ROW_2_COL_2] = CMD_SHIFT(3),
-    [NUM_ROW_2_COL_3] = KEY(END),
+    [NUM_ROW_2_COL_2] = KEY(HOME),
+    [NUM_ROW_2_COL_3] = KEY(PAGE_UP),
 
-    [NUM_ROW_3_COL_1] = KEY(F10),
-    [NUM_ROW_3_COL_2] = KEY(F11),
-    [NUM_ROW_3_COL_3] = KEY(F12),
+    [NUM_ROW_3_COL_1] = KEY(DELETE),
+    [NUM_ROW_3_COL_2] = KEY(END),
+    [NUM_ROW_3_COL_3] = KEY(PAGE_DOWN),
 
     [NUM_ROW_4_COL_1] = SHIFT(TAB),
     [NUM_ROW_4_COL_2] = KEY(PAGE_UP),
     [NUM_ROW_4_COL_3] = KEY(TAB),
+
+    [NUM_ROW_5_COL_1] = KEY(HOME),
+    [NUM_ROW_5_COL_2] = KEY(PAGE_DOWN),
+    [NUM_ROW_5_COL_3] = KEY(END),
+#elif RIGHT_BLOCK_TYPE == 5
+    [NUM_ROW_1_COL_1] = KEY(INSERT),
+    [NUM_ROW_1_COL_2] = KEY(HOME),
+    [NUM_ROW_1_COL_3] = KEY(PAGE_UP),
+
+    [NUM_ROW_2_COL_1] = KEY(DELETE),
+    [NUM_ROW_2_COL_2] = KEY(END),
+    [NUM_ROW_2_COL_3] = KEY(PAGE_DOWN),
+
+    [NUM_ROW_4_COL_2] = KEY(PAGE_UP),
 
     [NUM_ROW_5_COL_1] = KEY(HOME),
     [NUM_ROW_5_COL_2] = KEY(PAGE_DOWN),
