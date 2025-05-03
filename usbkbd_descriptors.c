@@ -145,11 +145,12 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
 #endif // ^ ENABLE_APPLE_FN_KEY
 
 #if ENABLE_MEDIA_KEYS
+    HID_USAGE_PAGE,         HID_USAGE_PAGE_CONSUMER,
+    //HID_USAGE,              HID_USAGE_CONSUMER_CONTROL,
     HID_LOGICAL_MINIMUM,    0,
     HID_LOGICAL_MAXIMUM,    1,
     HID_REPORT_SIZE,        1,
     HID_REPORT_COUNT,       1,
-    HID_USAGE_PAGE,         HID_USAGE_PAGE_CONSUMER,
     HID_USAGE,              CC_MEDIA_KEY_1,
     HID_INPUT,              HID_IO_VARIABLE,
     HID_USAGE,              CC_MEDIA_KEY_2,
@@ -170,10 +171,11 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
 #if MEDIA_KEYS_COUNT > 8
 #error "MEDIA_KEYS_COUNT must be <= 8"
 #endif
-#elif APPLE_KEYS_EXTRA_BITS != 1
+#endif
+#if (MEDIA_KEYS_COUNT + APPLE_KEYS_EXTRA_BITS) % 8 != 0
 #warning "Unused padding for media keys, increase MEDIA_KEYS_COUNT?"
-    HID_REPORT_COUNT,       8 - MEDIA_KEYS_COUNT,
-    HID_REPORT_SIZE,        1,
+    HID_REPORT_COUNT,       1,
+    HID_REPORT_SIZE,        8 - ((MEDIA_KEYS_COUNT + APPLE_KEYS_EXTRA_BITS) % 8),
     HID_INPUT,              HID_IO_CONSTANT,
 #endif
 #endif // ^ ENABLE_MEDIA_KEYS

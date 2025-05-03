@@ -183,12 +183,12 @@ enum keycode_usb {
     USB_KEY_PASTE = 0x7D,
     USB_KEY_FIND = 0x7E,
 
-    USB_KEY_PLAIN_MUTE = 0x7F, // unlikely to work
+    USB_KEY_LEGACY_MUTE = 0x7F, // unlikely to work
 
     // - MARK: - 8-bit keycodes
 
-    USB_KEY_PLAIN_VOLUME_UP = 0x80, // unlikely to work
-    USB_KEY_PLAIN_VOLUME_DOWN = 0x81, // unlikely to work
+    USB_KEY_LEGACY_VOLUME_UP = 0x80, // unlikely to work
+    USB_KEY_LEGACY_VOLUME_DOWN = 0x81, // unlikely to work
 
     USB_KEY_LOCKING_CAPS_LOCK = 0x82,
     USB_KEY_LOCKING_NUM_LOCK = 0x83,
@@ -382,15 +382,15 @@ enum keycode_usb {
     PASTE(USB_KEY_,name)       = PASTE(USB_KEY_VIRTUAL_MEDIA_,idx)
 
 #if !defined(ENABLE_MEDIA_KEYS) || ENABLE_MEDIA_KEYS
-    MEDIA_KEY_ENUM(REWIND,         1),
-    MEDIA_KEY_ENUM(FAST_FORWARD,   2),
-    MEDIA_KEY_ENUM(PLAY_PAUSE,     3),
-    MEDIA_KEY_ENUM(VOLUME_MUTE,    4),
-    MEDIA_KEY_ENUM(VOLUME_UP,      5),
-    MEDIA_KEY_ENUM(VOLUME_DOWN,    6),
-    MEDIA_KEY_ENUM(PREVIOUS_TRACK, 7),
+    MEDIA_KEY_ENUM(VOLUME_MUTE,    1),
+    MEDIA_KEY_ENUM(VOLUME_UP,      2),
+    MEDIA_KEY_ENUM(VOLUME_DOWN,    3),
+    MEDIA_KEY_ENUM(PLAY_PAUSE,     4),
+    MEDIA_KEY_ENUM(NEXT_TRACK,     5),
+    MEDIA_KEY_ENUM(PREVIOUS_TRACK, 6),
+    MEDIA_KEY_ENUM(FAST_FORWARD,   7),
 #if !defined(MEDIA_KEYS_COUNT) || MEDIA_KEYS_COUNT >= 8
-    MEDIA_KEY_ENUM(NEXT_TRACK,     8),
+    MEDIA_KEY_ENUM(REWIND,         8),
 #endif
 #endif
 };
