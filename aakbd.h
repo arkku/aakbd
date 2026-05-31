@@ -54,7 +54,7 @@ uint8_t current_10ms_tick_count(void);
 #define BYTES_WORD(lsb, msb)        (((msb) << 8) | (lsb))
 
 /// Divide `value` by `n` and round up.
-#define DIV_ROUND_BYTE(n, value)    (((value) / (n)) + ((value) & 1))
+#define DIV_ROUND_BYTE(n, value)    (((value) / (n)) + (((value) % (n)) != 0))
 
 // MARK: - Platform-specific
 
