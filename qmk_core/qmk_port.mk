@@ -5,12 +5,12 @@ DEBOUNCE_TYPE ?= sym_defer_g
 
 KEYBOARD_NAME ?= $(DEVICE)
 
-DEVICE_FLAGS += -DKEYBOARD_NAME=$(KEYBOARD_NAME) -Dasm=__asm -DNO_PRINT -DNO_DEBUG -I$(QMK_DIR) -I$(QMK_PLATFORMS_DIR) -I$(PLATFORM_DIR) -Wno-old-style-declaration -Wno-pedantic -include config.h
+DEVICE_FLAGS += -DKEYBOARD_NAME=$(KEYBOARD_NAME) -Dasm=__asm -DNO_PRINT -DNO_DEBUG -I$(QMK_DIR) -I$(QMK_DIR)/drivers -I$(QMK_PLATFORMS_DIR) -I$(PLATFORM_DIR) -Wno-old-style-declaration -Wno-pedantic -include config.h
 
 include $(PLATFORM_DIR)/$(QMK_PLATFORM).mk
 
-vpath %.c $(QMK_DIR) $(QMK_DIR)/debounce $(QMK_PLATFORMS_DIR) $(QMK_DIR)/drivers/haptic
-vpath %.h $(QMK_DIR) $(QMK_PLATFORMS_DIR) $(QMK_DIR)/drivers/haptic
+vpath %.c $(QMK_DIR) $(QMK_DIR)/debounce $(QMK_PLATFORMS_DIR) $(QMK_DIR)/drivers/haptic $(QMK_DIR)/drivers
+vpath %.h $(QMK_DIR) $(QMK_PLATFORMS_DIR) $(QMK_DIR)/drivers/haptic $(QMK_DIR)/drivers
 
 COMMON_HEADERS += config.h config_common.h pin_defs.h _pin_defs.h quantum.h platform_deps.h wait.h _wait.h matrix.h timer.h _timer.h gpio.h bitwise.h print.h util.h $(QMK_PLATFORM)/gpio.h eeconfig.h
 COMMON_HEADERS += $(wildcard local.mk) $(wildcard $(DEVICE)/local.mk)

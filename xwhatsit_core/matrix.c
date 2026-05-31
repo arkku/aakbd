@@ -159,13 +159,13 @@ static uint16_t current_threshold;
 
 static void dac_init(void) {
     current_threshold = 0;
-    writePin(CAPSENSE_DAC_NCS, 1);
-    setPinOutput(CAPSENSE_DAC_NCS);
-    setPinOutput(CAPSENSE_DAC_SCK);
-    setPinOutput(CAPSENSE_DAC_SDI);
-    writePin(CAPSENSE_DAC_NCS, 1);
-    writePin(CAPSENSE_DAC_SCK, 0);
-    writePin(CAPSENSE_DAC_SDI, 0);
+    gpio_write_pin(CAPSENSE_DAC_NCS, 1);
+    gpio_set_pin_output_push_pull(CAPSENSE_DAC_NCS);
+    gpio_set_pin_output_push_pull(CAPSENSE_DAC_SCK);
+    gpio_set_pin_output_push_pull(CAPSENSE_DAC_SDI);
+    gpio_write_pin(CAPSENSE_DAC_NCS, 1);
+    gpio_write_pin(CAPSENSE_DAC_SCK, 0);
+    gpio_write_pin(CAPSENSE_DAC_SDI, 0);
 }
 
 void dac_write_threshold(uint16_t value) {
@@ -179,26 +179,26 @@ void dac_write_threshold(uint16_t value) {
     value |= MCP_DAC_GAIN_1X << nGA_BIT;
     value |= buffered << BUF_BIT;
 
-    writePin(CAPSENSE_DAC_NCS, 0);
+    gpio_write_pin(CAPSENSE_DAC_NCS, 0);
     for (int_fast8_t i = 0; i < 16; ++i) {
-        writePin(CAPSENSE_DAC_SDI, (value >> 15) & 1);
+        gpio_write_pin(CAPSENSE_DAC_SDI, (value >> 15) & 1);
         value <<= 1;
-        writePin(CAPSENSE_DAC_SCK, 1);
-        writePin(CAPSENSE_DAC_SCK, 0);
+        gpio_write_pin(CAPSENSE_DAC_SCK, 1);
+        gpio_write_pin(CAPSENSE_DAC_SCK, 0);
     }
-    writePin(CAPSENSE_DAC_NCS, 1);
+    gpio_write_pin(CAPSENSE_DAC_NCS, 1);
     wait_us(CAPSENSE_DAC_SETTLE_TIME_US);
 }
 
 #else // ^ CAPSENSE_DAC_MCP4921
 static void dac_init(void) {
-    setPinOutput(CAPSENSE_DAC_SCLK);
-    setPinOutput(CAPSENSE_DAC_DIN);
-    setPinOutput(CAPSENSE_DAC_SYNC_N);
-    writePin(CAPSENSE_DAC_SYNC_N, 1);
-    writePin(CAPSENSE_DAC_SCLK, 0);
-    writePin(CAPSENSE_DAC_SCLK, 1);
-    writePin(CAPSENSE_DAC_SCLK, 0);
+    gpio_set_pin_output_push_pull(CAPSENSE_DAC_SCLK);
+    gpio_set_pin_output_push_pull(CAPSENSE_DAC_DIN);
+    gpio_set_pin_output_push_pull(CAPSENSE_DAC_SYNC_N);
+    gpio_write_pin(CAPSENSE_DAC_SYNC_N, 1);
+    gpio_write_pin(CAPSENSE_DAC_SCLK, 0);
+    gpio_write_pin(CAPSENSE_DAC_SCLK, 1);
+    gpio_write_pin(CAPSENSE_DAC_SCLK, 0);
 }
 
 void dac_write_threshold(uint16_t value) {
@@ -208,72 +208,72 @@ void dac_write_threshold(uint16_t value) {
 
     current_threshold = value;
     value <<= 2; // The two LSB bits of this DAC are don't care.
-    writePin(CAPSENSE_DAC_SYNC_N, 0);
+    gpio_write_pin(CAPSENSE_DAC_SYNC_N, 0);
     for (int_fast8_t i = 16; i; --i) {
-        writePin(CAPSENSE_DAC_DIN, (value >> 15) & 1);
+        gpio_write_pin(CAPSENSE_DAC_DIN, (value >> 15) & 1);
         value <<= 1;
-        writePin(CAPSENSE_DAC_SCLK, 1);
-        writePin(CAPSENSE_DAC_SCLK, 0);
+        gpio_write_pin(CAPSENSE_DAC_SCLK, 1);
+        gpio_write_pin(CAPSENSE_DAC_SCLK, 0);
     }
-    writePin(CAPSENSE_DAC_SYNC_N, 1);
-    writePin(CAPSENSE_DAC_SCLK, 1);
-    writePin(CAPSENSE_DAC_SCLK, 0);
+    gpio_write_pin(CAPSENSE_DAC_SYNC_N, 1);
+    gpio_write_pin(CAPSENSE_DAC_SCLK, 1);
+    gpio_write_pin(CAPSENSE_DAC_SCLK, 0);
     wait_us(CAPSENSE_DAC_SETTLE_TIME_US);
 }
 
 #endif
 
 static void shift_select_nothing(void) {
-    writePin(CAPSENSE_SHIFT_DIN, 0);
+    gpio_write_pin(CAPSENSE_SHIFT_DIN, 0);
     for (int_fast8_t i = SHIFT_BITS; i; --i) {
-        writePin(CAPSENSE_SHIFT_SHCP, 1);
-        writePin(CAPSENSE_SHIFT_SHCP, 0);
+        gpio_write_pin(CAPSENSE_SHIFT_SHCP, 1);
+        gpio_write_pin(CAPSENSE_SHIFT_SHCP, 0);
     }
-    writePin(CAPSENSE_SHIFT_STCP, 1);
-    writePin(CAPSENSE_SHIFT_STCP, 0);
+    gpio_write_pin(CAPSENSE_SHIFT_STCP, 1);
+    gpio_write_pin(CAPSENSE_SHIFT_STCP, 0);
 }
 
 void shift_data(uint32_t data, int data_idle, int shcp_idle, int stcp_idle) {
-    writePin(CAPSENSE_SHIFT_SHCP, 0);
-    writePin(CAPSENSE_SHIFT_STCP, 0);
+    gpio_write_pin(CAPSENSE_SHIFT_SHCP, 0);
+    gpio_write_pin(CAPSENSE_SHIFT_STCP, 0);
 
     for (int_fast8_t i = SHIFT_BITS; i; --i) {
-        writePin(CAPSENSE_SHIFT_DIN, (data >> (SHIFT_BITS - 1)) & 1);
-        writePin(CAPSENSE_SHIFT_SHCP, 1);
+        gpio_write_pin(CAPSENSE_SHIFT_DIN, (data >> (SHIFT_BITS - 1)) & 1);
+        gpio_write_pin(CAPSENSE_SHIFT_SHCP, 1);
         if (!((i == 1) && (shcp_idle))) {
-            writePin(CAPSENSE_SHIFT_SHCP, 0);
+            gpio_write_pin(CAPSENSE_SHIFT_SHCP, 0);
         }
         data <<= 1;
     }
-    writePin(CAPSENSE_SHIFT_STCP, 1);
+    gpio_write_pin(CAPSENSE_SHIFT_STCP, 1);
     if (!stcp_idle) {
-        writePin(CAPSENSE_SHIFT_STCP, 0);
+        gpio_write_pin(CAPSENSE_SHIFT_STCP, 0);
     }
-    writePin(CAPSENSE_SHIFT_DIN, !!data_idle);
+    gpio_write_pin(CAPSENSE_SHIFT_DIN, !!data_idle);
 }
 
 static void shift_select_col_no_strobe(uint8_t col) {
     for (int_fast8_t i = SHIFT_BITS - 1; i >= 0; --i) {
-        writePin(CAPSENSE_SHIFT_DIN, !!(col == i));
-        writePin(CAPSENSE_SHIFT_SHCP, 1);
-        writePin(CAPSENSE_SHIFT_SHCP, 0);
+        gpio_write_pin(CAPSENSE_SHIFT_DIN, !!(col == i));
+        gpio_write_pin(CAPSENSE_SHIFT_SHCP, 1);
+        gpio_write_pin(CAPSENSE_SHIFT_SHCP, 0);
     }
 }
 
 static INLINE void shift_select_col(uint8_t col) {
     shift_select_col_no_strobe(col);
-    writePin(CAPSENSE_SHIFT_STCP, 1);
-    writePin(CAPSENSE_SHIFT_STCP, 0);
+    gpio_write_pin(CAPSENSE_SHIFT_STCP, 1);
+    gpio_write_pin(CAPSENSE_SHIFT_STCP, 0);
 }
 
 static void shift_init(void) {
-    setPinOutput(CAPSENSE_SHIFT_DIN);
-    setPinOutput(CAPSENSE_SHIFT_OE);
-    setPinOutput(CAPSENSE_SHIFT_STCP);
-    setPinOutput(CAPSENSE_SHIFT_SHCP);
-    writePin(CAPSENSE_SHIFT_OE, 0);
-    writePin(CAPSENSE_SHIFT_STCP, 0);
-    writePin(CAPSENSE_SHIFT_SHCP, 0);
+    gpio_set_pin_output_push_pull(CAPSENSE_SHIFT_DIN);
+    gpio_set_pin_output_push_pull(CAPSENSE_SHIFT_OE);
+    gpio_set_pin_output_push_pull(CAPSENSE_SHIFT_STCP);
+    gpio_set_pin_output_push_pull(CAPSENSE_SHIFT_SHCP);
+    gpio_write_pin(CAPSENSE_SHIFT_OE, 0);
+    gpio_write_pin(CAPSENSE_SHIFT_STCP, 0);
+    gpio_write_pin(CAPSENSE_SHIFT_SHCP, 0);
     shift_select_nothing();
     wait_us(CAPSENSE_KEYBOARD_SETTLE_TIME_US);
 }
@@ -1055,7 +1055,7 @@ bool matrix_scan_custom(matrix_row_t current_matrix[]) {
         for (int_fast8_t col = 0; col < MATRIX_EXTRA_DIRECT_COLS; ++col) {
             const pin_t pin = extra_direct_pins[row][col];
             if (pin != NO_PIN) {
-                uint8_t value = readPin(pin);
+                uint8_t value = gpio_read_pin(pin);
                 #if MATRIX_EXTRA_DIRECT_PINS_ACTIVE_LOW
                     value = !value;
                 #endif
@@ -1080,10 +1080,10 @@ end_of_scan:
 void matrix_init_custom(void) {
 #if defined(CONTROLLER_IS_THROUGH_HOLE_BEAMSPRING) || defined(CONTROLLER_IS_THROUGH_HOLE_MODEL_F)
     // Disable on-board leds
-    setPinOutput(D5);
-    writePin(D5, 1);
-    setPinOutput(B0);
-    writePin(B0, 1);
+    gpio_set_pin_output_push_pull(D5);
+    gpio_write_pin(D5, 1);
+    gpio_set_pin_output_push_pull(B0);
+    gpio_write_pin(B0, 1);
 #endif
 
 #if MATRIX_EXTRA_DIRECT_ROWS
@@ -1092,9 +1092,9 @@ void matrix_init_custom(void) {
             pin_t pin = extra_direct_pins[row][col];
             if (pin != NO_PIN) {
                 #if MATRIX_EXTRA_DIRECT_PINS_NEED_INTERNAL_PULLUP
-                    setPinInputHigh(pin);
+                    gpio_set_pin_input_high(pin);
                 #else
-                    setPinInput(pin);
+                    gpio_set_pin_input(pin);
                 #endif
             }
         }

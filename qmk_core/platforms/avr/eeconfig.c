@@ -48,7 +48,7 @@ void eeconfig_init_quantum(void) {
 #if defined(EEPROM_DRIVER)
     eeprom_driver_erase();
 #endif
-    eeprom_update_word(EECONFIG_MAGIC, EECONFIG_MAGIC_NUMBER);
+    eeprom_update_word(EECONFIG_MAGIC_NUMBER_PTR, EECONFIG_MAGIC_NUMBER);
     eeprom_update_byte(EECONFIG_BACKLIGHT, 0);
     eeprom_update_dword(EECONFIG_RGBLIGHT, 0);
     eeprom_update_dword(EECONFIG_RGB_MATRIX, 0);
@@ -70,20 +70,20 @@ void eeconfig_init(void) {
 }
 
 void eeconfig_enable(void) {
-    eeprom_update_word(EECONFIG_MAGIC, EECONFIG_MAGIC_NUMBER);
+    eeprom_update_word(EECONFIG_MAGIC_NUMBER_PTR, EECONFIG_MAGIC_NUMBER);
 }
 
 void eeconfig_disable(void) {
 #if defined(EEPROM_DRIVER)
     eeprom_driver_erase();
 #endif
-    eeprom_update_word(EECONFIG_MAGIC, EECONFIG_MAGIC_NUMBER_OFF);
+    eeprom_update_word(EECONFIG_MAGIC_NUMBER_PTR, EECONFIG_MAGIC_NUMBER_OFF);
 }
 
 bool eeconfig_is_enabled(void) {
-    return (eeprom_read_word(EECONFIG_MAGIC) == EECONFIG_MAGIC_NUMBER);
+    return (eeprom_read_word(EECONFIG_MAGIC_NUMBER_PTR) == EECONFIG_MAGIC_NUMBER);
 }
 
 bool eeconfig_is_disabled(void) {
-    return (eeprom_read_word(EECONFIG_MAGIC) == EECONFIG_MAGIC_NUMBER_OFF);
+    return (eeprom_read_word(EECONFIG_MAGIC_NUMBER_PTR) == EECONFIG_MAGIC_NUMBER_OFF);
 }

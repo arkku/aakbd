@@ -265,9 +265,9 @@ uint8_t handle_generic_hid_report(uint8_t report_id, uint8_t count, uint8_t data
                     stcp_idle = data[9];
                 }
                 shift_data(shdata, data_idle, shcp_idle, stcp_idle);
-                response[3] = readPin(CAPSENSE_SHIFT_DIN);
-                response[4] = readPin(CAPSENSE_SHIFT_SHCP);
-                response[5] = readPin(CAPSENSE_SHIFT_STCP);
+                response[3] = gpio_read_pin(CAPSENSE_SHIFT_DIN);
+                response[4] = gpio_read_pin(CAPSENSE_SHIFT_SHCP);
+                response[5] = gpio_read_pin(CAPSENSE_SHIFT_STCP);
                 *response_length = 6;
                 break;
             }

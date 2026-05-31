@@ -290,8 +290,8 @@ shutdown_quantum (void) {
     usb_deinit();
 
 #ifdef ENABLE_I2C
-    // Also stop I2C if we are using it
-    i2c_stop();
+    // Note: The new i2c_master API handles stop internally
+    // No explicit i2c_stop() needed
 #endif
 
     delay_milliseconds(32);
