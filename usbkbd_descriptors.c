@@ -94,7 +94,7 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
     // included (these may or may not be the same).
     HID_REPORT_COUNT,       1,
     HID_REPORT_SIZE,        16 - MODIFIER_COUNT,
-    HID_INPUT,              HID_IO_CONSTANT,
+    HID_INPUT,              HID_IO_CONSTANT | HID_IO_VARIABLE,
 #endif
 
 #if ENABLE_APPLE_FN_KEY
@@ -113,7 +113,7 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
 #if APPLE_FN_IS_MODIFIER
     HID_REPORT_COUNT,       1,
     HID_REPORT_SIZE,        1,
-    HID_INPUT,              HID_IO_CONSTANT,
+    HID_INPUT,              HID_IO_CONSTANT | HID_IO_VARIABLE,
 #endif
     HID_LOGICAL_MINIMUM,    0,
     HID_LOGICAL_MAXIMUM,    1,
@@ -149,7 +149,7 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
 #if LED_COUNT < 8
     HID_REPORT_COUNT,       1,
     HID_REPORT_SIZE,        8 - LED_COUNT,
-    HID_OUTPUT,             HID_IO_CONSTANT,
+    HID_OUTPUT,             HID_IO_CONSTANT | HID_IO_VARIABLE,
 #endif
 
     // Keys
