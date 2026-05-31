@@ -743,7 +743,7 @@ ISR(USB_COM_vect) {
             if (type == USB_REQUEST_DEVICE_TO_HOST_STANDARD_DEVICE) {
                 usb_tx(usb_configuration);
             } else {
-                usb_tx(1);
+                success = false;
             }
         } else if (request == USB_REQUEST_SET_CONFIGURATION) {
             // Set configuration
