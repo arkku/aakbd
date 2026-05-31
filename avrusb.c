@@ -213,7 +213,7 @@ usb_init_endpoints (void) {
 
 static INLINE void
 usb_configuration_changed() {
-    usb_clear_setup();
+    usb_clear_status_flags();
     usb_init_endpoints();
     usb_enable_interrupts(INT_START_OF_FRAME_FLAG);
 }

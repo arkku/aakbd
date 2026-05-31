@@ -167,7 +167,7 @@
 #define usb_set_address(addr)       (UDADDR = (addr) | (1 << ADDEN))
 #define usb_get_address()           (UDADDR & ~(1 << ADDEN))
 
-#define usb_clear_setup()           (UEINTX &= ~(1 << RXSTPI))
+#define usb_clear_status_flags()    (UEINTX &= ~(1 << RXSTPI))
 #define usb_clear_setup_int()       (UEINTX = ~((1 << RXSTPI) | (1 << RXOUTI) | (1 << TXINI)))
 #define usb_release_rx()            (UEINTX = (1 << NAKINI) | (1 << RWAL) | (1 << RXSTPI) | (1 << STALLEDI) | (1 << TXINI)) // 0x6B
 #define usb_release_tx()            (UEINTX = (1 << NAKOUTI) | (1 << RWAL) | (1 << RXSTPI) | (1 << STALLEDI)) // 0x3A
