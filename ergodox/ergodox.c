@@ -23,8 +23,6 @@
 #include "led.h"
 #include "generic_hid.h"
 
-keyboard_config_t keyboard_config;
-
 void
 led_init_ports (void) {
     ergodox_led_all_on();
