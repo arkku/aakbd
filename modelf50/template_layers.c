@@ -24,18 +24,22 @@ enum macro {
 /// Layer 1 is the default base layer. Only the differences to the default
 /// mapping need to be defined here.
 DEFINE_LAYER(DEFAULT_BASE_LAYER) {
+#if ENABLE_APPLE_FN_KEY
+    // Insert does nothing useful on Mac
+    [KEY(F1)] = KEY_APPLE_FN,
+#else
     [KEY(F1)] = KEY(BACKSPACE),
-    [KEY(F2)] = KEY(DELETE),
+#endif
 
+    [KEY(F2)] = KEY(DELETE),
     [KEY(F5)] = KEY(HOME),
     [KEY(F6)] = KEY(END),
-
     [KEY(F9)] = KEY(PAGE_UP),
     [KEY(F10)] = KEY(PAGE_DOWN),
 
-    [KEY(F3)] = KEY(F13),
-    [KEY(F7)] = KEY(F14),
-    [KEY(F11)] = KEY(F15),
+    [KEY(F3)] = KEY(F16),
+    [KEY(F7)] = KEY(F17),
+    [KEY(F11)] = KEY(F18),
 
 #if ENABLE_MEDIA_KEYS
     [KEY(F4)] = KEY(VOLUME_MUTE),
@@ -72,13 +76,13 @@ DEFINE_LAYER(DEFAULT_BASE_LAYER) {
     [KEY(F23)] = KEY(F11),
     [KEY(F24)] = KEY(F12),
 
-    [KEY(KP_D)] = KEY(F1),
-    [KEY(KP_E)] = KEY(F2),
-    [KEY(KP_F)] = LAYER_OR_PLAIN_KEY(FN_LAYER, KEY(PAUSE)),
+    [KEY(KP_D)] = KEY(F13),
+    [KEY(KP_E)] = KEY(F14),
+    [KEY(KP_F)] = LAYER_OR_PLAIN_KEY(FN_LAYER, KEY(F15)),
 
 #if SPLIT_PAD_PLUS
-    // If the plus is split, add the equals sign
-    [KEY(KP_DIVIDE)] = KEY(KP_EQUALS),
+    // If the plus is split, use the Mac layout (but change = to backspace)
+    [KEY(KP_DIVIDE)] = KEY(BACKSPACE),
     [KEY(KP_MULTIPLY)] = KEY(KP_DIVIDE),
     [KEY(KP_MINUS)] = KEY(KP_MULTIPLY),
     [KEY(KP_PLUS)] = KEY(KP_MINUS),
@@ -95,6 +99,9 @@ DEFINE_LAYER(DEFAULT_BASE_LAYER) {
 DEFINE_LAYER(WINDOWS_LAYER) {
     [KEY(F1)] = KEY(INSERT),
 
+    // Windows doesn't seem to support the way my media keys are currently
+    // implemented (both Mac and Linux do), so I'm just binding otherwise
+    // unused F-keys there and using SharpKeys to remap them in the registry
     [KEY(F4)] = KEY(F19),
     [KEY(F8)] = KEY(F20),
     [KEY(F12)] = KEY(F21),
@@ -130,6 +137,18 @@ DEFINE_LAYER(NUM_LOCK_LAYER) {
 
     [KEY(KP_0_INSERT)] = KEY(INSERT),
     [KEY(KP_COMMA_DEL)] = KEY(DELETE),
+
+#if SPLIT_PAD_PLUS
+    [KEY(KP_MULTIPLY)] = KEY(DELETE),
+    [KEY(KP_MINUS)] = KEY(ALT_GR),
+    [KEY(KP_PLUS)] = KEY(RIGHT_SHIFT),
+    [KEY(BACKSPACE)] = KEY(SPACE),
+#else
+    [KEY(KP_DIVIDE)] = KEY(BACKSPACE),
+    [KEY(KP_MULTIPLY)] = KEY(ALT_GR),
+    [KEY(KP_MINUS)] = KEY(RIGHT_SHIFT),
+    [KEY(KP_PLUS)] = KEY(SPACE),
+#endif
 };
 #endif
 

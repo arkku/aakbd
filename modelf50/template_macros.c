@@ -29,23 +29,38 @@
 #endif
 
 #if ENABLE_APPLE_FN_KEY
-static bool is_weak_apple_fn_pressed = false;
+#define APPLE_FN_WEAK 1
+#define APPLE_FN_STRONG 2
+
+static uint8_t apple_fn_pressed = 0;
+
+#define is_weak_apple_fn_pressed()      (apple_fn_pressed == APPLE_FN_WEAK)
+#define is_strong_apple_fn_pressed()    (apple_fn_pressed == APPLE_FN_STRONG)
 
 static inline void press_weak_apple_fn(void) {
     if (!is_virtual_pressed(USB_KEY_VIRTUAL_APPLE_FN)) {
         press_virtual(USB_KEY_VIRTUAL_APPLE_FN);
-        is_weak_apple_fn_pressed = true;
+        apple_fn_pressed = APPLE_FN_WEAK;
     }
 }
 
 static inline bool release_weak_apple_fn(void) {
-    if (is_weak_apple_fn_pressed) {
+    if (is_weak_apple_fn_pressed()) {
         release_virtual(USB_KEY_VIRTUAL_APPLE_FN);
-        is_weak_apple_fn_pressed = false;
+        if (apple_fn_pressed == APPLE_FN_WEAK) {
+            apple_fn_pressed = 0;
+        }
         return true;
     } else {
         return false;
     }
+}
+
+static inline void press_strong_apple_fn() {
+    if (!is_virtual_pressed(USB_KEY_VIRTUAL_APPLE_FN)) {
+        press_virtual(USB_KEY_VIRTUAL_APPLE_FN);
+    }
+    apple_fn_pressed = APPLE_FN_STRONG;
 }
 #else
 #define press_weak_apple_fn(x)      do { } while (0)
@@ -59,13 +74,21 @@ static inline bool release_weak_apple_fn(void) {
 /// in `execute_macro` and for the release `postprocess_release`.
 static inline keycode_t preprocess_press(keycode_t keycode, uint8_t physical_key, uint8_t * restrict data) {
 #if ENABLE_APPLE_FN_KEY
-    if (physical_key >= KEY(F13) && physical_key <= KEY(F24) && !is_layer_active(WINDOWS_LAYER)) {
+    if (physical_key >= KEY(F13) && physical_key <= KEY(F24)
+        && !(is_layer_active(WINDOWS_LAYER) || is_layer_active(FN_LAYER))
+    ) {
         // Use as F-keys (F1-F12, which have been moved to the second block)
-        press_weak_apple_fn();
-        *data = 1;
+        if (is_strong_apple_fn_pressed()) {
+            *data = APPLE_FN_STRONG;
+            release_virtual(USB_KEY_VIRTUAL_APPLE_FN);
+            usb_keyboard_send_if_needed();
+        } else {
+            *data = APPLE_FN_WEAK;
+            press_weak_apple_fn();
+        }
         return keycode;
     } else if (keycode == KEY_APPLE_FN) {
-        is_weak_apple_fn_pressed = false; // Real Apple Fn makes weak strong
+        apple_fn_pressed = APPLE_FN_STRONG; // Real Apple Fn makes weak strong
     } else if (release_weak_apple_fn()) {
         // Release the weak Apple Fn when pressing any other key
         usb_keyboard_send_if_needed();
@@ -81,8 +104,17 @@ static inline keycode_t preprocess_press(keycode_t keycode, uint8_t physical_key
 /// `preprocess_press` and/or any macro handlers.
 static inline void postprocess_release(keycode_t keycode, uint8_t physical_key, uint8_t data) {
 #if ENABLE_APPLE_FN_KEY
-    if (data && release_weak_apple_fn()) {
-        usb_keyboard_send_if_needed();
+    if (data && physical_key >= KEY(F13) && physical_key <= KEY(F24)) {
+        if (data == APPLE_FN_WEAK && release_weak_apple_fn()) {
+            // Release the weak Apple Fn after releasing the F-key
+            usb_keyboard_send_if_needed();
+        } else if (data == APPLE_FN_STRONG && is_strong_apple_fn_pressed() && !is_virtual_pressed(USB_KEY_VIRTUAL_APPLE_FN)) {
+            // Press the strong Apple Fn again after releasing the F-key
+            press_virtual(USB_KEY_VIRTUAL_APPLE_FN);
+            usb_keyboard_send_if_needed();
+        }
+    } else if (keycode == KEY_APPLE_FN) {
+        apple_fn_pressed = 0;
     }
 #endif
 }
@@ -194,6 +226,9 @@ static inline void layer_state_changed(uint8_t layer, bool is_enabled) {
 /// from EEPROM, etc.
 static inline void handle_reset(void) {
     clear_override_leds();
+#if ENABLE_APPLE_FN_KEY
+    apple_fn_pressed = 0;
+#endif
 }
 
 /// Called approximately once every 10 milliseconds with an 8-bit time value.

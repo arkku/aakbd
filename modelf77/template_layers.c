@@ -96,7 +96,11 @@ DEFINE_LAYER(1) {
 #endif
 
 #if ISO_ENTER && SPLIT_ENTER
+#if SPLIT_BACKSPACE
     [KEY(ANSI_BACKSLASH)] = ALT(BACKSPACE),
+#else
+    [KEY(ANSI_BACKSLASH)] = KEY(DELETE),
+#endif
 #endif
 
 #if RIGHT_MODIFIERS_ARE_ARROWS
@@ -294,7 +298,11 @@ DEFINE_LAYER(WINDOWS_LAYER) {
     [KEY(CAPS_LOCK)] = CTRL_OR(ESC),
 
 #if ISO_ENTER && SPLIT_ENTER
+#if SPLIT_BACKSPACE
     [KEY(ANSI_BACKSLASH)] = CTRL(BACKSPACE),
+#else
+    [KEY(ANSI_BACKSLASH)] = KEY(DELETE),
+#endif
 #endif
 
     // Undo any remapping of these
