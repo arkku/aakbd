@@ -1,8 +1,8 @@
-## Brand New Model f50 Keyboard Alternative Firmware
+## Brand New Model F50 Keyboard Alternative Firmware
 
 This subdirectory of [AAKBD](https://github.com/arkku/aakbd) contains an
 alternative firmware for the Brand New Model F50 keyboard. The underlying code
-is ported from pandrew's QMK firmware, which (I believe) is based on xwhatit's
+is ported from pandrew's QMK firmware, which (I believe) is based on xwhatsit's
 firmware. The F50-specific configuration is from NathanA's VIAL firmware, which
 is currently what the keyboard ships with.
 
@@ -40,7 +40,7 @@ The `KPA` through `KPF` in the bottom row correspond to _numpad_ A–F keys,
 which are probably unsupported and I have never seen a keyboard that actually
 has them. They are just there so that it's easy to remember what to remap.
 
-The righmost 4×5 block is a standard PC numpad. The keyboard ships with all
+The rightmost 4×5 block is a standard PC numpad. The keyboard ships with all
 springs installed, so if you wish to use the standard numpad layout you need
 to remove the springs from the bottom barrels of the Plus and Enter keys, as
 well as from the left barrel of the 0/Ins key. To use individual keys, define

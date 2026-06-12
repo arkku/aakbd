@@ -87,7 +87,7 @@ For Model F keyboards, this has only been tested with the last USB-C versions
 of the keyboards.
 <kbd>Fn</kbd>+<kbd>Space</kbd>+<kbd>R</kbd> may work to reset the keyboard,
 or you can power it up while shorting the programming pads (but they are
-inconviently located on the "inner" side of the PCB, so you probably need to
+inconveniently located on the "inner" side of the PCB, so you probably need to
 unscrew the board). You can flash the hex file using the same tools as you
 would for the original firmware. I recommend enabling the DFU interface so
 the keyboard can be reset through that in case something goes wrong.
@@ -170,7 +170,7 @@ likely to be something like `PORT=/dev/cu.usbmodem14101`). You can also
 specify `UPLOAD_PROTOCOL=avr109` in case it differs from the default
 (which is `avr109`).
 
-To intially get your device into bootloader mode, you need to short the reset
+To initially get your device into bootloader mode, you need to short the reset
 (`RST`) pin to ground. If the device already has a program on it, the time it
 stays in the bootloader after reset may be extremely short. Reset it twice in
 a row to extend the time.
@@ -193,7 +193,7 @@ Once you have flashed the firmware onto the device once and have the keyboard
 working, updating the firmware is much simpler than the initial upload
 (provided that a bootloader is installed).
 
-If your keyboard has both left and right Shift keys and as well as
+If your keyboard has both left and right Shift keys as well as
 Scroll Lock _mapped_, you can enter the bootloader by pressing
 <kbd>Left Shift</kbd> <kbd>Scroll Lock</kbd> <kbd>Right Shift</kbd> in that
 order. If you don't have these keys, or have remapped them in ways that make
@@ -359,7 +359,7 @@ Examples of extended keycodes include:
 * modifier on hold or layer on/off toggle on tap – acts as a modifier when held
   down but toggles layer if no key was pressed while held, e.g.,
   `CTRL_ALT_CMD_SHIFT_OR_LAYER(2)`
-* layer on/off toggle hold or plain key on tap – toggles a a layer while
+* layer on/off toggle hold or plain key on tap – toggles a layer while
   holding, but instead sends a plain key press (no modifiers) if no other
   key was pressed while held, e.g., `LAYER_OR_PLAIN_KEY(2, KEY(ESC))`
 * base layer change – changes the base layer, effectively disabling all layers
@@ -418,13 +418,13 @@ The arguments of this function are as follows:
   keys and produce a different result)
 * `data` – a pointer to a single (1) byte of storage, which you can set the
   value of and it will persist from the key press (`is_release == false`) to
-  to release (`is_release == true`)
+  release (`is_release == true`)
 
 The helper facilities available to macros are mostly listed in `macros.h`.
 However, since this is an arbitrary program, you can call any C function,
 use inline assembly, etc. The file `usbkbd_config.h` has various lower level
 functions, such as simulated keypresses (bypassing the key processing system)
-and simulated typing (if enabled at compile type) where you can
+and simulated typing (if enabled at compile time) where you can
 `fprintf(usb_kbd_type, "any text");` and the keyboard will "type" it.
 
 Some of the more important functions are:
@@ -790,7 +790,8 @@ things. The rollover _is_ configurable, however. You can get modifiers + 7KRO
 "for free" since the 7th key uses the normally unused reserved byte of the
 boot protocol report. The default `USB_MAX_KEY_ROLLOVER` is set to 10, i.e.,
 modifiers + 10KRO, which really "should be enough for anybody", given that you
-can press one non-modifier key per finger and any combination of modifiers.
+can press one non-modifier key per finger and any combination of modifiers on
+top of that.
 
 Ten keys with modifiers should even cover the most complex macros that press
 many virtual keys with one physical key, especially since most such combinations

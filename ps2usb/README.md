@@ -34,7 +34,7 @@ No other components are needed, apart from the physical connectors.
 Set `DEVICE` to `ps2usb` either in `local.mk` (in the project root directory),
 or on the command line (i.e., `make DEVICE=ps2usb`).
 
-You can have two complementary `local.mk` files: one the the project root
+You can have two complementary `local.mk` files: one in the project root
 directory, and `ps2usb/local.mk` specific to this PS/2 to USB converter.
 
 For example:

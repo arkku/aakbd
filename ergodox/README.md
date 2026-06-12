@@ -17,7 +17,7 @@ my fault.
 Set `DEVICE` to `ergodox` either in `local.mk` (in the project root directory),
 or on the command line (i.e., `make DEVICE=ergodox`).
 
-You can have two complementary `local.mk` files: one the the project root
+You can have two complementary `local.mk` files: one in the project root
 directory, and `ergodox/local.mk` specific to ErgoDox Ez.
 
 For example:

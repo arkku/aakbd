@@ -2,7 +2,7 @@
 
 This subdirectory of [AAKBD](https://github.com/arkku/aakbd) contains an
 alternative firmware for the Brand New Model F77 keyboard, ported from
-pandrew's QMK firmware, which is based on xwhatit's firmware.
+pandrew's QMK firmware, which is based on xwhatsit's firmware.
 
 My modifications include:
 
