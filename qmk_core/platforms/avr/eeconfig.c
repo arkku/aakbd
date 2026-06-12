@@ -25,13 +25,13 @@ void eeconfig_update_user(uint32_t val) {
     eeprom_update_dword(EECONFIG_USER, val);
 }
 
-#ifdef EECONFIG_HAPTIC
-uint32_t eeconfig_read_haptic(void) {
-    return eeprom_read_dword(EECONFIG_HAPTIC);
+#if defined(HAPTIC_ENABLE) && defined(EECONFIG_HAPTIC)
+void eeconfig_read_haptic(haptic_config_t *haptic_config) {
+    haptic_config->raw = eeprom_read_dword(EECONFIG_HAPTIC);
 }
 
-void eeconfig_update_haptic(uint32_t val) {
-    eeprom_update_dword(EECONFIG_HAPTIC, val);
+void eeconfig_update_haptic(const haptic_config_t *haptic_config) {
+    eeprom_update_dword(EECONFIG_HAPTIC, haptic_config->raw);
 }
 #endif
 

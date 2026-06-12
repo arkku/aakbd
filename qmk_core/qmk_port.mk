@@ -37,8 +37,8 @@ $(BUILDDIR)/matrix_common.o: $(COMMON_HEADERS)
 $(BUILDDIR)/i2c_master.o: i2c_master.h $(COMMON_HEADERS)
 $(BUILDDIR)/bitwise.o: bitwise.h util.h
 $(BUILDDIR)/suspend_core.o: suspend.h matrix.h
-$(BUILDDIR)/haptic.o: haptic.h solenoid.h usb_hardware.h debug.h $(COMMON_HEADERS)
-$(BUILDDIR)/solenoid.o: solenoid.h haptic.h usb_hardware.h $(COMMON_HEADERS)
+$(BUILDDIR)/haptic.o: haptic.h solenoid.h usb_device_state.h usb_hardware.h debug.h $(COMMON_HEADERS)
+$(BUILDDIR)/solenoid.o: solenoid.h haptic.h usb_device_state.h usb_hardware.h $(COMMON_HEADERS)
 
 $(BUILDDIR)/sym_eager_pk.o: debounce.h $(COMMON_HEADERS)
 $(BUILDDIR)/sym_eager_pr.o: debounce.h $(COMMON_HEADERS)
