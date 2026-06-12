@@ -1,0 +1,79 @@
+#!/usr/bin/env ruby
+require 'fileutils'
+require 'yaml'
+
+OUT_DIR = 'release'
+OBJ_DIR = "#{OUT_DIR}/build"
+CONFIG_PATTERN = '*/release.yaml'
+
+def build_variant(device, base_flags, flags, name)
+  hex = "#{name}.hex"
+  out_hex = "#{OUT_DIR}/#{hex}"
+  build_dir = "#{OBJ_DIR}/#{device}/#{name}"
+  build_hex = "#{build_dir}/#{name}.hex"
+  build_bin = "#{build_dir}/#{name}.bin"
+
+  return false if File.file?(out_hex) && File.file?(build_hex) && File.mtime(out_hex) >= File.mtime(build_hex)
+
+  custom_dir = "#{OUT_DIR}/#{device}"
+  all_flags = (base_flags + flags +
+               ["HEX=#{build_hex}", "BIN=#{build_bin}", "DEVICE=#{device}",
+                "CUSTOM_DIR=#{custom_dir}", "BUILDDIR=#{build_dir}"]).join(' ')
+  system("make -s -j$(nproc) #{all_flags}", exception: true)
+  FileUtils.cp(build_hex, out_hex)
+  true
+rescue => e
+  warn "FAILED: #{name}: #{e.message}"
+  false
+end
+
+def expand_options(device, base_flags, option_groups, name = device, flags = [], &block)
+  if option_groups.empty?
+    block.call(device, base_flags, flags, name)
+  else
+    group = option_groups.first
+    rest = option_groups[1..]
+    group.each do |flag_name, flag_value|
+      next_name = flag_name.empty? ? name : "#{name}_#{flag_name}"
+      next if name.include?('rmod_arrows') && flag_name.include?('_arrows')
+      expand_options(device, base_flags, rest, next_name, flags + [flag_value], &block)
+    end
+  end
+end
+
+def sync_custom_dir(device)
+  custom_dir = "#{OUT_DIR}/#{device}"
+  Dir.mkdir(custom_dir) unless Dir.exist?(custom_dir)
+  %w[layers.c macros.c].each do |file|
+    src = "#{device}/release_#{file}"
+    dst = "#{custom_dir}/#{file}"
+    next unless File.file?(src)
+    next if File.file?(dst) && File.mtime(dst) >= File.mtime(src)
+    FileUtils.cp(src, dst)
+  end
+end
+
+Dir.mkdir(OUT_DIR) unless Dir.exist?(OUT_DIR)
+
+device_hexes = Hash.new { |h, k| h[k] = [] }
+built = false
+
+configs = Dir[CONFIG_PATTERN]
+configs.each do |config_file|
+  device = File.dirname(config_file)
+  config = YAML.safe_load(File.read(config_file))
+  sync_custom_dir(device)
+  expand_options(device, config['base_flags'] || [], config['options'] || []) do |*args|
+    built = true if build_variant(*args)
+  end
+  device_hexes[device] += Dir["#{OUT_DIR}/#{device}_*.hex"]
+end
+
+if built
+  device_hexes.each do |device, hexes|
+    next if hexes.empty?
+    zip = "#{OUT_DIR}/#{device}.zip"
+    system("zip -jq #{zip} #{hexes.join(' ')}", exception: true)
+    puts "Created #{zip}"
+  end
+end

@@ -7,7 +7,7 @@
 CC=avr-gcc
 OPTIMIZATION=s
 CC_FLAGS=-I$(DEVICE) -I. $(AVR_FLAGS)
-CFLAGS=-O$(OPTIMIZATION) -Wall -std=c11 -Wextra -Wno-unused-parameter $(CUSTOM_FLAGS) $(CC_FLAGS) $(DEVICE_FLAGS) $(CONFIG_FLAGS)
+CFLAGS=-O$(OPTIMIZATION) -Wall -std=gnu11 -Wextra -Wno-unused-parameter $(CUSTOM_FLAGS) $(CC_FLAGS) $(DEVICE_FLAGS) $(CONFIG_FLAGS)
 LD_FLAGS=$(AVR_FLAGS)
 LDFLAGS=-O$(OPTIMIZATION) $(LD_FLAGS)
 AR=avr-ar
@@ -171,9 +171,17 @@ clean:
 	rm -f *.o
 	@[ -d ./$(BUILDDIR) ] && rm -f ./$(BUILDDIR)/*.o || true
 	@[ -e $(BUILDDIR) ] && rmdir $(BUILDDIR) || true
+	@[ -d ./release/build ] && rm -rf ./release/build || true
+
+release:
+	@./build_release
+
+upload_release:
+	@./upload_release $(TAG)
 
 distclean: | clean
 	rm -f *.hex *.bin .ccls
+	rm -rf release
 	find . -name '*.o' -type f -delete
 	find . -name 'build' -type d -d -exec rmdir '{}' ';'
 	@[ -e $(MACROS_C) -o -e $(LAYERS_C) ] && echo NOT deleting $(MACROS_C) and $(LAYERS_C) files! || true
@@ -182,4 +190,4 @@ backup:
 	cp $(MACROS_C) $(MACROS_C)~
 	cp $(LAYERS_C) $(LAYERS_C)~
 
-.PHONY: all clean distclean burn fuses upload lock unlock bootloader backup dfu reset
+.PHONY: all clean distclean release upload_release burn fuses upload lock unlock bootloader backup dfu reset

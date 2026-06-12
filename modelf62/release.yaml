@@ -1,0 +1,17 @@
+base_flags:
+  - PLAIN_DEVICE=1
+  - DVORAK_MAPPINGS=0
+
+options:
+  - apple: ENABLE_APPLE_FN_KEY=1
+    "": ENABLE_APPLE_FN_KEY=0
+  - iso: ISO_LAYOUT=1
+  - split_rshift: SPLIT_RIGHT_SHIFT=1 RIGHT_MODIFIERS_ARE_ARROWS=0
+    split_rshift_rmod_arrows: SPLIT_RIGHT_SHIFT=1 RIGHT_MODIFIERS_ARE_ARROWS=1
+    "": SPLIT_RIGHT_SHIFT=0 RIGHT_MODIFIERS_ARE_ARROWS=0
+  - split_backspace: SPLIT_BACKSPACE=1
+    "": SPLIT_BACKSPACE=0
+  - short_space: SHORT_SPACE=1
+    "": SHORT_SPACE=0
+  - tkl_arrows: RIGHT_BLOCK_TYPE=1
+    numpad_regular: RIGHT_BLOCK_TYPE=3

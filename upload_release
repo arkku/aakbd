@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+tag="$1"
+if [ -z "$tag" ]; then
+  echo "Usage: $0 <tag>"
+  echo "  e.g.: $0 0.9.11"
+  exit 1
+fi
+git tag -a "$tag" -m "Release $tag"
+git push origin "$tag"
+gh release create "$tag" --title "$tag" --notes "" release/*.zip
