@@ -183,7 +183,7 @@ distclean: | clean
 	rm -f *.hex *.bin .ccls
 	rm -rf release
 	find . -name '*.o' -type f -delete
-	find . -name 'build' -type d -d -exec rmdir '{}' ';'
+	find . -depth -name 'build' -type d -exec rmdir '{}' ';'
 	@[ -e $(MACROS_C) -o -e $(LAYERS_C) ] && echo NOT deleting $(MACROS_C) and $(LAYERS_C) files! || true
 
 backup:
