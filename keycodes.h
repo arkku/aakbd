@@ -1,7 +1,7 @@
 /**
  * keycodes.h: Keycodes for remapping, layers, and macros.
  *
- * Copyright (c) 2021 Kimmo Kulovesi, https://arkku.dev/
+ * Copyright (c) 2021-2025 Kimmo Kulovesi, https://arkku.dev/
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@ typedef uint16_t keycode_t;
 /// Plain key, no modifiers.
 #define KEY(name)                   PASTE(USB_KEY_, name)
 
-/// Plain key, on modifiers.
+/// Plain key, no modifiers.
 #define PLAIN(name)                 KEY(name)
 
 /// A special keycode that causes the keypress to have no effect.
@@ -659,8 +659,10 @@ enum extended_keycode {
 #define APPLE_FN(key)                   (MODS_APPLE_FN | KEY(key))
 #endif
 
+#ifndef PASTE
 #define PASTE_(a, b)        a##b
 #define PASTE(a, b)         PASTE_(a, b)
+#endif
 
 // Keycode bit patterns:
 // 0000 0000 0000 0000 - pass through (`PASS`)

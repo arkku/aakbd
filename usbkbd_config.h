@@ -15,7 +15,7 @@
  *
  * Note that you need to escape double quotes in that file, such as with '.
  *
- * Copyright (c) 2021-2022 Kimmo Kulovesi, https://arkku.dev/
+ * Copyright (c) 2021-2025 Kimmo Kulovesi, https://arkku.dev/
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -158,6 +158,10 @@
 /// Use Dvorak layout mappings for simulated typing (instead of QWERTY)?
 #define DVORAK_MAPPINGS 0
 #endif
+#ifndef ENABLE_MEDIA_KEYS
+/// Enable media keys (consumer control usage).
+#define ENABLE_MEDIA_KEYS 0
+#endif
 #ifndef ENABLE_APPLE_FN_KEY
 #if USB_VENDOR_ID == USB_VENDOR_ID_APPLE
 /// Enable Apple Fn key? This requires you to use Apple's USB_VENDOR_ID.
@@ -178,8 +182,9 @@
 #define APPLE_FN_IS_MODIFIER 0
 #endif
 #if ENABLE_APPLE_FN_KEY && !defined(ENABLE_EXTRA_APPLE_KEYS)
-#if APPLE_FN_IS_MODIFIER
-/// If Apple Fn is a modifier, we don't need an extra byte in the report.
+#if APPLE_FN_IS_MODIFIER || ENABLE_MEDIA_KEYS
+/// If Apple Fn is a modifier, we don't need an extra byte in the report,
+/// or the byte is better spent on media keys.
 #define ENABLE_EXTRA_APPLE_KEYS 0
 #else
 /// Instead of wasting 7 bits on padding for the Apple Fn key, it seems to
@@ -230,6 +235,61 @@
 
 #ifndef IS_SUSPEND_SUPPORTED
 #define IS_SUSPEND_SUPPORTED        1
+#endif
+
+#if ENABLE_APPLE_FN_KEY || ENABLE_MEDIA_KEYS
+#define ENABLE_VIRTUAL_KEYS         1
+#else
+#define ENABLE_VIRTUAL_KEYS         0
+#endif
+
+#if ENABLE_MEDIA_KEYS
+#ifndef MEDIA_KEYS_COUNT
+#if ENABLE_APPLE_FN_KEY && !(APPLE_FN_IS_MODIFIER || ENABLE_EXTRA_APPLE_KEYS)
+// Share the reserved byte with Apple Fn
+#define MEDIA_KEYS_COUNT            7
+#else
+#define MEDIA_KEYS_COUNT            8
+#endif
+#else // ^ !MEDIA_KEYS_COUNT
+#if MEDIA_KEYS_COUNT < 7
+#warning "MEDIA_KEYS_COUNT less than 7 doesn't currently help anything."
+#undef MEDIA_KEYS_COUNT
+#define MEDIA_KEYS_COUNT 7
+#endif
+#endif // ^ MEDIA_KEYS_COUNT
+#else // ^ ENABLE_MEDIA_KEYS
+#undef MEDIA_KEYS_COUNT
+#define MEDIA_KEYS_COUNT            0
+#endif // ^ !ENABLE_MEDIA_KEYS
+
+#if MEDIA_KEYS_COUNT > 8
+#error "MEDIA_KEYS_COUNT must be <= 8"
+#endif
+
+#if ENABLE_APPLE_FN_KEY
+#if ENABLE_EXTRA_APPLE_KEYS
+#define APPLE_KEYS_EXTRA_BITS       8
+#else
+#define APPLE_KEYS_EXTRA_BITS       (APPLE_FN_IS_MODIFIER ? 0 : 1)
+#endif
+#else
+#define APPLE_KEYS_EXTRA_BITS       0
+#endif
+
+#if ENABLE_MEDIA_KEYS
+#if (MEDIA_KEYS_COUNT + APPLE_KEYS_EXTRA_BITS) <= 8
+#define MEDIA_KEYS_BIT_OFFSET       APPLE_KEYS_EXTRA_BITS
+#define VIRTUAL_KEY_BYTES_IN_REPORT 1
+#else
+#define VIRTUAL_KEY_BYTES_IN_REPORT 2
+#endif
+#else // ^ ENABLE_MEDIA_KEYS
+#define VIRTUAL_KEY_BYTES_IN_REPORT (APPLE_KEYS_EXTRA_BITS > 0 ? 1 : 0)
+#endif // ^ !ENABLE_MEDIA_KEYS
+
+#if VIRTUAL_KEY_BYTES_IN_REPORT > 1
+#warning "There are multiple bytes of virtual keys - not fully boot protocol compatible."
 #endif
 
 #endif

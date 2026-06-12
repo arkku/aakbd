@@ -43,15 +43,15 @@ has them. They are just there so that it's easy to remember what to remap.
 The righmost 4×5 block is a standard PC numpad. The keyboard ships with all
 springs installed, so if you wish to use the standard numpad layout you need
 to remove the springs from the bottom barrels of the Plus and Enter keys, as
-well as from the right barrel of the 0/Ins key. To use individual keys, define
+well as from the left barrel of the 0/Ins key. To use individual keys, define
 the `SPLIT_PAD_*` options in `local.mk` (see below).
 
 The splits change the layout as follows:
 
 * The lower half of Plus will become a Backspace key
 * The upper half of Enter will become a numpad Equals key
-* The right half of 0/Ins will become a 00 key (probably unsupported, but it's
-  possible to macro it)
+* The right half of 0/Ins will become a 00 key (probably unsupported by
+  any operating system, but it's possible to macro it)
 
 ## Configuration
 
@@ -88,6 +88,8 @@ use `dfu-util` and `dfu-programmer` to automate further:
 ``` sh
 dfu-util -e && sleep 2 && dfu-programmer atmega32u2 erase && dfu-programmer atmega32u2 flash modelf50.hex && dfu-programmer atmega32u2 launch
 ```
+
+The above can also be accomplished with `make dfu`.
 
 ## Note
 

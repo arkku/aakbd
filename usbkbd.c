@@ -1,7 +1,7 @@
 /*
  * usbkbd.c: USB HID keyboard implementation.
  *
- * Copyright (c) 2021-2022 Kimmo Kulovesi, https://arkku.dev/
+ * Copyright (c) 2021-2025 Kimmo Kulovesi, https://arkku.dev/
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -44,8 +44,8 @@ uint8_t usb_keys_buffer[MAX_KEY_ROLLOVER + 1] = { 0 };
 /// them causes the modifier to be released.
 uint8_t usb_keys_modifier_flags = 0;
 
-/// Flags of extended keys (e.g., Apple Fn).
-uint8_t usb_keys_extended_flags = 0;
+/// Flags of extended keys (e.g., media keys and Apple Fn).
+usb_keys_extended_flags_t usb_keys_extended_flags = 0;
 
 /// The selected keyboard protocol.
 uint8_t usb_keyboard_protocol = HID_PROTOCOL_REPORT;
@@ -95,9 +95,9 @@ usb_keyboard_press (const uint8_t key) {
     } else if (IS_MODIFIER(key)) {
         usb_keyboard_add_modifiers(MODIFIER_BIT(key));
     }
-#if ENABLE_APPLE_FN_KEY
+#if ENABLE_VIRTUAL_KEYS
     else {
-        press_apple_virtual(key);
+        press_virtual(key);
     }
 #endif
 }
@@ -133,54 +133,53 @@ usb_keyboard_release (const uint8_t key) {
     } else if (IS_MODIFIER(key)) {
         usb_keyboard_remove_modifiers(MODIFIER_BIT(key));
     }
-#if ENABLE_APPLE_FN_KEY
+#if ENABLE_VIRTUAL_KEYS
     else {
-        release_apple_virtual(key);
+        release_virtual(key);
     }
 #endif
 }
 
-#if ENABLE_APPLE_FN_KEY
+#if ENABLE_VIRTUAL_KEYS
 void
-press_apple_virtual (const uint8_t key) {
-    if (IS_APPLE_VIRTUAL(key)) {
-        usb_keys_extended_flags |= APPLE_VIRTUAL_BIT(key);
+press_virtual (const uint8_t key) {
+    if (IS_VIRTUAL_KEY(key)) {
 #if APPLE_FN_IS_MODIFIER
         if (key == USB_KEY_VIRTUAL_APPLE_FN) {
             usb_keyboard_add_modifiers(APPLE_FN_BIT);
         }
 #endif
         usb_keyboard_updated = true;
+        usb_keys_extended_flags |= VIRTUAL_KEY_BIT(key);
     }
 }
 
 void
-release_apple_virtual (const uint8_t key) {
-    if (IS_APPLE_VIRTUAL(key)) {
-        usb_keys_extended_flags &= ~APPLE_VIRTUAL_BIT(key);
+release_virtual (const uint8_t key) {
+    if (IS_VIRTUAL_KEY(key)) {
 #if APPLE_FN_IS_MODIFIER
         if (key == USB_KEY_VIRTUAL_APPLE_FN) {
             usb_keyboard_remove_modifiers(APPLE_FN_BIT);
         }
 #endif
         usb_keyboard_updated = true;
+        usb_keys_extended_flags &= ~VIRTUAL_KEY_BIT(key);
     }
 }
 
 bool
-is_apple_virtual_pressed (const uint8_t key) {
-    if (IS_APPLE_VIRTUAL(key)) {
+is_virtual_pressed (const uint8_t key) {
+    if (IS_VIRTUAL_KEY(key)) {
 #if APPLE_FN_IS_MODIFIER
-        if (key == USB_KEY_VIRTUAL_APPLE_FN && (usb_keys_modifier_flags & APPLE_FN_BIT)) {
-            return true;
+        if (key == USB_KEY_VIRTUAL_APPLE_FN) {
+            return (usb_keys_modifier_flags & APPLE_FN_BIT) != 0;
         }
 #endif
-        return (usb_keys_extended_flags & APPLE_VIRTUAL_BIT(key)) != 0;
-    } else {
-        return false;
+        return (usb_keys_extended_flags & VIRTUAL_KEY_BIT(key)) != 0;
     }
+    return false;
 }
-#endif
+#endif // ENABLE_VIRTUAL_KEYS
 
 void
 usb_keyboard_release_all_keys (void) {

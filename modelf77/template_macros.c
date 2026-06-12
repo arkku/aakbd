@@ -18,10 +18,6 @@
 #include <qmk_core/platforms/timer.h>
 #include <xwhatsit_core/matrix_manipulate.h>
 
-#if HAPTIC_ENABLE
-#include <qmk_core/haptic.h>
-#endif
-
 #ifndef KK_LAYERS_H
 // Note that the the `enum macro` is defined in `layers.c`. This is to ensure
 // that `layers.c` and `macros.c` agree on the macro names/numbers.
@@ -32,15 +28,15 @@
 static bool is_weak_apple_fn_pressed = false;
 
 static inline void press_weak_apple_fn(void) {
-    if (!is_apple_virtual_pressed(USB_KEY_VIRTUAL_APPLE_FN)) {
-        press_apple_virtual(USB_KEY_VIRTUAL_APPLE_FN);
+    if (!is_virtual_pressed(USB_KEY_VIRTUAL_APPLE_FN)) {
+        press_virtual(USB_KEY_VIRTUAL_APPLE_FN);
         is_weak_apple_fn_pressed = true;
     }
 }
 
 static inline bool release_weak_apple_fn(void) {
     if (is_weak_apple_fn_pressed) {
-        release_apple_virtual(USB_KEY_VIRTUAL_APPLE_FN);
+        release_virtual(USB_KEY_VIRTUAL_APPLE_FN);
         is_weak_apple_fn_pressed = false;
         return true;
     } else {
@@ -59,8 +55,8 @@ static inline bool release_weak_apple_fn(void) {
 /// in `execute_macro` and for the release `postprocess_release`.
 static inline keycode_t preprocess_press(keycode_t keycode, uint8_t physical_key, uint8_t * restrict data) {
 #if ENABLE_APPLE_FN_KEY
-    if (is_layer_active(APPLE_FN_LAYER) && keycode >= KEY(F1) && keycode <= KEY(F12) && physical_key >= KEY(F1)) {
-        // Combine real F-keys with Apple Fn on the virtual Fn layer
+    if (keycode == PASS && is_layer_active(APPLE_FN_LAYER) && !is_layer_active(WINDOWS_FN_LAYER)) {
+        // A passthrough key on Apple Fn layer will be used for Fn-combos
         press_weak_apple_fn();
     } else if (keycode == KEY_APPLE_FN) {
         is_weak_apple_fn_pressed = false; // Real Apple Fn makes weak strong
@@ -79,13 +75,12 @@ static inline keycode_t preprocess_press(keycode_t keycode, uint8_t physical_key
 static inline void postprocess_release(keycode_t keycode, uint8_t physical_key, uint8_t data) {
 }
 
-
 #if ENABLE_SIMULATED_TYPING
 static void matrix_print_calibration_stats(void) {
 #if CAPSENSE_CAL_DEBUG
     fprintf_P(usb_kbd_type, PSTR("Calibration %u ms\n"), cal_time);
 #endif
-    fprintf_P(usb_kbd_type, PSTR("Cal=%d Load=%d Save=%d Skip=%d Doubt=%d flags=%02X\n"), calibration_done, calibration_loaded, calibration_saved, calibration_skipped, calibration_unreliable, cal_flags);
+    fprintf_P(usb_kbd_type, PSTR("Done=%d Load=%d Save=%d Skip=%d Doubt=%d flags=%02X\n"), calibration_done, calibration_loaded, calibration_saved, calibration_skipped, calibration_unreliable, cal_flags);
     fprintf_P(usb_kbd_type, PSTR("Min = %u, Max = %u, Offset = %u\n"), cal_threshold_min, cal_threshold_max, cal_threshold_offset);
 
     uint16_t scan_time = timer_read();
@@ -126,12 +121,26 @@ static void execute_macro(uint8_t macro_number, bool is_release, uint8_t physica
     case MACRO_UNSAVE_CALIBRATION:
         if (is_release) {
             clear_saved_matrix_calibration();
+            usb_keyboard_simulate_keypress(USB_KEY_SPACE, 0);
         }
         break;
 
     case MACRO_DEBUG_CALIBRATION:
         if (is_release) {
+#if ENABLE_SIMULATED_TYPING
             matrix_print_calibration_stats();
+#endif
+        }
+        break;
+
+    case MACRO_CALIBRATE:
+        if (is_release) {
+            cal_time = timer_read();
+            calibrate_matrix();
+            cal_time = timer_elapsed(cal_time);
+#if ENABLE_SIMULATED_TYPING
+            matrix_print_calibration_stats();
+#endif
         }
         break;
 
@@ -147,20 +156,62 @@ static void execute_macro(uint8_t macro_number, bool is_release, uint8_t physica
             if (!is_layer_active(layer)) {
                 enable_layer(layer);
                 *data = layer;
+            } else {
+                *data = 0;
             }
         }
         break;
 
-    case MACRO_TOGGLE_SOLENOID:
-#if HAPTIC_ENABLE
-        haptic_toggle();
-#endif
+    case MACRO_IPAD_AE_OE:
+        if (!is_release) {
+            const uint8_t mods = strong_modifiers_mask();
+            if (!(mods & ~(SHIFT_BIT | RIGHT_SHIFT_BIT))) {
+                const bool is_dvorak = !is_layer_active(DVORAK_LAYER);
+                usb_keyboard_simulate_keypress(
+                    is_dvorak ? KEY(DVORAK_U) : KEY(U),
+                    ALT_BIT
+                );
+                usb_keyboard_simulate_keypress(
+                    (mods & (SHIFT_BIT | RIGHT_SHIFT_BIT)) ?
+                        (is_dvorak ? KEY(DVORAK_O) : KEY(O)) :
+                        KEY(A)
+                    , 0
+                );
+            } else {
+                *data = KEY(INT_NEXT_TO_LEFT_SHIFT);
+            }
+        }
+        if (*data) {
+            register_key(*data, is_release);
+        }
+        break;
+
+    case MACRO_IPAD_A_O:
+        if (!is_release) {
+            const bool is_dvorak = !is_layer_active(DVORAK_LAYER);
+            const uint8_t mods = strong_modifiers_mask();
+            if ((mods & (ALT_BIT | ALTGR_BIT)) && !(mods & (CMD_BIT | RIGHT_CMD_BIT | CTRL_BIT | RIGHT_CTRL_BIT))) {
+                usb_keyboard_simulate_keypress(
+                    is_dvorak ? KEY(DVORAK_U) : KEY(U),
+                    ALT_BIT
+                );
+                clear_strong_modifiers();
+                add_weak_modifiers(SHIFT_BIT);
+            }
+            if (physical_key == KEY(A)) {
+                *data = physical_key;
+            } else {
+                *data = is_dvorak ? KEY(DVORAK_O) : KEY(O);
+            }
+        }
+        register_key(*data, is_release);
         break;
 
     default:
         break;
     }
 }
+
 
 /// Called after enabling or disabling a layer.
 /// This can be used to do things like add/remove modifiers based on the state
@@ -170,11 +221,14 @@ static inline void layer_state_changed(uint8_t layer, bool is_enabled) {
         switch (layer) {
 #ifdef NUM_LOCK_LAYER
         case NUM_LOCK_LAYER:
-            add_override_leds_off(LED_NUM_LOCK_BIT);
+            add_override_leds_on(LED_NUM_LOCK_BIT);
             break;
 #endif
         case APPLE_FN_LAYER:
             add_override_leds_on(LED_SCROLL_LOCK_BIT);
+            break;
+        case WINDOWS_FN_LAYER:
+            enable_layer(APPLE_FN_LAYER);
             break;
         default:
             break;
@@ -183,12 +237,15 @@ static inline void layer_state_changed(uint8_t layer, bool is_enabled) {
         switch (layer) {
 #ifdef NUM_LOCK_LAYER
         case NUM_LOCK_LAYER:
-            remove_override_leds_off(LED_NUM_LOCK_BIT);
+            remove_override_leds_on(LED_NUM_LOCK_BIT);
             break;
 #endif
         case APPLE_FN_LAYER:
             remove_override_leds_on(LED_SCROLL_LOCK_BIT);
             (void) release_weak_apple_fn(); // Make sure it gets released
+            break;
+        case WINDOWS_FN_LAYER:
+            disable_layer(APPLE_FN_LAYER);
             break;
         default:
             break;
@@ -204,6 +261,7 @@ static inline void handle_reset(void) {
     is_weak_apple_fn_pressed = false;
 #endif
     clear_override_leds();
+    add_override_leds_off(LED_NUM_LOCK_BIT); // Capture Num Lock LED
 }
 
 /// Called approximately once every 10 milliseconds with an 8-bit time value.

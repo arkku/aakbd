@@ -62,6 +62,8 @@
 #define HID_USAGE_KEYBOARD                  0x06
 #define HID_USAGE_CONSUMER_CONTROL          0x01
 
+#define HID_USAGE_PAGE_CONSUMER             0x0C
+
 #define HID_USAGE_APPLE_VENDOR_BR_UP_KEY    0x20 // 0x04 in top cover
 #define HID_USAGE_APPLE_VENDOR_BR_DOWN_KEY  0x21 // 0x05 in top cover
 #define HID_USAGE_APPLE_VENDOR_POWER_KEY    0x04

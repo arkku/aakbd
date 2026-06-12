@@ -89,16 +89,15 @@ bool usb_keyboard_simulate_keypress(const uint8_t key, const uint8_t modifier_fl
 /// protocol correctly, even though according to spec it should.
 void usb_keyboard_toggle_boot_protocol(void);
 
-#if ENABLE_APPLE_FN_KEY
-/// Set the Apple Fn key down. This key does _not_ count as a modifier, even
-/// though it technically is.
-void press_apple_virtual(const uint8_t key);
+#if ENABLE_VIRTUAL_KEYS
+/// Set the virtual key down.
+void press_virtual(const uint8_t key);
 
-/// Set the Apple Fn key up.
-void release_apple_virtual(const uint8_t key);
+/// Set the virtual key up.
+void release_virtual(const uint8_t key);
 
-/// Is the Apple Fn key being held down?
-bool is_apple_virtual_pressed(const uint8_t key);
+/// Is the virtual key being held down?
+bool is_virtual_pressed(const uint8_t key);
 #endif
 
 // MARK: - Simulated typing
@@ -144,8 +143,14 @@ extern uint8_t usb_keys_buffer[MAX_KEY_ROLLOVER + 1];
 /// them causes the modifier to be released.
 extern uint8_t usb_keys_modifier_flags;
 
-/// Flags of extended keys (e.g., Apple Fn).
-extern uint8_t usb_keys_extended_flags;
+#if VIRTUAL_KEY_BYTES_IN_REPORT > 1
+typedef uint16_t usb_keys_extended_flags_t;
+#else
+typedef uint8_t usb_keys_extended_flags_t;
+#endif
+
+/// Flags of extended keys (e.g. media keys and Apple virtual keys).
+extern usb_keys_extended_flags_t usb_keys_extended_flags;
 
 /// The selected keyboard protocol.
 extern uint8_t usb_keyboard_protocol;
@@ -173,16 +178,29 @@ extern volatile uint8_t key_error;
 
 // MARK: - Virtual keys
 
-#if ENABLE_APPLE_FN_KEY
+#if ENABLE_VIRTUAL_KEYS
 #include "usb_keys.h"
 
-#define APPLE_VIRTUAL_START     USB_KEY_VIRTUAL_APPLE_FN
-#define APPLE_VIRTUAL_END       USB_KEY_VIRTUAL_APPLE_EXPOSE_DESKTOP
-#define APPLE_VIRTUAL_MASK      (0xFFU)
-
-#define IS_APPLE_VIRTUAL(key)   ((key) >= APPLE_VIRTUAL_START && (key) <= APPLE_VIRTUAL_END)
-
-#define APPLE_VIRTUAL_BIT(key)  (1 << ((key) - APPLE_VIRTUAL_START))
+#if ENABLE_APPLE_FN_KEY
+#define VIRTUAL_KEYS_START      USB_KEY_VIRTUAL_APPLE_FN
+#else
+#define VIRTUAL_KEYS_START      USB_KEY_VIRTUAL_MEDIA_1
 #endif
+
+#if ENABLE_MEDIA_KEYS
+#define VIRTUAL_KEYS_END        (USB_KEY_VIRTUAL_MEDIA_1 + (MEDIA_KEYS_COUNT - 1))
+#else
+#define VIRTUAL_KEYS_END        USB_KEY_VIRTUAL_APPLE_EXPOSE_DESKTOP
+#endif
+
+#define IS_VIRTUAL_KEY(key)     ((key) >= VIRTUAL_KEYS_START && (key) <= VIRTUAL_KEYS_END)
+
+#if ENABLE_MEDIA_KEYS && APPLE_KEYS_EXTRA_BITS <= 1 && ENABLE_APPLE_FN_KEY
+#define VIRTUAL_KEY_BIT(key)    (((key) < USB_KEY_VIRTUAL_MEDIA_1) ? APPLE_KEYS_EXTRA_BITS : ((usb_keys_extended_flags_t) 1 << (((key) - USB_KEY_VIRTUAL_MEDIA_1) + APPLE_KEYS_EXTRA_BITS)))
+#else
+#define VIRTUAL_KEY_BIT(key)    ((usb_keys_extended_flags_t) 1 << ((key) - VIRTUAL_KEYS_START))
+#endif
+
+#endif // ^ ENABLE_VIRTUAL_KEYS
 
 #endif

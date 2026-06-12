@@ -2,9 +2,11 @@
 #include "keymap.h"
 
 #define DEFAULT_BASE_LAYER 1
-#define ESC_LAYER 2
+#define WINDOWS_LAYER 2
+#define NUM_LOCK_LAYER 3
+#define FN_LAYER 4
 
-#define LAYER_COUNT ESC_LAYER
+#define LAYER_COUNT FN_LAYER
 
 enum macro {
     MACRO_NOP,
@@ -12,6 +14,7 @@ enum macro {
     MACRO_SAVE_CALIBRATION,
     MACRO_UNSAVE_CALIBRATION,
     MACRO_DEBUG_CALIBRATION,
+    MACRO_TYPE_00,
     MACRO_TOGGLE_SOLENOID,
 };
 
@@ -20,37 +23,151 @@ enum macro {
 #if LAYER_COUNT >= 1
 /// Layer 1 is the default base layer. Only the differences to the default
 /// mapping need to be defined here.
-DEFINE_LAYER(1) {
-    // Bottom row left
-    [KEY(KP_A)] = LAYER_OR_PLAIN_KEY(ESC_LAYER, KEY(ESC)),
-    [KEY(KP_B)] = KEY(PAGE_UP),
-    [KEY(KP_C)] = KEY(PAGE_DOWN),
+DEFINE_LAYER(DEFAULT_BASE_LAYER) {
+#if ENABLE_APPLE_FN_KEY
+    // Insert does nothing useful on Mac
+    [KEY(F1)] = KEY_APPLE_FN,
+#else
+    [KEY(F1)] = KEY(BACKSPACE),
+#endif
 
-    // Bottom row middle
-    [KEY(KP_D)] = KEY(PRINT_SCREEN),
-    [KEY(KP_E)] = KEY(SCROLL_LOCK),
-    [KEY(KP_F)] = KEY(PAUSE_BREAK),
+    [KEY(F2)] = KEY(DELETE),
+    [KEY(F5)] = KEY(HOME),
+    [KEY(F6)] = KEY(END),
+    [KEY(F9)] = KEY(PAGE_UP),
+    [KEY(F10)] = KEY(PAGE_DOWN),
+
+    [KEY(F3)] = KEY(F16),
+    [KEY(F7)] = KEY(F17),
+    [KEY(F11)] = KEY(F18),
+
+#if ENABLE_MEDIA_KEYS
+    [KEY(F4)] = KEY(VOLUME_MUTE),
+    [KEY(F8)] = KEY(VOLUME_DOWN),
+    [KEY(F12)] = KEY(VOLUME_UP),
+#else
+    [KEY(F4)] = KEY(F10),
+    [KEY(F8)] = KEY(F11),
+    [KEY(F12)] = KEY(F12),
+#endif
+
+#if ENABLE_MEDIA_KEYS
+    [KEY(KP_A)] = KEY(PREVIOUS_TRACK),
+    [KEY(KP_B)] = KEY(PLAY_PAUSE),
+    [KEY(KP_C)] = KEY(NEXT_TRACK),
+#else
+    [KEY(KP_A)] = KEY(F7),
+    [KEY(KP_B)] = KEY(F8),
+    [KEY(KP_C)] = KEY(F9),
+#endif
+
+    [KEY(F13)] = KEY(F1),
+    [KEY(F14)] = KEY(F2),
+    [KEY(F15)] = KEY(F3),
+    [KEY(F16)] = KEY(F4),
+    
+    [KEY(F17)] = KEY(F5),
+    [KEY(F18)] = KEY(F6),
+    [KEY(F19)] = KEY(F7),
+    [KEY(F20)] = KEY(F8),
+
+    [KEY(F21)] = KEY(F9),
+    [KEY(F22)] = KEY(F10),
+    [KEY(F23)] = KEY(F11),
+    [KEY(F24)] = KEY(F12),
+
+    [KEY(KP_D)] = KEY(F13),
+    [KEY(KP_E)] = KEY(F14),
+    [KEY(KP_F)] = LAYER_OR_PLAIN_KEY(FN_LAYER, KEY(F15)),
+
+#if SPLIT_PAD_PLUS
+    // If the plus is split, use the Mac layout (but change = to backspace)
+    [KEY(KP_DIVIDE)] = KEY(BACKSPACE),
+    [KEY(KP_MULTIPLY)] = KEY(KP_DIVIDE),
+    [KEY(KP_MINUS)] = KEY(KP_MULTIPLY),
+    [KEY(KP_PLUS)] = KEY(KP_MINUS),
+    [KEY(BACKSPACE)] = KEY(KP_PLUS),
+#endif
+
+#if SPLIT_PAD_ZERO
+    [KEY(KP_00)] = MACRO(MACRO_TYPE_00),
+#endif
 };
 #endif
 
-#if LAYER_COUNT >= ESC_LAYER
-DEFINE_LAYER(ESC_LAYER) {
-    // The default action of a layer is to pass through to layers below, and
-    // ultimately to the key's default action. However, if you wish to disable
-    // keys that you don't explicitly define, use the following line at the
-    // beginning of the layer:
-    DISABLE_ALL_KEYS_NOT_DEFINED_BELOW,
+#if LAYER_COUNT >= WINDOWS_LAYER
+DEFINE_LAYER(WINDOWS_LAYER) {
+    [KEY(F1)] = KEY(INSERT),
 
-    [KEY(NUM_LOCK)] = EXT(ENTER_BOOTLOADER),
+    // Windows doesn't seem to support the way my media keys are currently
+    // implemented (both Mac and Linux do), so I'm just binding otherwise
+    // unused F-keys there and using SharpKeys to remap them in the registry
+    [KEY(F4)] = KEY(F19),
+    [KEY(F8)] = KEY(F20),
+    [KEY(F12)] = KEY(F21),
+
+    [KEY(KP_A)] = KEY(F22),
+    [KEY(KP_B)] = KEY(F23),
+    [KEY(KP_C)] = KEY(F24),
+
+    [KEY(KP_D)] = KEY(PRINT_SCREEN),
+    [KEY(KP_E)] = KEY(SCROLL_LOCK),
+    [KEY(KP_F)] = LAYER_OR_PLAIN_KEY(FN_LAYER, KEY(PAUSE)),
+
+#if SPLIT_PAD_PLUS
+    // The KP_EQUALS key doesn't seem to work on Windows
+    [KEY(KP_DIVIDE)] = KEY(BACKSPACE),
+#endif
+};
+#endif
+
+#if LAYER_COUNT >= NUM_LOCK_LAYER
+DEFINE_LAYER(NUM_LOCK_LAYER) {
+    [KEY(KP_7_HOME)] = KEY(HOME),
+    [KEY(KP_8_UP)] = KEY(UP_ARROW),
+    [KEY(KP_9_PAGE_UP)] = KEY(PAGE_UP),
+
+    [KEY(KP_4_LEFT)] = KEY(LEFT_ARROW),
+    [KEY(KP_5)] = KEY(DOWN_ARROW),
+    [KEY(KP_6_RIGHT)] = KEY(RIGHT_ARROW),
+
+    [KEY(KP_1_END)] = KEY(END),
+    [KEY(KP_2_DOWN)] = KEY(DOWN_ARROW),
+    [KEY(KP_3_PAGE_DOWN)] = KEY(PAGE_DOWN),
+
+    [KEY(KP_0_INSERT)] = KEY(INSERT),
+    [KEY(KP_COMMA_DEL)] = KEY(DELETE),
+
+#if SPLIT_PAD_PLUS
+    [KEY(KP_MULTIPLY)] = KEY(DELETE),
+    [KEY(KP_MINUS)] = KEY(ALT_GR),
+    [KEY(KP_PLUS)] = KEY(RIGHT_SHIFT),
+    [KEY(BACKSPACE)] = KEY(SPACE),
+#else
+    [KEY(KP_DIVIDE)] = KEY(BACKSPACE),
+    [KEY(KP_MULTIPLY)] = KEY(ALT_GR),
+    [KEY(KP_MINUS)] = KEY(RIGHT_SHIFT),
+    [KEY(KP_PLUS)] = KEY(SPACE),
+#endif
+};
+#endif
+
+#if LAYER_COUNT >= FN_LAYER
+DEFINE_LAYER(FN_LAYER) {
+    [KEY(F1)] = LAYER_TOGGLE(WINDOWS_LAYER),
+    [KEY(NUM_LOCK)] = LAYER_TOGGLE(NUM_LOCK_LAYER),
+
+    [KEY(KP_ENTER)] = EXT(ENTER_BOOTLOADER),
 
 #if ENABLE_SIMULATED_TYPING
-    // Bottom row middle
-    [KEY(KP_D)] = EXT(PRINT_DEBUG_INFO),
-    [KEY(KP_E)] = MACRO(MACRO_DEBUG_CALIBRATION),
+    [KEY(F13)] = EXT(PRINT_DEBUG_INFO),
+    [KEY(F14)] = MACRO(MACRO_DEBUG_CALIBRATION),
 #endif
-    [KEY(KP_F)] = EXT(RESET_KEYBOARD),
 
     [KEY(F5)] = MACRO(MACRO_SAVE_CALIBRATION),
     [KEY(F8)] = MACRO(MACRO_UNSAVE_CALIBRATION),
+
+    [KEY(F17)] = MACRO(MACRO_SAVE_CALIBRATION),
+    [KEY(F20)] = MACRO(MACRO_UNSAVE_CALIBRATION),
 };
 #endif

@@ -28,12 +28,73 @@
 #include "layers.c"
 #endif
 
+#if ENABLE_APPLE_FN_KEY
+#define APPLE_FN_WEAK 1
+#define APPLE_FN_STRONG 2
+
+static uint8_t apple_fn_pressed = 0;
+
+#define is_weak_apple_fn_pressed()      (apple_fn_pressed == APPLE_FN_WEAK)
+#define is_strong_apple_fn_pressed()    (apple_fn_pressed == APPLE_FN_STRONG)
+
+static inline void press_weak_apple_fn(void) {
+    if (!is_virtual_pressed(USB_KEY_VIRTUAL_APPLE_FN)) {
+        press_virtual(USB_KEY_VIRTUAL_APPLE_FN);
+        apple_fn_pressed = APPLE_FN_WEAK;
+    }
+}
+
+static inline bool release_weak_apple_fn(void) {
+    if (is_weak_apple_fn_pressed()) {
+        release_virtual(USB_KEY_VIRTUAL_APPLE_FN);
+        if (apple_fn_pressed == APPLE_FN_WEAK) {
+            apple_fn_pressed = 0;
+        }
+        return true;
+    } else {
+        return false;
+    }
+}
+
+static inline void press_strong_apple_fn() {
+    if (!is_virtual_pressed(USB_KEY_VIRTUAL_APPLE_FN)) {
+        press_virtual(USB_KEY_VIRTUAL_APPLE_FN);
+    }
+    apple_fn_pressed = APPLE_FN_STRONG;
+}
+#else
+#define press_weak_apple_fn(x)      do { } while (0)
+#define release_weak_apple_fn(x)    false
+#endif
+
 /// This function is called after resolving the keycode of a pressed key from
 /// the currently active layers. It can change the keycode and/or have any
 /// side effects wanted. A single byte of data is available to store state
 /// information for this specific keypress. The same byte is used for macros
 /// in `execute_macro` and for the release `postprocess_release`.
 static inline keycode_t preprocess_press(keycode_t keycode, uint8_t physical_key, uint8_t * restrict data) {
+#if ENABLE_APPLE_FN_KEY
+    if (physical_key >= KEY(F13) && physical_key <= KEY(F24)
+        && !(is_layer_active(WINDOWS_LAYER) || is_layer_active(FN_LAYER))
+    ) {
+        // Use as F-keys (F1-F12, which have been moved to the second block)
+        if (is_strong_apple_fn_pressed()) {
+            *data = APPLE_FN_STRONG;
+            release_virtual(USB_KEY_VIRTUAL_APPLE_FN);
+            usb_keyboard_send_if_needed();
+        } else {
+            *data = APPLE_FN_WEAK;
+            press_weak_apple_fn();
+        }
+        return keycode;
+    } else if (keycode == KEY_APPLE_FN) {
+        apple_fn_pressed = APPLE_FN_STRONG; // Real Apple Fn makes weak strong
+    } else if (release_weak_apple_fn()) {
+        // Release the weak Apple Fn when pressing any other key
+        usb_keyboard_send_if_needed();
+    }
+    *data = 0;
+#endif
     return keycode;
 }
 
@@ -42,6 +103,20 @@ static inline keycode_t preprocess_press(keycode_t keycode, uint8_t physical_key
 /// clean up any state. The single byte of data is the same as was written by
 /// `preprocess_press` and/or any macro handlers.
 static inline void postprocess_release(keycode_t keycode, uint8_t physical_key, uint8_t data) {
+#if ENABLE_APPLE_FN_KEY
+    if (data && physical_key >= KEY(F13) && physical_key <= KEY(F24)) {
+        if (data == APPLE_FN_WEAK && release_weak_apple_fn()) {
+            // Release the weak Apple Fn after releasing the F-key
+            usb_keyboard_send_if_needed();
+        } else if (data == APPLE_FN_STRONG && is_strong_apple_fn_pressed() && !is_virtual_pressed(USB_KEY_VIRTUAL_APPLE_FN)) {
+            // Press the strong Apple Fn again after releasing the F-key
+            press_virtual(USB_KEY_VIRTUAL_APPLE_FN);
+            usb_keyboard_send_if_needed();
+        }
+    } else if (keycode == KEY_APPLE_FN) {
+        apple_fn_pressed = 0;
+    }
+#endif
 }
 
 
@@ -100,6 +175,14 @@ static void execute_macro(uint8_t macro_number, bool is_release, uint8_t physica
         }
         break;
 
+    case MACRO_TYPE_00:
+        if (!is_release) {
+            *data = KEY(KP_0_INSERT);
+        }
+        register_key(*data, is_release);
+        usb_keyboard_simulate_keypress(*data, 0);
+        break;
+
     case MACRO_TOGGLE_SOLENOID:
 #if HAPTIC_ENABLE
         haptic_toggle();
@@ -143,6 +226,9 @@ static inline void layer_state_changed(uint8_t layer, bool is_enabled) {
 /// from EEPROM, etc.
 static inline void handle_reset(void) {
     clear_override_leds();
+#if ENABLE_APPLE_FN_KEY
+    apple_fn_pressed = 0;
+#endif
 }
 
 /// Called approximately once every 10 milliseconds with an 8-bit time value.

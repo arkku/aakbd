@@ -288,9 +288,12 @@ usb_tx_report_header (void) {
 #if RESERVE_BOOT_PROTOCOL_RESERVED_BYTE
     usb_tx(0);
 #endif
-#if APPLE_BYTES_IN_REPORT
+#if VIRTUAL_KEY_BYTES_IN_REPORT
     if (!(RESERVE_BOOT_PROTOCOL_RESERVED_BYTE && is_boot_protocol)) {
-        usb_tx(usb_keys_extended_flags & APPLE_VIRTUAL_MASK);
+        usb_tx(usb_keys_extended_flags & 0xFFU);
+#if VIRTUAL_KEY_BYTES_IN_REPORT > 1
+        usb_tx((usb_keys_extended_flags >> 8) & 0xFFU);
+#endif
     }
 #endif
 }
