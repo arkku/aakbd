@@ -2,9 +2,9 @@ DEVICE=$(notdir $(CURDIR))
 export DEVICE
 
 all:
-	@$(MAKE) -C .. $(MAKEFLAGS)
+	@$(MAKE) -C ..
 
 %: force
-	@$(MAKE) -C .. $@ $(MAKEFLAGS)
+	@$(MAKE) -C .. $@
 
 force: ;

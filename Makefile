@@ -7,7 +7,7 @@
 CC=avr-gcc
 OPTIMIZATION=s
 CC_FLAGS=-I$(DEVICE) -I. $(AVR_FLAGS)
-CFLAGS=-O$(OPTIMIZATION) -Wall -std=c11 -pedantic -Wextra -Wno-unused-parameter $(CUSTOM_FLAGS) $(CC_FLAGS) $(DEVICE_FLAGS) $(CONFIG_FLAGS)
+CFLAGS=-O$(OPTIMIZATION) -Wall -std=c11 -Wextra -Wno-unused-parameter $(CUSTOM_FLAGS) $(CC_FLAGS) $(DEVICE_FLAGS) $(CONFIG_FLAGS)
 LD_FLAGS=$(AVR_FLAGS)
 LDFLAGS=-O$(OPTIMIZATION) $(LD_FLAGS)
 AR=avr-ar
