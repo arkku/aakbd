@@ -22,6 +22,10 @@ Features supported:
   key or the keylock key is pressed again)
 * simulated Apple Fn key (if you are willing to pretend to be an Apple device,
   i.e., this is for personal use only)
+* some support for media keys (volume control, playback control), at least on
+  operating systems that support embedding them in the same USB HID keyboard
+  report (this may exclude Windows - probably better off using F13-F22 keys
+  and remapping them in the system registry with SharpKeys or similar)
 * up to 128 arbitrary macros _per physical key_ with 1 byte of automatically
   saved state for each held key (and of course each macro can save and use any
   other state as well)

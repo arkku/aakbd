@@ -50,7 +50,9 @@ DO NOT edit or delete user's `local.mk`, `layers.c`, `macros.c` without promptin
 | `usbkbd.c` / `usbkbd.h` | USB HID report construction |
 | `usbkbd_config.h` | Compile-time options |
 | `usb_keys.h` | USB keycode enum |
-| `avrusb.c` / `avrusb.h` | Low-level AVR USB driver |
+| `avrusb.h` | Low-level AVR USB macros |
+| `avrusb.c` | Low-level AVR USB driver (always use avrusb.h macros, no direct
+device / register access!) |
 | `main.h` | Interface each device main must implement |
 
 ### Device directories
