@@ -133,8 +133,6 @@ usb_reset (void) {
     while (!is_pll_locked)
         ;
     usb_start_clock();
-
-    usb_attach();
 }
 
 void
@@ -156,6 +154,11 @@ usb_init (void) {
 #if ENABLE_DFU_INTERFACE
     usb_request_detach = 0;
 #endif
+}
+
+void
+usb_bus_attach (void) {
+    usb_attach();
 }
 
 static INLINE void
