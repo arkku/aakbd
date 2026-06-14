@@ -1,7 +1,7 @@
 /*
  * usbkbd_descriptors.c: USB HID keyboard descriptors.
  *
- * Copyright (c) 2021-2022 Kimmo Kulovesi, https://arkku.dev/
+ * Copyright (c) 2021-2026 Kimmo Kulovesi, https://arkku.dev/
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,8 +58,6 @@ static const uint8_t PROGMEM device_qualifier_descriptor[DESCRIPTOR_SIZE_DEVICE_
 };
 #endif
 
-#define HID_KEYBOARD_REPORT_KEY_ARRAY(rollover)         \
-
 /// HID descriptor for the keyboard (boot protocol compatible).
 static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
     HID_USAGE_PAGE,         HID_USAGE_PAGE_GENERIC_DESKTOP,
@@ -94,7 +92,7 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
     // included (these may or may not be the same).
     HID_REPORT_COUNT,       1,
     HID_REPORT_SIZE,        16 - MODIFIER_COUNT,
-    HID_INPUT,              HID_IO_CONSTANT | HID_IO_VARIABLE,
+    HID_INPUT,              HID_IO_CONSTANT,
 
 #if ENABLE_EXTRA_APPLE_KEYS
 #error "RESERVE_BOOT_PROTOCOL_RESERVED_BYTE is incompatible with ENABLE_EXTRA_APPLE_KEYS"
@@ -117,8 +115,14 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
 
     HID_LOGICAL_MINIMUM,    0,
     HID_LOGICAL_MAXIMUM,    1,
+#if APPLE_KEYS_EXTRA_BITS == 1 && !ENABLE_MEDIA_KEYS
+    HID_REPORT_SIZE,        1,
+#endif
 #if APPLE_FN_IS_MODIFIER
 #warning "APPLE_FN_IS_MODIFIER is pointless with ENABLE_EXTRA_APPLE_KEYS"
+    // Mask out duplicate entry for the Apple Fn (already sent in modifiers)
+    HID_REPORT_SIZE,        1,
+    HID_REPORT_COUNT,       1,
     HID_INPUT,              HID_IO_CONSTANT,
 #endif
     HID_USAGE_PAGE_WORD,    WORD_BYTES(HID_USAGE_PAGE_VENDOR_APPLE_KEYBOARD),
@@ -193,7 +197,7 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
 #if LED_COUNT < 8
     HID_REPORT_COUNT,       1,
     HID_REPORT_SIZE,        8 - LED_COUNT,
-    HID_OUTPUT,             HID_IO_CONSTANT | HID_IO_VARIABLE,
+    HID_OUTPUT,             HID_IO_CONSTANT,
 #endif
 
     // Keys
@@ -237,11 +241,13 @@ static const uint8_t PROGMEM generic_hid_descriptor[] = {
 };
 #endif
 
-#define FUNCTIONAL_CONFIGURATION_COUNT      INTERFACES_COUNT
+#define HID_INTERFACE_COUNT     (ENABLE_KEYBOARD_ENDPOINT + ENABLE_GENERIC_HID_ENDPOINT)
 
-#define CONFIGURATION_SIZE_I_F_E(if_count, func_count, ep_count)     (DESCRIPTOR_SIZE_CONFIGURATION + (DESCRIPTOR_SIZE_INTERFACE * (if_count)) + (DESCRIPTOR_SIZE_FUNCTIONAL * (func_count)) + (DESCRIPTOR_SIZE_ENDPOINT * (ep_count)))
+#define SUB_DESCRIPTOR_COUNT    (HID_INTERFACE_COUNT + ENABLE_DFU_INTERFACE)
 
-#define CONFIGURATION_SIZE  CONFIGURATION_SIZE_I_F_E(INTERFACES_COUNT, FUNCTIONAL_CONFIGURATION_COUNT, ENDPOINT_COUNT)
+#define CONFIGURATION_SIZE_I_F_E(if_count, sub_count, ep_count)     (DESCRIPTOR_SIZE_CONFIGURATION + (DESCRIPTOR_SIZE_INTERFACE * (if_count)) + (DESCRIPTOR_SIZE_FUNCTIONAL * (sub_count)) + (DESCRIPTOR_SIZE_ENDPOINT * (ep_count)))
+
+#define CONFIGURATION_SIZE  CONFIGURATION_SIZE_I_F_E(INTERFACES_COUNT, SUB_DESCRIPTOR_COUNT, ENDPOINT_COUNT)
 
 /// The offset of the HID configuration at `index`, assuming all prior indices
 /// are also HID interfaces with one endpoint and configuration each.
@@ -249,7 +255,7 @@ static const uint8_t PROGMEM generic_hid_descriptor[] = {
 
 #define KEYBOARD_HID_CONFIGURATION_OFFSET   HID_CONFIGURATION_OFFSET(KEYBOARD_INTERFACE_INDEX)
 #define GENERIC_HID_CONFIGURATION_OFFSET    HID_CONFIGURATION_OFFSET(GENERIC_INTERFACE_INDEX)
-#define DFU_CONFIGURATION_OFFSET            CONFIGURATION_SIZE_I_F_E(INTERFACES_COUNT, FUNCTIONAL_CONFIGURATION_COUNT - 1, ENDPOINT_COUNT)
+#define DFU_CONFIGURATION_OFFSET            CONFIGURATION_SIZE_I_F_E(INTERFACES_COUNT, SUB_DESCRIPTOR_COUNT - 1, ENDPOINT_COUNT)
 
 #if IS_SUSPEND_SUPPORTED
 #define CONFIGURATION_ATTRIBUTES (CONFIGURATION_ATTRIBUTES_RESERVED | CONFIGURATION_ATTRIBUTES_REMOTE_WAKE_UP_FLAG)
@@ -303,7 +309,7 @@ static const uint8_t PROGMEM configuration_descriptor[] = {
     WORD_BYTES(sizeof kbd_boot_hid_descriptor), // wDescriptorLength
 #endif
 
-#if (ENABLE_KEYBOARD_ENDPOINT || ENABLE_DFU_INTERFACE)
+#if ENABLE_KEYBOARD_ENDPOINT
     // Endpoint
     DESCRIPTOR_SIZE_ENDPOINT,               // bLength
     DESCRIPTOR_TYPE_ENDPOINT,               // bDescriptorType
@@ -339,7 +345,7 @@ static const uint8_t PROGMEM configuration_descriptor[] = {
     DESCRIPTOR_TYPE_ENDPOINT,               // bDescriptorType
     GENERIC_ENDPOINT_ADDRESS_IN,            // bEndpointAddress
     ENDPOINT_ATTRIBUTES_INTERRUPT,          // bmAttributes
-    WORD_BYTES(GENERIC_ENDPOINT_SIZE),      // iwMaxPacketSize
+    WORD_BYTES(GENERIC_ENDPOINT_SIZE),      // wMaxPacketSize
     GENERIC_HID_POLL_INTERVAL_MS,           // bInterval
 
 #if ENABLE_GENERIC_HID_OUTPUT
@@ -347,7 +353,7 @@ static const uint8_t PROGMEM configuration_descriptor[] = {
     DESCRIPTOR_TYPE_ENDPOINT,               // bDescriptorType
     GENERIC_ENDPOINT_ADDRESS_OUT,           // bEndpointAddress
     ENDPOINT_ATTRIBUTES_INTERRUPT,          // bmAttributes
-    WORD_BYTES(GENERIC_ENDPOINT_SIZE),      // iwMaxPacketSize
+    WORD_BYTES(GENERIC_ENDPOINT_SIZE),      // wMaxPacketSize
     GENERIC_HID_POLL_INTERVAL_MS,           // bInterval
 #endif
 #endif

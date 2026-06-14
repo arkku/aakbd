@@ -5,7 +5,7 @@
  * another platform by substituting this header and a few other
  * things.
  *
- * Copyright (c) 2021 Kimmo Kulovesi, https://arkku.dev/
+ * Copyright (c) 2021-2026 Kimmo Kulovesi, https://arkku.dev/
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,6 +28,7 @@
 
 #if (defined(__AVR_AT90USB162__) || defined(__AVR_AT90USB82__)  || defined(__AVR_ATmega32U2__) || defined(__AVR_ATmega16U2__) || defined(__AVR_ATmega8U2__))
 #define USB_SERIES_2_AVR
+#define USB_SUSPEND_NEEDS_RECONNECT
 #elif (defined(__AVR_ATmega32U4__) || defined(__AVR_ATmega16U4__))
 #define USB_SERIES_4_AVR
 #endif
@@ -99,9 +100,11 @@
 #define usb_frame_count             UDFNUML
 
 #ifdef UHWCON
-#define usb_hardware_init()         (UHWCON = (1 << UVREGE))
+#define usb_hardware_init()         (UHWCON |= (1 << UVREGE))
+#define usb_hardware_deinit()       (UHWCON &= ~(1 << UVREGE))
 #else
 #define usb_hardware_init()         (REGCR &= ~(1 << REGDIS))
+#define usb_hardware_deinit()       (REGCR |= (1 << REGDIS))
 #endif
 #define usb_freeze()                (USBCON = (1 << USBE) | (1 << FRZCLK))
 
@@ -134,9 +137,9 @@
 
 #define usb_clear_interrupts(x)         (usb_interrupt_flags_reg &= ~(x))
 #ifdef USBINT
-#define usb_clear_all_interrupts(x)     do { usb_interrupt_flags_reg = 0; USBINT = 0; } while (0)
+#define usb_clear_all_interrupts()      do { usb_interrupt_flags_reg = 0; USBINT = 0; } while (0)
 #else
-#define usb_clear_all_interrupts(x)     (usb_interrupt_flags_reg = 0)
+#define usb_clear_all_interrupts()      (usb_interrupt_flags_reg = 0)
 #endif
 #define usb_enable_interrupts(x)        (usb_interrupt_enable_reg |= (x))
 #define usb_disable_interrupts(x)       (usb_interrupt_enable_reg &= ~(x))
@@ -158,22 +161,23 @@
 #define is_pll_locked               (PLLCSR & (1 << PLOCK))
 
 #define usb_stall()                 (UECONX = (1 << STALLRQ) | (1 << EPEN))
-#define usb_clear_stall()           (UECONX = (1 << STALLRQC) | (1 << RSTDT) | (1 << EPEN))
-#define usb_reset_data_toggle()     (UECONX |= (1 << RSTDT))
+#define usb_clear_stall()           (UECONX = (1 << STALLRQC) | (1 << EPEN))
+#define usb_reset_data_toggle()     (UECONX = (1 << RSTDT) | (1 << EPEN))
 
 #define usb_set_remote_wakeup()     (UDCON |= (1 << RMWKUP))
 #define usb_clear_remote_wakeup()   (UDCON &= ~(1 << RMWKUP))
 
-#define usb_set_address(addr)       (UDADDR = (addr) | (1 << ADDEN))
+#define usb_set_address(addr)       (UDADDR = (UDADDR & (1 << ADDEN)) | ((addr) & 0x7F))
+#define usb_enable_address()        (UDADDR |= (1 << ADDEN))
 #define usb_get_address()           (UDADDR & ~(1 << ADDEN))
 
-#define usb_clear_status_flags()    (UEINTX &= ~(1 << RXSTPI))
-#define usb_clear_setup_int()       (UEINTX = ~((1 << RXSTPI) | (1 << RXOUTI) | (1 << TXINI)))
-#define usb_release_rx()            (UEINTX = (1 << NAKINI) | (1 << RWAL) | (1 << RXSTPI) | (1 << STALLEDI) | (1 << TXINI)) // 0x6B
-#define usb_release_tx()            (UEINTX = (1 << NAKOUTI) | (1 << RWAL) | (1 << RXSTPI) | (1 << STALLEDI)) // 0x3A
+#define usb_clear_status_flags()    (UEINTX &= (uint8_t) ~(1 << RXSTPI))
+#define usb_clear_setup_int()       (UEINTX = (uint8_t) ~((1 << RXSTPI) | (1 << RXOUTI) | (1 << TXINI)))
+#define usb_release_rx()            (UEINTX = (1 << NAKINI) | (1 << RWAL) | (1 << RXSTPI) | (1 << STALLEDI) | (1 << TXINI))
+#define usb_release_tx()            (UEINTX = (1 << NAKOUTI) | (1 << RWAL) | (1 << RXSTPI) | (1 << STALLEDI))
 
-#define usb_flush_endpoint(num)     do {    \
-    usb_set_endpoint((ep));                 \
+#define usb_flush_tx_endpoint(num)  do {    \
+    usb_set_endpoint((num));                \
     if (usb_fifo_byte_count) {              \
         usb_release_tx();                   \
     }                                       \
@@ -184,9 +188,9 @@
     UERST = 0;                       \
 } while (0)
 
-#define usb_reset_endpoints_1to(num) do {                                   \
-    UERST = (num == 7) ? 0x7E : (((1 << ((num) + 1)) - 1U) & ~1U);          \
-    UERST = 0;                                                              \
+#define usb_reset_endpoints_1to(num) do { \
+    UERST = ((1 << ((num) + 1)) - 2U); \
+    UERST = 0; \
 } while (0)
 
 #define usb_setup_endpoint(number, type, size, flags) do {                  \
@@ -206,7 +210,7 @@
 #if F_CPU == 16000000UL
 #ifdef PINDIV
 #define PLL_DIV_FLAG            (1 << PINDIV)
-#elif defined(__AVR_ATmega32U2__)
+#elif defined(PLLP0)
 #define PLL_DIV_FLAG            (1 << PLLP0)
 #endif
 #elif F_CPU == 8000000UL

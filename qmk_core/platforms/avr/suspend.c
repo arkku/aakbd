@@ -6,6 +6,8 @@
 #include "action.h"
 #include "timer.h"
 
+extern volatile uint8_t usb_keyboard_leds;
+
 #ifdef PROTOCOL_LUFA
 #    include "lufa.h"
 #endif
@@ -116,8 +118,11 @@ void suspend_power_down(void) {
  * FIXME: needs doc
  */
 void suspend_wakeup_init(void) {
+    uint8_t saved_leds = usb_keyboard_leds;
+
     // clear keyboard state
     clear_keyboard();
 
+    usb_keyboard_leds = saved_leds;
     suspend_wakeup_init_quantum();
 }

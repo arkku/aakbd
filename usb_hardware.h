@@ -26,7 +26,13 @@
 // MARK: - Lifecycle
 
 /// Initialise the USB system.
+/// - Note: `usb_bus_attach()` must be called after this.
 void usb_init(void);
+
+/// Connect to the USB bus after `usb_init()`. Must be called with interrupts
+/// enabled if the USB ISRs are to handle events immediately.
+/// - Precondition: `usb_init()` must be called first.
+void usb_bus_attach(void);
 
 /// Must be called from the main loop to run the USB system.
 void usb_tick(void);

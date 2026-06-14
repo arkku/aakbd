@@ -1,7 +1,7 @@
 /*
  * avrusb.c: USB implementation for ATMEGA32U4.
  *
- * Copyright (c) 2021-2022 Kimmo Kulovesi, https://arkku.dev/
+ * Copyright (c) 2021-2026 Kimmo Kulovesi, https://arkku.dev/
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -60,7 +60,7 @@
 static volatile uint8_t keyboard_idle_count = 0;
 
 /// The value of `keyboard_idle_count` to send an update on.
-static volatile uint8_t keyboard_update_on_idle_count = KEYBOARD_UPDATE_IDLE_MS / IDLE_COUNT_FRAME_DIVIDER;
+static volatile uint8_t keyboard_update_on_idle_count = DIV_ROUND_BYTE(IDLE_COUNT_FRAME_DIVIDER, KEYBOARD_UPDATE_IDLE_MS);
 
 /// The active USB configuration. This is set by a request from the host.
 static volatile uint8_t usb_configuration = 0;
@@ -75,7 +75,7 @@ static volatile bool usb_suspended = 0;
 static volatile uint8_t usb_error = 0;
 
 #if ENABLE_GENERIC_HID_ENDPOINT
-static volatile uint8_t generic_update_on_idle_count = GENERIC_HID_UPDATE_IDLE_MS / IDLE_COUNT_FRAME_DIVIDER;
+static volatile uint8_t generic_update_on_idle_count = DIV_ROUND_BYTE(IDLE_COUNT_FRAME_DIVIDER, GENERIC_HID_UPDATE_IDLE_MS);
 static volatile uint8_t generic_idle_count = 0;
 static volatile uint8_t generic_report_pending = 0;
 
@@ -112,7 +112,7 @@ static volatile uint8_t usb_request_detach = 0;
 
 #define is_boot_protocol usb_keyboard_is_in_boot_protocol
 
-static INLINE bool usb_wait_for_rw(uint8_t * const sregptr, const int_fast8_t endpoint);
+static INLINE bool usb_wait_for_rw_on_endpoint(const int_fast8_t endpoint, uint8_t sregptr[static 1]);
 
 static void
 usb_devices_reset (void) {
@@ -120,7 +120,7 @@ usb_devices_reset (void) {
     keyboard_idle_count = 0;
     keyboard_update_on_idle_count = DIV_ROUND_BYTE(IDLE_COUNT_FRAME_DIVIDER, KEYBOARD_UPDATE_IDLE_MS);
 #if ENABLE_GENERIC_HID_ENDPOINT
-    generic_update_on_idle_count = DIV_ROUND_BYTE(IDLE_COUNT_FRAME_DIVIDER, GENERIC_HID_POLL_INTERVAL_MS);
+    generic_update_on_idle_count = DIV_ROUND_BYTE(IDLE_COUNT_FRAME_DIVIDER, GENERIC_HID_UPDATE_IDLE_MS);
     generic_report_pending = 0;
     generic_report_reset();
 #endif
@@ -133,8 +133,6 @@ usb_reset (void) {
     while (!is_pll_locked)
         ;
     usb_start_clock();
-
-    usb_attach();
 }
 
 void
@@ -158,64 +156,53 @@ usb_init (void) {
 #endif
 }
 
+void
+usb_bus_attach (void) {
+    usb_attach();
+}
+
 static INLINE void
 usb_init_endpoint (const uint8_t num, const uint8_t type, const uint8_t size, const uint8_t flags) {
-    for (uint8_t i = num; i <= USB_MAX_ENDPOINT; ++i) {
-        uint8_t cfg_type;
-        uint8_t cfg_flags;
-        uint8_t cfg_interrupts;
-
-        usb_set_endpoint(i);
-
-        if (i == num) {
-            cfg_type = type;
-            cfg_flags = flags | EP_SIZE_FLAGS(size);
-            cfg_interrupts = 0;
-        } else {
-            cfg_type = usb_endpoint_type_config;
-            cfg_flags = usb_endpoint_flags_config;
-            cfg_interrupts = usb_endpoint_interrupts_config;
-        }
-
-        if (!(cfg_flags & EP_ALLOC)) {
-            continue;
-        }
-
-        usb_disable_endpoint();
-        usb_deallocate_endpoint();
-
-        usb_enable_endpoint();
-        usb_endpoint_type_config = cfg_type;
-        usb_endpoint_flags_config = cfg_flags;
-        usb_endpoint_interrupts_config = cfg_interrupts;
-    }
-
     usb_set_endpoint(num);
+
+    usb_disable_endpoint();
+    usb_deallocate_endpoint();
+
+    usb_enable_endpoint();
+    usb_endpoint_type_config = type;
+    usb_endpoint_flags_config = flags | EP_SIZE_FLAGS(size);
+    usb_endpoint_interrupts_config = 0;
 }
 
 static INLINE void
 usb_init_endpoints (void) {
 #if ENABLE_KEYBOARD_ENDPOINT
     _Static_assert(IS_ENDPOINT_SIZE_VALID(KEYBOARD_ENDPOINT_SIZE), "Invalid keyboard endpoint size");
+    _Static_assert(KEYBOARD_ENDPOINT_NUM <= USB_MAX_ENDPOINT, "Keyboard endpoint number exceeds device maximum");
     usb_init_endpoint(KEYBOARD_ENDPOINT_NUM, KEYBOARD_ENDPOINT_TYPE, KEYBOARD_ENDPOINT_SIZE, KEYBOARD_ENDPOINT_FLAGS);
 #endif
 
 #if ENABLE_GENERIC_HID_ENDPOINT
     _Static_assert(IS_ENDPOINT_SIZE_VALID(GENERIC_ENDPOINT_SIZE), "Invalid Generic HID endpoint size");
+    _Static_assert(GENERIC_HID_ENDPOINT_IN_NUM <= USB_MAX_ENDPOINT, "Generic HID IN endpoint number exceeds device maximum");
     usb_init_endpoint(GENERIC_HID_ENDPOINT_IN_NUM, GENERIC_ENDPOINT_IN_TYPE, GENERIC_ENDPOINT_SIZE, GENERIC_ENDPOINT_FLAGS);
 #if ENABLE_GENERIC_HID_OUTPUT
+    _Static_assert(GENERIC_HID_ENDPOINT_OUT_NUM <= USB_MAX_ENDPOINT, "Generic HID OUT endpoint number exceeds device maximum");
     usb_init_endpoint(GENERIC_HID_ENDPOINT_OUT_NUM, GENERIC_ENDPOINT_OUT_TYPE, GENERIC_ENDPOINT_SIZE, GENERIC_ENDPOINT_FLAGS);
 #endif
 #endif
-
-    //usb_reset_endpoints_1to(USB_MAX_ENDPOINT);
 }
 
 static INLINE void
 usb_configuration_changed() {
     usb_clear_status_flags();
     usb_init_endpoints();
+#if IS_SUSPEND_SUPPORTED
+    usb_clear_interrupts(INT_SUSPEND_FLAG);
+    usb_enable_interrupts(INT_START_OF_FRAME_FLAG | INT_SUSPEND_FLAG);
+#else
     usb_enable_interrupts(INT_START_OF_FRAME_FLAG);
+#endif
 }
 
 bool
@@ -255,23 +242,28 @@ usb_detach_requested (void) {
 static INLINE void
 usb_wake_up_if_suspended (void) {
 #if IS_SUSPEND_SUPPORTED
-    if (usb_suspended) {
+    if (usb_suspended && (usb_status & USB_STATUS_REMOTE_WAKEUP_ENABLED)) {
         usb_set_remote_wakeup();
+        while (is_usb_remote_wakeup_set)
+            ;
     }
 #endif
 }
 
 bool
 usb_wake_up_host (void) {
-    usb_clear_remote_wakeup();
-
-    if (is_usb_remote_wakeup_set || usb_suspended || !(usb_status & USB_STATUS_REMOTE_WAKEUP_ENABLED)) {
+    if (!usb_suspended || !(usb_status & USB_STATUS_REMOTE_WAKEUP_ENABLED)) {
         usb_error = 'w';
         return false;
     }
 
-    usb_init();
+    pll_enable();
+    while (!is_pll_locked)
+        ;
+    usb_start_clock();
     usb_set_remote_wakeup();
+    while (is_usb_remote_wakeup_set)
+        ;
 
     return true;
 }
@@ -331,11 +323,12 @@ usb_tx_keys_state (void) {
 }
 
 static INLINE bool
-usb_wait_for_rw (uint8_t * const sregptr, const int_fast8_t endpoint) {
+usb_wait_for_rw_on_endpoint (const int_fast8_t endpoint, uint8_t sregptr[static 1]) {
     const uint8_t timeout = usb_frame_count + 50U;
 
     uint8_t old_sreg = SREG;
     cli();
+    usb_set_endpoint(endpoint);
 
     for (;;) {
         if (is_usb_rw_allowed) {
@@ -344,7 +337,7 @@ usb_wait_for_rw (uint8_t * const sregptr, const int_fast8_t endpoint) {
 
         SREG = old_sreg;
 
-        if (!usb_configuration || (usb_frame_count == timeout)) {
+        if (!usb_configuration || (uint8_t)(usb_frame_count - timeout) < 128U) {
             *sregptr = old_sreg;
             return false;
         }
@@ -366,15 +359,14 @@ usb_keyboard_send_report (void) {
         return false;
     }
 
+    usb_wake_up_if_suspended();
+
     uint8_t old_sreg;
 
-    if (!usb_wait_for_rw(&old_sreg, KEYBOARD_ENDPOINT_NUM)) {
+    if (!usb_wait_for_rw_on_endpoint(KEYBOARD_ENDPOINT_NUM, &old_sreg)) {
         usb_error = 'T';
         return false;
     }
-
-    usb_set_endpoint(KEYBOARD_ENDPOINT_NUM);
-    usb_wake_up_if_suspended();
 
     usb_tx_keys_state();
     usb_release_tx();
@@ -383,34 +375,6 @@ usb_keyboard_send_report (void) {
     usb_error = 0;
     SREG = old_sreg;
 #endif
-    return true;
-}
-
-static INLINE bool
-usb_keyboard_wait_to_send (uint8_t * const sregptr, const int_fast8_t endpoint) {
-    const uint8_t timeout = usb_frame_count + 50U;
-
-    uint8_t old_sreg = SREG;
-    cli();
-
-    for (;;) {
-        if (is_usb_rw_allowed) {
-            break;
-        }
-
-        SREG = old_sreg;
-
-        if (!usb_configuration || (usb_frame_count == timeout)) {
-            *sregptr = old_sreg;
-            return false;
-        }
-
-        old_sreg = SREG;
-        cli();
-        usb_set_endpoint(endpoint);
-    }
-
-    *sregptr = old_sreg;
     return true;
 }
 
@@ -423,15 +387,14 @@ send_generic_hid_report (uint8_t report_id, uint8_t count, const uint8_t report[
         return false;
     }
 
+    usb_wake_up_if_suspended();
+
     uint8_t old_sreg;
-    if (!usb_keyboard_wait_to_send(&old_sreg, GENERIC_HID_ENDPOINT_IN_NUM)) {
+    if (!usb_wait_for_rw_on_endpoint(GENERIC_HID_ENDPOINT_IN_NUM, &old_sreg)) {
         return false;
     }
 
     generic_report_pending = false;
-
-    usb_set_endpoint(GENERIC_HID_ENDPOINT_IN_NUM);
-    usb_wake_up_if_suspended();
 
     if (report_id) {
         usb_tx(report_id);
@@ -539,20 +502,19 @@ usb_tick (void) {
 // MARK: - Interrupt handlers (this is most of the USB stuff happens)
 
 ISR(USB_GEN_vect) {
-    static volatile uint8_t frame_count = 0;
+    static uint8_t frame_count = 0;
     const uint8_t intflags = usb_interrupt_flags_reg;
     usb_clear_interrupts(INT_END_OF_RESET_FLAG | INT_START_OF_FRAME_FLAG);
 
     if (intflags & INT_END_OF_RESET_FLAG) {
         _Static_assert(IS_ENDPOINT_SIZE_VALID(ENDPOINT_0_SIZE), "Invalid endpoint 0 size");
 
-        usb_setup_endpoint(
-            0,
-            EP_TYPE_CONTROL,
-            ENDPOINT_0_SIZE,
-            ENDPOINT_0_FLAGS
-        );
+        usb_setup_endpoint(0, EP_TYPE_CONTROL, ENDPOINT_0_SIZE, ENDPOINT_0_FLAGS);
         usb_configuration = 0;
+        usb_suspended = false;
+        usb_clear_interrupts(INT_SUSPEND_FLAG);
+        usb_disable_interrupts(INT_SUSPEND_FLAG);
+        usb_enable_interrupts(INT_WAKE_UP_FLAG);
 #if ENABLE_DFU_INTERFACE
         if (usb_request_detach) {
             usb_status |= USB_STATUS_JUMP_TO_BOOTLOADER;
@@ -616,18 +578,20 @@ ISR(USB_GEN_vect) {
         }
     }
 
+    if (intflags & INT_SUSPEND_FLAG) {
+        usb_disable_interrupts(INT_SUSPEND_FLAG);
+        usb_enable_interrupts(INT_WAKE_UP_FLAG);
+        usb_suspended = true;
+        usb_suspend_interrupt();
+        usb_clear_interrupts(INT_SUSPEND_FLAG);
+    }
+
     if (intflags & INT_WAKE_UP_FLAG) {
         usb_disable_interrupts(INT_WAKE_UP_FLAG);
         usb_enable_interrupts(INT_SUSPEND_FLAG);
         usb_suspended = false;
         usb_wake_up_interrupt();
         usb_clear_interrupts(INT_WAKE_UP_FLAG);
-    } else if (intflags & INT_SUSPEND_FLAG) {
-        usb_disable_interrupts(INT_SUSPEND_FLAG);
-        usb_enable_interrupts(INT_WAKE_UP_FLAG);
-        usb_suspended = true;
-        usb_suspend_interrupt();
-        usb_clear_interrupts(INT_SUSPEND_FLAG | INT_WAKE_UP_FLAG);
     }
 }
 
@@ -724,9 +688,10 @@ ISR(USB_COM_vect) {
             // size, we need to tell that it is over by sending an empty
             // packet. (The flush as the end of this function.)
         } else if (request == USB_REQUEST_SET_ADDRESS) {
-            // Set address
-            usb_wait_tx_in();
+            // Set address: write address before status stage, enable ADDEN after
             usb_set_address(value);
+            usb_wait_tx_in();
+            usb_enable_address();
         } else if (request == USB_REQUEST_GET_STATUS) {
             // Get status
             if (type == USB_REQUEST_DEVICE_TO_HOST_STANDARD_DEVICE) {
@@ -885,10 +850,13 @@ ISR(USB_COM_vect) {
                 }
                 usb_ack_rx_out();
                 usb_flush_tx_in();
-                generic_report_wait_lock();
-                success = generic_request_call_handler(value & 0xFFU, length, request);
-                generic_report_unlock();
-                return;
+                if (!generic_report_locked) {
+                    generic_report_lock();
+                    success = generic_request_call_handler(value & 0xFFU, length, request);
+                    generic_report_unlock();
+                } else {
+                    success = false;
+                }
 #endif
             } else if (request == HID_REQUEST_SET_IDLE) {
                 generic_idle_count = 0;
@@ -950,9 +918,15 @@ usb_deinit (void) {
     _delay_ms(8);
 
     cli();
+    usb_set_enabled_interrupts(0);
+    usb_clear_all_interrupts();
     usb_detach();
     usb_freeze();
     _delay_ms(8);
     usb_disable();
+#if USB_DEINIT_POWER_DOWN
+    pll_disable();
+    usb_hardware_deinit();
+#endif
     sei();
 }

@@ -145,6 +145,10 @@ protocol_init (void) {
 #endif
 
     protocol_post_init();
+
+    // Must be called with interrupts enabled so the USB ISRs can handle
+    // the USB reset and the first SETUP immediately:
+    usb_bus_attach();
 }
 
 void
@@ -235,10 +239,7 @@ protocol_task (void) {
         while (usb_is_suspended()) {
             suspend_power_down();
             if (suspend_wakeup_condition()) {
-                if (usb_wake_up_host()) {
-                    usb_keyboard_reset();
-                    delay_milliseconds(200);
-                }
+                (void) usb_wake_up_host();
             }
         }
         suspend_wakeup_init();
@@ -270,6 +271,7 @@ main (void) {
 
     protocol_init();
     keyboard_init();
+    reset_keys();
 
     for (;;) {
         protocol_task();
@@ -318,17 +320,6 @@ void
 jump_to_bootloader (void) {
     shutdown_quantum();
     bootloader_jump();
-}
-
-void
-matrix_init_quantum (void) {
-    reset_keys();
-    matrix_init_kb();
-}
-
-void
-matrix_scan_quantum (void) {
-    matrix_scan_kb();
 }
 
 #ifdef ENCODER_ENABLE

@@ -11,4 +11,5 @@ layers.c
 macros.c
 .ccls
 .tags
+release/
 schematic/*

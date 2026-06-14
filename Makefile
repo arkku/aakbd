@@ -7,7 +7,7 @@
 CC=avr-gcc
 OPTIMIZATION=s
 CC_FLAGS=-I$(DEVICE) -I. $(AVR_FLAGS)
-CFLAGS=-O$(OPTIMIZATION) -Wall -std=c11 -Wextra -Wno-unused-parameter $(CUSTOM_FLAGS) $(CC_FLAGS) $(DEVICE_FLAGS) $(CONFIG_FLAGS)
+CFLAGS=-O$(OPTIMIZATION) -Wall -std=gnu11 -Wextra -Wno-unused-parameter $(CUSTOM_FLAGS) $(CC_FLAGS) $(DEVICE_FLAGS) $(CONFIG_FLAGS)
 LD_FLAGS=$(AVR_FLAGS)
 LDFLAGS=-O$(OPTIMIZATION) $(LD_FLAGS)
 AR=avr-ar
@@ -106,12 +106,12 @@ $(BUILDDIR)/keys.o: keys.c
 	$(CC) $(CFLAGS) -Wno-pedantic -Wno-override-init -Wno-type-limits -c $< -o $@
 
 $(BIN): $(OBJECT_FILES)
-	$(CC) $(LDFLAGS) -s -o $@ $+
+	@echo $(CC) $(LDFLAGS) -s -o $@ ...
+	@$(CC) $(LDFLAGS) -s -o $@ $+
 	@chmod a-x $@
 	@avr-size $@
 
 $(HEX): $(BIN)
-	@echo $(OBJECT_FILES)
 	$(OBJCOPY) -j .text -j .data -O ihex $< $@
 
 local.mk:
@@ -130,30 +130,29 @@ $(MACROS_C): $(wildcard $(DEVICE)/template_macros.c) template_macros.c
 	@[ ! -r $@ ] && cp -v -f $< $@ || echo NOTICE: $< is newer than $@ - silence with: touch $@
 
 burn: $(HEX)
-	$(AVRDUDE) -c $(BURNER) $(if $(PORT),-P $(PORT) ,)$(if $(BPS),-b $(BPS) ,)-p $(MCU) -U flash:w:$< -v
+	$(SUDO) $(AVRDUDE) -c $(BURNER) $(if $(PORT),-P $(PORT) ,)$(if $(BPS),-b $(BPS) ,)-p $(MCU) -U flash:w:$< -v
 
 upload: $(HEX)
-	stty -f $(if $(PORT),$(PORT),/dev/ttyUSB0) 1200
-	$(AVRDUDE) -c $(UPLOAD_PROTOCOL) $(if $(PORT),-P $(PORT),-P /dev/ttyUSB0) $(if $(BPS),-b $(BPS),) -p $(MCU) -U flash:w:$< -v
+	#$(SUDO) stty -f $(if $(PORT),$(PORT),/dev/ttyACM0) 1200
+	$(SUDO) $(AVRDUDE) -c $(UPLOAD_PROTOCOL) $(if $(PORT),-P $(PORT),-P /dev/ttyACM0) $(if $(BPS),-b $(BPS),) -p $(MCU) -U flash:w:$< -v
 
 reset:
-	dfu-util -e
+	$(SUDO) dfu-util -e
 
 dfu: $(HEX)
-	dfu-util -e || true
-	@sleep 2
-	dfu-programmer $(MCU) erase
-	dfu-programmer $(MCU) flash $<
-	dfu-programmer $(MCU) launch
+	$(SUDO) dfu-util -e && sleep 2 || true
+	$(SUDO) dfu-programmer $(MCU) erase
+	$(SUDO) dfu-programmer $(MCU) flash $<
+	$(SUDO) dfu-programmer $(MCU) launch || $(SUDO) dfu-programmer $(MCU) reset
 
 fuses:
-	$(AVRDUDE) -c $(BURNER) $(if $(PORT),-P $(PORT) ,)$(if $(BPS),-b (BPS) ,)-p $(MCU) -U efuse:w:0x$(EFUSE):m -U hfuse:w:0x$(HFUSE):m $(if $(LFUSE),-U lfuse:w:0x$(LFUSE):m,)
+	$(SUDO) $(AVRDUDE) -c $(BURNER) $(if $(PORT),-P $(PORT) ,)$(if $(BPS),-b (BPS) ,)-p $(MCU) -U efuse:w:0x$(EFUSE):m -U hfuse:w:0x$(HFUSE):m $(if $(LFUSE),-U lfuse:w:0x$(LFUSE):m,)
 
 unlock:
-	$(AVRDUDE) -c $(BURNER) $(if $(PORT),-P $(PORT) ,)$(if $(BPS),-b $(BPS) ,)-p $(MCU) -U lock:w:0x3F:m -v
+	$(SUDO) $(AVRDUDE) -c $(BURNER) $(if $(PORT),-P $(PORT) ,)$(if $(BPS),-b $(BPS) ,)-p $(MCU) -U lock:w:0x3F:m -v
 
 lock:
-	$(AVRDUDE) -c $(BURNER) $(if $(PORT),-P $(PORT) ,)$(if $(BPS),-b $(BPS) ,)-p $(MCU) -U lock:w:0x0F:m -v
+	$(SUDO) $(AVRDUDE) -c $(BURNER) $(if $(PORT),-P $(PORT) ,)$(if $(BPS),-b $(BPS) ,)-p $(MCU) -U lock:w:0x0F:m -v
 
 .ccls: Makefile local.mk $(DEVICE)/local.mk
 	@echo $(CC) >$@
@@ -171,15 +170,23 @@ clean:
 	rm -f *.o
 	@[ -d ./$(BUILDDIR) ] && rm -f ./$(BUILDDIR)/*.o || true
 	@[ -e $(BUILDDIR) ] && rmdir $(BUILDDIR) || true
+	@[ -d ./release/build ] && rm -rf ./release/build || true
+
+release:
+	@./build_release
+
+upload_release:
+	@./upload_release $(TAG)
 
 distclean: | clean
 	rm -f *.hex *.bin .ccls
+	rm -rf release
 	find . -name '*.o' -type f -delete
-	find . -name 'build' -type d -d -exec rmdir '{}' ';'
+	find . -depth -name 'build' -type d -exec rmdir '{}' ';'
 	@[ -e $(MACROS_C) -o -e $(LAYERS_C) ] && echo NOT deleting $(MACROS_C) and $(LAYERS_C) files! || true
 
 backup:
 	cp $(MACROS_C) $(MACROS_C)~
 	cp $(LAYERS_C) $(LAYERS_C)~
 
-.PHONY: all clean distclean burn fuses upload lock unlock bootloader backup dfu reset
+.PHONY: all clean distclean release upload_release burn fuses upload lock unlock bootloader backup dfu reset

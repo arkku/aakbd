@@ -361,6 +361,7 @@ setup (const bool is_power_up) {
 
     // Enable interrupts
     sei();
+    usb_bus_attach();
 
     if (is_power_up) {
         // Give the keyboard some time to start up
@@ -422,6 +423,28 @@ update_keyboard_leds (const uint8_t usb_state) {
     }
 }
 
+#ifndef NO_SUSPEND_POWER_DOWN
+static void
+wdt_intr_enable (uint8_t wdto) {
+    wdt_reset();
+    wdt_enable(wdto);
+    WDTCSR |= _BV(WDIE);
+}
+
+static void
+power_down (uint8_t wdto) {
+    wdt_intr_enable(wdto);
+    set_sleep_mode(SLEEP_MODE_IDLE);
+    sleep_enable();
+    sei();
+    sleep_cpu();
+    sleep_disable();
+    wdt_disable();
+}
+
+ISR(WDT_vect) { }
+#endif
+
 int
 main (void) {
     uint8_t byte;
@@ -433,6 +456,27 @@ main (void) {
 
     for (;;)
     {
+#ifndef NO_USB_STARTUP_CHECK
+        if (usb_is_suspended()) {
+            kbd_reset_key_state();
+            while (usb_is_suspended()) {
+#ifndef NO_SUSPEND_POWER_DOWN
+                if (!ps2_bytes_available()) {
+                    power_down(WDTO_15MS);
+                }
+#endif
+                if (ps2_bytes_available()) {
+                    (void) usb_wake_up_host();
+                }
+                usb_tick();
+            }
+            reset_keys();
+            kbd_idle_reset();
+            wdt_reset();
+            wdt_enable(WDTO_4S);
+        }
+#endif
+
         byte = tick_10ms_count;
         if (tick_is_due_at(byte)) {
             keys_tick(byte);
@@ -483,7 +527,7 @@ main (void) {
             kbd_init(true);
         }
 
-        if (kbd_idle_10ms_count > MAX_IDLE_10MS) {
+        if (!usb_is_suspended() && kbd_idle_10ms_count > MAX_IDLE_10MS) {
             // Ping the keyboard when idle to detect unplugging
             if (ps2_command(PS2_COMMAND_ECHO) != PS2_COMMAND_ECHO) {
                 kbd_error_count = MAX_ERROR_COUNT + 1;
