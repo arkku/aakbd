@@ -112,7 +112,7 @@ static volatile uint8_t usb_request_detach = 0;
 
 #define is_boot_protocol usb_keyboard_is_in_boot_protocol
 
-static INLINE bool usb_wait_for_rw(uint8_t * const sregptr, const int_fast8_t endpoint);
+static INLINE bool usb_wait_for_rw_on_endpoint(const int_fast8_t endpoint, uint8_t sregptr[static 1]);
 
 static void
 usb_devices_reset (void) {
@@ -313,11 +313,12 @@ usb_tx_keys_state (void) {
 }
 
 static INLINE bool
-usb_wait_for_rw (uint8_t * const sregptr, const int_fast8_t endpoint) {
+usb_wait_for_rw_on_endpoint (const int_fast8_t endpoint, uint8_t sregptr[static 1]) {
     const uint8_t timeout = usb_frame_count + 50U;
 
     uint8_t old_sreg = SREG;
     cli();
+    usb_set_endpoint(endpoint);
 
     for (;;) {
         if (is_usb_rw_allowed) {
@@ -326,7 +327,7 @@ usb_wait_for_rw (uint8_t * const sregptr, const int_fast8_t endpoint) {
 
         SREG = old_sreg;
 
-        if (!usb_configuration || (usb_frame_count == timeout)) {
+        if (!usb_configuration || (uint8_t)(usb_frame_count - timeout) < 128U) {
             *sregptr = old_sreg;
             return false;
         }
@@ -348,15 +349,14 @@ usb_keyboard_send_report (void) {
         return false;
     }
 
+    usb_wake_up_if_suspended();
+
     uint8_t old_sreg;
 
-    if (!usb_wait_for_rw(&old_sreg, KEYBOARD_ENDPOINT_NUM)) {
+    if (!usb_wait_for_rw_on_endpoint(KEYBOARD_ENDPOINT_NUM, &old_sreg)) {
         usb_error = 'T';
         return false;
     }
-
-    usb_set_endpoint(KEYBOARD_ENDPOINT_NUM);
-    usb_wake_up_if_suspended();
 
     usb_tx_keys_state();
     usb_release_tx();
@@ -365,34 +365,6 @@ usb_keyboard_send_report (void) {
     usb_error = 0;
     SREG = old_sreg;
 #endif
-    return true;
-}
-
-static INLINE bool
-usb_keyboard_wait_to_send (uint8_t * const sregptr, const int_fast8_t endpoint) {
-    const uint8_t timeout = usb_frame_count + 50U;
-
-    uint8_t old_sreg = SREG;
-    cli();
-
-    for (;;) {
-        if (is_usb_rw_allowed) {
-            break;
-        }
-
-        SREG = old_sreg;
-
-        if (!usb_configuration || (usb_frame_count == timeout)) {
-            *sregptr = old_sreg;
-            return false;
-        }
-
-        old_sreg = SREG;
-        cli();
-        usb_set_endpoint(endpoint);
-    }
-
-    *sregptr = old_sreg;
     return true;
 }
 
@@ -405,15 +377,14 @@ send_generic_hid_report (uint8_t report_id, uint8_t count, const uint8_t report[
         return false;
     }
 
+    usb_wake_up_if_suspended();
+
     uint8_t old_sreg;
-    if (!usb_keyboard_wait_to_send(&old_sreg, GENERIC_HID_ENDPOINT_IN_NUM)) {
+    if (!usb_wait_for_rw_on_endpoint(GENERIC_HID_ENDPOINT_IN_NUM, &old_sreg)) {
         return false;
     }
 
     generic_report_pending = false;
-
-    usb_set_endpoint(GENERIC_HID_ENDPOINT_IN_NUM);
-    usb_wake_up_if_suspended();
 
     if (report_id) {
         usb_tx(report_id);
