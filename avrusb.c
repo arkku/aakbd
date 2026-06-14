@@ -160,55 +160,34 @@ usb_init (void) {
 
 static INLINE void
 usb_init_endpoint (const uint8_t num, const uint8_t type, const uint8_t size, const uint8_t flags) {
-    for (uint8_t i = num; i <= USB_MAX_ENDPOINT; ++i) {
-        uint8_t cfg_type;
-        uint8_t cfg_flags;
-        uint8_t cfg_interrupts;
-
-        usb_set_endpoint(i);
-
-        if (i == num) {
-            cfg_type = type;
-            cfg_flags = flags | EP_SIZE_FLAGS(size);
-            cfg_interrupts = 0;
-        } else {
-            cfg_type = usb_endpoint_type_config;
-            cfg_flags = usb_endpoint_flags_config;
-            cfg_interrupts = usb_endpoint_interrupts_config;
-        }
-
-        if (!(cfg_flags & EP_ALLOC)) {
-            continue;
-        }
-
-        usb_disable_endpoint();
-        usb_deallocate_endpoint();
-
-        usb_enable_endpoint();
-        usb_endpoint_type_config = cfg_type;
-        usb_endpoint_flags_config = cfg_flags;
-        usb_endpoint_interrupts_config = cfg_interrupts;
-    }
-
     usb_set_endpoint(num);
+
+    usb_disable_endpoint();
+    usb_deallocate_endpoint();
+
+    usb_enable_endpoint();
+    usb_endpoint_type_config = type;
+    usb_endpoint_flags_config = flags | EP_SIZE_FLAGS(size);
+    usb_endpoint_interrupts_config = 0;
 }
 
 static INLINE void
 usb_init_endpoints (void) {
 #if ENABLE_KEYBOARD_ENDPOINT
     _Static_assert(IS_ENDPOINT_SIZE_VALID(KEYBOARD_ENDPOINT_SIZE), "Invalid keyboard endpoint size");
+    _Static_assert(KEYBOARD_ENDPOINT_NUM <= USB_MAX_ENDPOINT, "Keyboard endpoint number exceeds device maximum");
     usb_init_endpoint(KEYBOARD_ENDPOINT_NUM, KEYBOARD_ENDPOINT_TYPE, KEYBOARD_ENDPOINT_SIZE, KEYBOARD_ENDPOINT_FLAGS);
 #endif
 
 #if ENABLE_GENERIC_HID_ENDPOINT
     _Static_assert(IS_ENDPOINT_SIZE_VALID(GENERIC_ENDPOINT_SIZE), "Invalid Generic HID endpoint size");
+    _Static_assert(GENERIC_HID_ENDPOINT_IN_NUM <= USB_MAX_ENDPOINT, "Generic HID IN endpoint number exceeds device maximum");
     usb_init_endpoint(GENERIC_HID_ENDPOINT_IN_NUM, GENERIC_ENDPOINT_IN_TYPE, GENERIC_ENDPOINT_SIZE, GENERIC_ENDPOINT_FLAGS);
 #if ENABLE_GENERIC_HID_OUTPUT
+    _Static_assert(GENERIC_HID_ENDPOINT_OUT_NUM <= USB_MAX_ENDPOINT, "Generic HID OUT endpoint number exceeds device maximum");
     usb_init_endpoint(GENERIC_HID_ENDPOINT_OUT_NUM, GENERIC_ENDPOINT_OUT_TYPE, GENERIC_ENDPOINT_SIZE, GENERIC_ENDPOINT_FLAGS);
 #endif
 #endif
-
-    //usb_reset_endpoints_1to(USB_MAX_ENDPOINT);
 }
 
 static INLINE void
