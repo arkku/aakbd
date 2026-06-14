@@ -60,7 +60,7 @@
 static volatile uint8_t keyboard_idle_count = 0;
 
 /// The value of `keyboard_idle_count` to send an update on.
-static volatile uint8_t keyboard_update_on_idle_count = KEYBOARD_UPDATE_IDLE_MS / IDLE_COUNT_FRAME_DIVIDER;
+static volatile uint8_t keyboard_update_on_idle_count = DIV_ROUND_BYTE(IDLE_COUNT_FRAME_DIVIDER, KEYBOARD_UPDATE_IDLE_MS);
 
 /// The active USB configuration. This is set by a request from the host.
 static volatile uint8_t usb_configuration = 0;
@@ -75,7 +75,7 @@ static volatile bool usb_suspended = 0;
 static volatile uint8_t usb_error = 0;
 
 #if ENABLE_GENERIC_HID_ENDPOINT
-static volatile uint8_t generic_update_on_idle_count = GENERIC_HID_UPDATE_IDLE_MS / IDLE_COUNT_FRAME_DIVIDER;
+static volatile uint8_t generic_update_on_idle_count = DIV_ROUND_BYTE(IDLE_COUNT_FRAME_DIVIDER, GENERIC_HID_UPDATE_IDLE_MS);
 static volatile uint8_t generic_idle_count = 0;
 static volatile uint8_t generic_report_pending = 0;
 
@@ -120,7 +120,7 @@ usb_devices_reset (void) {
     keyboard_idle_count = 0;
     keyboard_update_on_idle_count = DIV_ROUND_BYTE(IDLE_COUNT_FRAME_DIVIDER, KEYBOARD_UPDATE_IDLE_MS);
 #if ENABLE_GENERIC_HID_ENDPOINT
-    generic_update_on_idle_count = DIV_ROUND_BYTE(IDLE_COUNT_FRAME_DIVIDER, GENERIC_HID_POLL_INTERVAL_MS);
+    generic_update_on_idle_count = DIV_ROUND_BYTE(IDLE_COUNT_FRAME_DIVIDER, GENERIC_HID_UPDATE_IDLE_MS);
     generic_report_pending = 0;
     generic_report_reset();
 #endif
