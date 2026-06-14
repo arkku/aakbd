@@ -5,7 +5,7 @@
  * another platform by substituting this header and a few other
  * things.
  *
- * Copyright (c) 2021 Kimmo Kulovesi, https://arkku.dev/
+ * Copyright (c) 2021-2026 Kimmo Kulovesi, https://arkku.dev/
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -173,8 +173,8 @@
 
 #define usb_clear_status_flags()    (UEINTX &= (uint8_t) ~(1 << RXSTPI))
 #define usb_clear_setup_int()       (UEINTX = (uint8_t) ~((1 << RXSTPI) | (1 << RXOUTI) | (1 << TXINI)))
-#define usb_release_rx()            (UEINTX = (1 << NAKINI) | (1 << RWAL) | (1 << RXSTPI) | (1 << STALLEDI) | (1 << TXINI)) // 0x6B
-#define usb_release_tx()            (UEINTX = (1 << NAKOUTI) | (1 << RWAL) | (1 << RXSTPI) | (1 << STALLEDI)) // 0x3A
+#define usb_release_rx()            (UEINTX = (1 << NAKINI) | (1 << RWAL) | (1 << RXSTPI) | (1 << STALLEDI) | (1 << TXINI))
+#define usb_release_tx()            (UEINTX = (1 << NAKOUTI) | (1 << RWAL) | (1 << RXSTPI) | (1 << STALLEDI))
 
 #define usb_flush_tx_endpoint(num)  do {    \
     usb_set_endpoint((num));                \

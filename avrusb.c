@@ -1,7 +1,7 @@
 /*
  * avrusb.c: USB implementation for ATMEGA32U4.
  *
- * Copyright (c) 2021-2022 Kimmo Kulovesi, https://arkku.dev/
+ * Copyright (c) 2021-2026 Kimmo Kulovesi, https://arkku.dev/
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -857,7 +857,6 @@ ISR(USB_COM_vect) {
                 } else {
                     success = false;
                 }
-                return;
 #endif
             } else if (request == HID_REQUEST_SET_IDLE) {
                 generic_idle_count = 0;
