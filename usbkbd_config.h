@@ -237,6 +237,10 @@
 #define IS_SUSPEND_SUPPORTED        1
 #endif
 
+#ifndef USB_DEINIT_POWER_DOWN
+#define USB_DEINIT_POWER_DOWN       0
+#endif
+
 #if ENABLE_APPLE_FN_KEY || ENABLE_MEDIA_KEYS
 #define ENABLE_VIRTUAL_KEYS         1
 #else

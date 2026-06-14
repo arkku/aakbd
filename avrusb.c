@@ -688,9 +688,10 @@ ISR(USB_COM_vect) {
             // size, we need to tell that it is over by sending an empty
             // packet. (The flush as the end of this function.)
         } else if (request == USB_REQUEST_SET_ADDRESS) {
-            // Set address
-            usb_wait_tx_in();
+            // Set address: write address before status stage, enable ADDEN after
             usb_set_address(value);
+            usb_wait_tx_in();
+            usb_enable_address();
         } else if (request == USB_REQUEST_GET_STATUS) {
             // Get status
             if (type == USB_REQUEST_DEVICE_TO_HOST_STANDARD_DEVICE) {
@@ -849,9 +850,13 @@ ISR(USB_COM_vect) {
                 }
                 usb_ack_rx_out();
                 usb_flush_tx_in();
-                generic_report_wait_lock();
-                success = generic_request_call_handler(value & 0xFFU, length, request);
-                generic_report_unlock();
+                if (!generic_report_locked) {
+                    generic_report_lock();
+                    success = generic_request_call_handler(value & 0xFFU, length, request);
+                    generic_report_unlock();
+                } else {
+                    success = false;
+                }
                 return;
 #endif
             } else if (request == HID_REQUEST_SET_IDLE) {
@@ -914,9 +919,15 @@ usb_deinit (void) {
     _delay_ms(8);
 
     cli();
+    usb_set_enabled_interrupts(0);
+    usb_clear_all_interrupts();
     usb_detach();
     usb_freeze();
     _delay_ms(8);
     usb_disable();
+#if USB_DEINIT_POWER_DOWN
+    pll_disable();
+    usb_hardware_deinit();
+#endif
     sei();
 }
