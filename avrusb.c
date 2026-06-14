@@ -197,7 +197,12 @@ static INLINE void
 usb_configuration_changed() {
     usb_clear_status_flags();
     usb_init_endpoints();
+#if IS_SUSPEND_SUPPORTED
+    usb_clear_interrupts(INT_SUSPEND_FLAG);
+    usb_enable_interrupts(INT_START_OF_FRAME_FLAG | INT_SUSPEND_FLAG);
+#else
     usb_enable_interrupts(INT_START_OF_FRAME_FLAG);
+#endif
 }
 
 bool
@@ -237,23 +242,28 @@ usb_detach_requested (void) {
 static INLINE void
 usb_wake_up_if_suspended (void) {
 #if IS_SUSPEND_SUPPORTED
-    if (usb_suspended) {
+    if (usb_suspended && (usb_status & USB_STATUS_REMOTE_WAKEUP_ENABLED)) {
         usb_set_remote_wakeup();
+        while (is_usb_remote_wakeup_set)
+            ;
     }
 #endif
 }
 
 bool
 usb_wake_up_host (void) {
-    usb_clear_remote_wakeup();
-
-    if (is_usb_remote_wakeup_set || usb_suspended || !(usb_status & USB_STATUS_REMOTE_WAKEUP_ENABLED)) {
+    if (!usb_suspended || !(usb_status & USB_STATUS_REMOTE_WAKEUP_ENABLED)) {
         usb_error = 'w';
         return false;
     }
 
-    usb_init();
+    pll_enable();
+    while (!is_pll_locked)
+        ;
+    usb_start_clock();
     usb_set_remote_wakeup();
+    while (is_usb_remote_wakeup_set)
+        ;
 
     return true;
 }
@@ -492,20 +502,19 @@ usb_tick (void) {
 // MARK: - Interrupt handlers (this is most of the USB stuff happens)
 
 ISR(USB_GEN_vect) {
-    static volatile uint8_t frame_count = 0;
+    static uint8_t frame_count = 0;
     const uint8_t intflags = usb_interrupt_flags_reg;
     usb_clear_interrupts(INT_END_OF_RESET_FLAG | INT_START_OF_FRAME_FLAG);
 
     if (intflags & INT_END_OF_RESET_FLAG) {
         _Static_assert(IS_ENDPOINT_SIZE_VALID(ENDPOINT_0_SIZE), "Invalid endpoint 0 size");
 
-        usb_setup_endpoint(
-            0,
-            EP_TYPE_CONTROL,
-            ENDPOINT_0_SIZE,
-            ENDPOINT_0_FLAGS
-        );
+        usb_setup_endpoint(0, EP_TYPE_CONTROL, ENDPOINT_0_SIZE, ENDPOINT_0_FLAGS);
         usb_configuration = 0;
+        usb_suspended = false;
+        usb_clear_interrupts(INT_SUSPEND_FLAG);
+        usb_disable_interrupts(INT_SUSPEND_FLAG);
+        usb_enable_interrupts(INT_WAKE_UP_FLAG);
 #if ENABLE_DFU_INTERFACE
         if (usb_request_detach) {
             usb_status |= USB_STATUS_JUMP_TO_BOOTLOADER;
@@ -569,18 +578,20 @@ ISR(USB_GEN_vect) {
         }
     }
 
+    if (intflags & INT_SUSPEND_FLAG) {
+        usb_disable_interrupts(INT_SUSPEND_FLAG);
+        usb_enable_interrupts(INT_WAKE_UP_FLAG);
+        usb_suspended = true;
+        usb_suspend_interrupt();
+        usb_clear_interrupts(INT_SUSPEND_FLAG);
+    }
+
     if (intflags & INT_WAKE_UP_FLAG) {
         usb_disable_interrupts(INT_WAKE_UP_FLAG);
         usb_enable_interrupts(INT_SUSPEND_FLAG);
         usb_suspended = false;
         usb_wake_up_interrupt();
         usb_clear_interrupts(INT_WAKE_UP_FLAG);
-    } else if (intflags & INT_SUSPEND_FLAG) {
-        usb_disable_interrupts(INT_SUSPEND_FLAG);
-        usb_enable_interrupts(INT_WAKE_UP_FLAG);
-        usb_suspended = true;
-        usb_suspend_interrupt();
-        usb_clear_interrupts(INT_SUSPEND_FLAG | INT_WAKE_UP_FLAG);
     }
 }
 
