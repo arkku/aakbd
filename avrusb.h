@@ -99,7 +99,7 @@
 #define usb_frame_count             UDFNUML
 
 #ifdef UHWCON
-#define usb_hardware_init()         (UHWCON = (1 << UVREGE))
+#define usb_hardware_init()         (UHWCON |= (1 << UVREGE))
 #else
 #define usb_hardware_init()         (REGCR &= ~(1 << REGDIS))
 #endif
@@ -134,9 +134,9 @@
 
 #define usb_clear_interrupts(x)         (usb_interrupt_flags_reg &= ~(x))
 #ifdef USBINT
-#define usb_clear_all_interrupts(x)     do { usb_interrupt_flags_reg = 0; USBINT = 0; } while (0)
+#define usb_clear_all_interrupts()      do { usb_interrupt_flags_reg = 0; USBINT = 0; } while (0)
 #else
-#define usb_clear_all_interrupts(x)     (usb_interrupt_flags_reg = 0)
+#define usb_clear_all_interrupts()      (usb_interrupt_flags_reg = 0)
 #endif
 #define usb_enable_interrupts(x)        (usb_interrupt_enable_reg |= (x))
 #define usb_disable_interrupts(x)       (usb_interrupt_enable_reg &= ~(x))
@@ -167,13 +167,13 @@
 #define usb_set_address(addr)       (UDADDR = (addr) | (1 << ADDEN))
 #define usb_get_address()           (UDADDR & ~(1 << ADDEN))
 
-#define usb_clear_status_flags()    (UEINTX &= ~(1 << RXSTPI))
-#define usb_clear_setup_int()       (UEINTX = ~((1 << RXSTPI) | (1 << RXOUTI) | (1 << TXINI)))
+#define usb_clear_status_flags()    (UEINTX &= (uint8_t) ~(1 << RXSTPI))
+#define usb_clear_setup_int()       (UEINTX = (uint8_t) ~((1 << RXSTPI) | (1 << RXOUTI) | (1 << TXINI)))
 #define usb_release_rx()            (UEINTX = (1 << NAKINI) | (1 << RWAL) | (1 << RXSTPI) | (1 << STALLEDI) | (1 << TXINI)) // 0x6B
 #define usb_release_tx()            (UEINTX = (1 << NAKOUTI) | (1 << RWAL) | (1 << RXSTPI) | (1 << STALLEDI)) // 0x3A
 
-#define usb_flush_endpoint(num)     do {    \
-    usb_set_endpoint((ep));                 \
+#define usb_flush_tx_endpoint(num)  do {    \
+    usb_set_endpoint((num));                \
     if (usb_fifo_byte_count) {              \
         usb_release_tx();                   \
     }                                       \
@@ -184,9 +184,9 @@
     UERST = 0;                       \
 } while (0)
 
-#define usb_reset_endpoints_1to(num) do {                                   \
-    UERST = (num == 7) ? 0x7E : (((1 << ((num) + 1)) - 1U) & ~1U);          \
-    UERST = 0;                                                              \
+#define usb_reset_endpoints_1to(num) do { \
+    UERST = ((1 << ((num) + 1)) - 2U); \
+    UERST = 0; \
 } while (0)
 
 #define usb_setup_endpoint(number, type, size, flags) do {                  \
