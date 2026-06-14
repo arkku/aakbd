@@ -28,6 +28,7 @@
 
 #if (defined(__AVR_AT90USB162__) || defined(__AVR_AT90USB82__)  || defined(__AVR_ATmega32U2__) || defined(__AVR_ATmega16U2__) || defined(__AVR_ATmega8U2__))
 #define USB_SERIES_2_AVR
+#define USB_SUSPEND_NEEDS_RECONNECT
 #elif (defined(__AVR_ATmega32U4__) || defined(__AVR_ATmega16U4__))
 #define USB_SERIES_4_AVR
 #endif
@@ -100,8 +101,10 @@
 
 #ifdef UHWCON
 #define usb_hardware_init()         (UHWCON |= (1 << UVREGE))
+#define usb_hardware_deinit()       (UHWCON &= ~(1 << UVREGE))
 #else
 #define usb_hardware_init()         (REGCR &= ~(1 << REGDIS))
+#define usb_hardware_deinit()       (REGCR |= (1 << REGDIS))
 #endif
 #define usb_freeze()                (USBCON = (1 << USBE) | (1 << FRZCLK))
 
@@ -207,7 +210,7 @@
 #if F_CPU == 16000000UL
 #ifdef PINDIV
 #define PLL_DIV_FLAG            (1 << PINDIV)
-#elif defined(__AVR_ATmega32U2__)
+#elif defined(PLLP0)
 #define PLL_DIV_FLAG            (1 << PLLP0)
 #endif
 #elif F_CPU == 8000000UL
