@@ -15,7 +15,7 @@
  *
  * Note that you need to escape double quotes in that file, such as with '.
  *
- * Copyright (c) 2021-2025 Kimmo Kulovesi, https://arkku.dev/
+ * Copyright (c) 2021-2026 Kimmo Kulovesi, https://arkku.dev/
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -76,8 +76,26 @@
 /// too short (since it may be unrecognisable from a terminal escape sequence).
 /// Since the delay halts everything, I recommend using at most 10 ms here
 /// and configuring software to use a shorter delay as necessary.
+#if KEYBOARD_POLL_INTERVAL_MS <= 10
 #define SIMULATED_KEYPRESS_TIME_MS 10
+#else
+#define SIMULATED_KEYPRESS_TIME_MS KEYBOARD_POLL_INTERVAL_MS
 #endif
+#endif
+
+#ifndef RESET_LAYERS_ON_SUSPEND
+/// Should layer state be preserved when waking up from suspend (e.g., computer
+/// sleep suspends USB keyboards)? The advantage is preserving any sticky
+/// layers, the risk is that theoretically there might be some momentary layers
+/// activated during or before suspend and they will stay active permanently
+/// since the key up event will be lost. But that should be rare, e.g., you are
+/// probably not putting the computer to sleep while holding an Fn key.
+///
+/// However, if you are doing custom layer state management in `handle_reset`
+/// in `macros.c`, you may wish to set this to `1` to avoid conflicts.
+#define RESET_LAYERS_ON_SUSPEND     0
+#endif
+
 #ifndef USB_VENDOR_ID
 /// USB vendor id. Technically this needs to be assigned by USB-IF, but
 /// in practice it should be safe to copy the vendor and product id of an
@@ -112,9 +130,22 @@
 //#define USB_VERSION                 0x0200U
 #endif
 #ifndef LED_COUNT
-/// The number of LEDs to report the keyboard supports (typically 3-5).
+/// The number of LEDs to report the keyboard supports. Officially they are
+/// defined up to 5: `LED_NUM_LOCK_BIT`, `LED_CAPS_LOCK_BIT`,
+/// `LED_SCROLL_LOCK_BIT`, `LED_COMPOSE_BIT`, and `LED_KANA_BIT`. The default
+/// is the classic 3 LEDs, but this can be defined up to 5 to support more.
 #define LED_COUNT                   3
 #endif
+#ifndef ENABLE_VIRTUAL_LEDS
+#if LED_COUNT <= 5
+/// Virtual LEDs are locally generated status indicators that can be displayed
+/// by custom hooks or used in macros.
+#define ENABLE_VIRTUAL_LEDS         1
+#else
+#define ENABLE_VIRTUAL_LEDS         0
+#endif
+#endif
+
 #ifndef DEVICE_VERSION
 /// Version number in binary-coded decimal (i.e., 1.00 = 0x0100).
 #define DEVICE_VERSION 0x0100U
@@ -149,6 +180,15 @@
 /// messing with the USB implementation.
 #define ENABLE_DEBUG_SHORTCUT 0
 #endif
+
+/// Collect debounce statistics: histogram of actual debounce times needed.
+/// Prints a line at each debug report showing the distribution of observed
+/// debounce delays (in ms) and the highest debounce value that would have
+/// been sufficient. Only relevant when DEBOUNCE is non-zero.
+#ifndef DEBOUNCE_DEBUG
+#define DEBOUNCE_DEBUG 0
+#endif
+
 #ifndef ENABLE_SIMULATED_TYPING
 /// Enable function to simulate typing. This is required for the
 /// `ENABLE_DEBUG_SHORTCUT` option and for macros that wish to utilise it.

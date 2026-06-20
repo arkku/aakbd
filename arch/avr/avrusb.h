@@ -165,7 +165,6 @@
 #define usb_reset_data_toggle()     (UECONX = (1 << RSTDT) | (1 << EPEN))
 
 #define usb_set_remote_wakeup()     (UDCON |= (1 << RMWKUP))
-#define usb_clear_remote_wakeup()   (UDCON &= ~(1 << RMWKUP))
 
 #define usb_set_address(addr)       (UDADDR = (UDADDR & (1 << ADDEN)) | ((addr) & 0x7F))
 #define usb_enable_address()        (UDADDR |= (1 << ADDEN))

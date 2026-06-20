@@ -1,3 +1,23 @@
+/*
+ * suspend.c: AVR suspend from QMK, adapted for AAKBD.
+ *
+ * Copyright QMK Community
+ * Copyright 2021 Kimmo Kulovesi
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <stdbool.h>
 #include <avr/sleep.h>
 #include <avr/wdt.h>
@@ -14,8 +34,6 @@ extern volatile uint8_t usb_keyboard_leds;
 #ifdef PROTOCOL_VUSB
 #    include "vusb.h"
 #endif
-
-// TODO: This needs some cleanup
 
 #if !defined(NO_SUSPEND_POWER_DOWN) && defined(WDT_vect)
 
@@ -52,22 +70,10 @@ __asm__ __volatile__ ( \
  */
 static uint8_t wdt_timeout = 0;
 
-/** \brief Power down
- *
- * FIXME: needs doc
- */
 static void power_down(uint8_t wdto) {
     wdt_timeout = wdto;
 
-    // Watchdog Interrupt Mode
     wdt_intr_enable(wdto);
-
-    // TODO: more power saving
-    // See PicoPower application note
-    // - I/O port input with pullup
-    // - prescale clock
-    // - BOD disable
-    // - Power Reduction Register PRR
     set_sleep_mode(SLEEP_MODE_PWR_DOWN);
     sleep_enable();
     sei();
@@ -91,10 +97,6 @@ ISR(WDT_vect) {
 
 #endif
 
-/** \brief Suspend power down
- *
- * FIXME: needs doc
- */
 void suspend_power_down(void) {
 #ifdef PROTOCOL_LUFA
     if (USB_DeviceState == DEVICE_STATE_Configured) return;
@@ -106,22 +108,17 @@ void suspend_power_down(void) {
     suspend_power_down_quantum();
 
 #ifndef NO_SUSPEND_POWER_DOWN
-    // Enter sleep state if possible (ie, the MCU has a watchdog timeout interrupt)
 #    if defined(WDT_vect)
     power_down(WDTO_15MS);
 #    endif
 #endif
 }
 
-/** \brief run immediately after wakeup
- *
- * FIXME: needs doc
- */
 void suspend_wakeup_init(void) {
     uint8_t saved_leds = usb_keyboard_leds;
 
     // clear keyboard state
-    clear_keyboard();
+    keyboard_wake_up();
 
     usb_keyboard_leds = saved_leds;
     suspend_wakeup_init_quantum();

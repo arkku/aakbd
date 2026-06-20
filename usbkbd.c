@@ -1,7 +1,7 @@
 /*
  * usbkbd.c: USB HID keyboard implementation.
  *
- * Copyright (c) 2021-2025 Kimmo Kulovesi, https://arkku.dev/
+ * Copyright (c) 2021-2026 Kimmo Kulovesi, https://arkku.dev/
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,11 +29,18 @@
 #include "usb_hardware.h"
 #include "generic_hid.h"
 #include "progmem.h"
+#if DEBOUNCE_DEBUG
+#include "debounce/debounce_debug.h"
+#endif
 
 // MARK: - Keyboard Variables
 
 /// Desired state of the keyboard LEDs as set over USB.
 volatile uint8_t usb_keyboard_leds = 0;
+
+#if ENABLE_VIRTUAL_LEDS
+volatile uint8_t usb_virtual_leds = 0;
+#endif
 
 /// The buffer for keys currently pressed. Terminated by a zero, hence one
 /// element more than required.
@@ -351,6 +358,7 @@ usb_keyboard_type_bitmask (const uint8_t bitmask) {
     }
 }
 
+#if defined(__AVR__)
 static int
 debug_kbd_putchar (const char c, FILE *f) {
     if (usb_keyboard_type_char(c)) {
@@ -361,10 +369,22 @@ debug_kbd_putchar (const char c, FILE *f) {
     }
 }
 
-/// The serial port UART device.
-static FILE debug_kbd_fdev = FDEV_SETUP_STREAM((debug_kbd_putchar), NULL, _FDEV_SETUP_WRITE);
-
+static FILE debug_kbd_fdev = FDEV_SETUP_STREAM(debug_kbd_putchar, NULL, _FDEV_SETUP_WRITE);
 FILE *usb_kbd_type = &debug_kbd_fdev;
+#elif defined(__arm__)
+static int
+debug_kbd_write (void *cookie, const char *buf, int len) {
+    for (int i = 0; i < len; ++i) {
+        if (!usb_keyboard_type_char(buf[i])) {
+            return i;
+        }
+    }
+    return len;
+    (void) cookie;
+}
+
+FILE *usb_kbd_type = NULL;
+#endif
 
 void
 usb_keyboard_type_debug_report (void) {
@@ -374,14 +394,27 @@ usb_keyboard_type_debug_report (void) {
         ++key_count;
     }
 
+#if defined(__AVR__)
     extern int __heap_start, *__brkval;
     int free_bytes = ((int) &free_bytes) - (__brkval ? (int) __brkval : (int) &__heap_start);
+#elif defined(__arm__)
+    extern uint32_t _ebss;
+    volatile uint32_t pos_on_stack = 0;
+    int free_bytes = (char *)&pos_on_stack - (char *)&_ebss;
+#endif
 
     usb_keyboard_release_all_keys();
 
+#if defined(__arm__)
+    if (!usb_kbd_type) {
+        usb_kbd_type = funopen(NULL, NULL, debug_kbd_write, NULL, NULL);
+        setvbuf(usb_kbd_type, NULL, _IOLBF, 0);
+    }
+#endif
+
     (void) fprintf_P(
         usb_kbd_type,
-        PSTR("M %d A%d %d@%d %d$%d ^%d *%c%c%c %c\n"),
+        PSTR("M %d A%u %u@%u %d$%d ^%u *%c%c%c %c %u\n"),
         free_bytes,
         usb_address(),
         usb_is_configured(),
@@ -392,8 +425,13 @@ usb_keyboard_type_debug_report (void) {
         (usb_keyboard_leds & 1) ? '1' : '0',
         (usb_keyboard_leds & 2) ? '1' : '0',
         (usb_keyboard_leds & 4) ? '1' : '0',
-        usb_is_suspended() ? '!' : '@'
+        usb_is_suspended() ? '!' : '@',
+        (unsigned int) current_10ms_tick_count()
     );
+
+#if DEBOUNCE_DEBUG
+    debounce_debug_print_histogram();
+#endif
 
     usb_keyboard_release_all_keys();
     usb_keys_modifier_flags = old_mods;
@@ -457,7 +495,11 @@ usb_key_error (void) {
 
 uint8_t
 usb_keyboard_led_state (void) {
+#if ENABLE_VIRTUAL_LEDS
+    return usb_keyboard_leds | usb_virtual_leds;
+#else
     return usb_keyboard_leds;
+#endif
 }
 
 void

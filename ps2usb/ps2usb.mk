@@ -1,4 +1,6 @@
-DEVICE_OBJS = kk_ps2.o ps2usb_keys.o avrusb.o
+include arch/avr/avr-common.mk
+
+DEVICE_OBJS = kk_ps2.o ps2usb_keys.o
 DEVICE_FLAGS += -DGENERIC_HID_REPORT_SIZE=8 -DGENERIC_HID_FEATURE_SIZE=1
 
 MANUFACTURER ?= "AAKBD"

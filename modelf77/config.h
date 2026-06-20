@@ -1,5 +1,6 @@
 /*
 Copyright 2020 Purdea Andrei
+Copyright 2021 Kimmo Kulovesi (modified for AAKBD)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -46,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CAPSENSE_CAL_AUTOSAVE 0
 #endif
 
-#define CAPSENSE_HARDCODED_THRESHOLD 146
+#define CAPSENSE_HARDCODED_THRESHOLD 148
 
 #define CAPSENSE_KEYMAP_COL_TO_PHYSICAL_COL(col) (((col) == 10)?15:(col))
 

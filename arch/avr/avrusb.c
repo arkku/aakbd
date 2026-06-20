@@ -33,6 +33,7 @@
 #include "usb.h"
 #include "usb_keys.h"
 #include "generic_hid.h"
+#include "keys.h"
 #include "progmem.h"
 
 // MARK: - Configuration
@@ -476,8 +477,26 @@ receive_generic_hid_report (void) {
 
 // MARK: - Periodically called task
 
+static void
+update_virtual_leds (void) {
+#if ENABLE_VIRTUAL_LEDS
+    uint8_t v = 0;
+    if (is_boot_protocol) {
+        v |= LED_VIRTUAL_BOOT_PROTOCOL_BIT;
+    }
+    if (usb_is_configured() && !usb_suspended) {
+        v |= LED_VIRTUAL_USB_ACTIVE_BIT;
+    }
+    if (!usb_is_ok()) {
+        v |= LED_VIRTUAL_USB_ERROR_BIT;
+    }
+    usb_virtual_leds = v;
+#endif
+}
+
 void
 usb_tick (void) {
+    update_virtual_leds();
     if (usb_configuration == 0) {
         if (usb_status & USB_STATUS_JUMP_TO_BOOTLOADER) {
             jump_to_bootloader();

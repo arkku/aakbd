@@ -277,7 +277,7 @@ kbd_init (const bool do_reset) {
 
     wdt_reset();
 
-    reset_keys();
+    reset_keys(false);
 
     if (kbd_configure()) {
         kbd_reset_key_state();
@@ -470,7 +470,7 @@ main (void) {
                 }
                 usb_tick();
             }
-            reset_keys();
+            reset_keys(true);
             kbd_idle_reset();
             wdt_reset();
             wdt_enable(WDTO_4S);
@@ -672,7 +672,7 @@ make_generic_hid_report (uint8_t report_id, uint8_t count, uint8_t report[static
     report[1] = ps2_last_error();
     report[2] = kbd_error_count;
     report[3] = keys_error();
-    report[4] = usb_is_in_boot_protocol();
+    report[4] = usb_keyboard_is_in_boot_protocol;
     report[5] = kbd_key_state;
     report[6] = usb_address();
     report[7] = kbd_idle_10ms_count;

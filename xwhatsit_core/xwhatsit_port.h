@@ -1,3 +1,7 @@
+/**
+ * xwhatsit_port.h: Helper for porting xwhatsit-based QMK keyboards to AAKBD.
+ */
+
 #pragma once
 
 #include <stdbool.h>

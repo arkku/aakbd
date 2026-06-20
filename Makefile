@@ -1,21 +1,20 @@
 # Makefile
-# Copyright (c) 2021 Kimmo Kulovesi, https://arkku.dev/
+# Copyright (c) 2021-2026 Kimmo Kulovesi, https://arkku.dev/
 ###############################################################################
 # Put your local settings in "local.mk", it is ignored by Git.
 -include local.mk
 
-CC=avr-gcc
-OPTIMIZATION=s
-CC_FLAGS=-I$(DEVICE) -I. $(AVR_FLAGS)
+OPTIMIZATION ?= s
 CFLAGS=-O$(OPTIMIZATION) -Wall -std=gnu11 -Wextra -Wno-unused-parameter $(CUSTOM_FLAGS) $(CC_FLAGS) $(DEVICE_FLAGS) $(CONFIG_FLAGS)
-LD_FLAGS=$(AVR_FLAGS)
 LDFLAGS=-O$(OPTIMIZATION) $(LD_FLAGS)
-AR=avr-ar
+AR ?= avr-ar
 ARFLAGS=rcs
-OBJCOPY=avr-objcopy
-AVRDUDE=avrdude
 
-AVR_FLAGS=-mmcu=$(MCU) -DF_CPU=$(F_CPU) -DF_USB=$(F_USB)
+CC_FLAGS=-I$(DEVICE) -I. -Iarch/$(ARCH)
+LD_FLAGS=
+
+# Default goal must be the first target in the Makefile
+all:
 
 ifneq (,$(TARGET))
 DEVICE = $(TARGET)
@@ -24,18 +23,16 @@ DEVICE ?= ps2usb
 TARGET = $(DEVICE)
 endif
 
-HEX ?= $(DEVICE:=.hex)
-BIN = $(HEX:.hex=.bin)
+BIN ?= $(DEVICE:=.bin)
+HEX ?= $(BIN:.bin=.hex)
 OBJ = $(DEVICE:=.o)
 
-OBJS = $(OBJ) usbkbd_descriptors.o usbkbd.o keys.o $(DEVICE_OBJS)
+OBJS = $(OBJ) usbkbd_descriptors.o usbkbd.o keys.o $(DEVICE_OBJS) $(PLATFORM_OBJS)
 
 BUILDDIR ?= $(DEVICE)/build
 
-all: $(HEX)
-
-vpath %.c . $(DEVICE)
-vpath %.h . $(DEVICE)
+vpath %.c . $(DEVICE) arch/$(ARCH)
+vpath %.h . $(DEVICE) arch/$(ARCH)
 
 ifneq (,$(CUSTOM_DIR))
 CUSTOM_FLAGS += -I$(CUSTOM_DIR)
@@ -54,39 +51,18 @@ LAYERS_C = layers.c
 endif
 endif
 
-BOARD = NONE
-
 -include $(DEVICE)/local.mk
 include $(DEVICE)/$(DEVICE).mk
 
-### AVR MCU ###################################################################
+ifndef ARCH
+$(error ARCH not set. Make sure arch/$(ARCH)/$(ARCH)-common.mk gets included.)
+endif
 
-MCU ?= atmega32u4
-F_CPU ?= 16000000UL
-F_USB ?= $(F_CPU)
-
-# LFUSE configures the clock speed; it is probably correct out of the box if
-# you use a ready-made board. If not, `make fuses LFUSE=CE` for a 16 MHz
-# crystal oscillator.
-#LFUSE ?= CE
-HFUSE ?= D0
-EFUSE ?= FB
-#EFUSE ?= F4 # HWBEN
-
-#### BURNER ###################################################################
-# Specify the burner on the command-line if you wish, e.g.,
-#	make burn BURNER=avrisp2 PORT=/dev/ttyUSB0 BPS=115200
-
-# Burner device
-BURNER ?= dragon_isp
-# Burner port
-#PORT ?= /dev/ttyUSB0
-# Burner speed
-#BPS ?= 115200
-
-# Protocol for the bootloader, e.g., make upload PORT=/dev/cu.usbmodem1401
-UPLOAD_PROTOCOL ?= avr109
-###############################################################################
+ifneq (,$(HEX))
+all: $(HEX)
+else
+all: $(BIN)
+endif
 
 OBJECT_FILES = $(OBJS:%.o=$(BUILDDIR)/%.o)
 
@@ -96,8 +72,6 @@ $(BUILDDIR)/usbkbd_descriptors.o: usbkbd_descriptors.h usbkbd_config.h usb.h usb
 $(BUILDDIR)/keys.o: keys.h keycodes.h usbkbd.h usbkbd_config.h aakbd.h usb_keys.h layers.h macros.h progmem.h $(MACROS_C) $(LAYERS_C)
 $(OBJECT_FILES): Makefile $(DEVICE)/$(DEVICE).mk $(wildcard local.mk) $(wildcard $(DEVICE)/local.mk)
 
-$(HEX): $(BIN)
-
 $(BUILDDIR)/%.o: %.c | $(BUILDDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -105,14 +79,17 @@ $(BUILDDIR)/%.o: %.c | $(BUILDDIR)
 $(BUILDDIR)/keys.o: keys.c
 	$(CC) $(CFLAGS) -Wno-pedantic -Wno-override-init -Wno-type-limits -c $< -o $@
 
+# AVR: link to .bin
+ifneq (,$(HEX))
 $(BIN): $(OBJECT_FILES)
 	@echo $(CC) $(LDFLAGS) -s -o $@ ...
 	@$(CC) $(LDFLAGS) -s -o $@ $+
 	@chmod a-x $@
-	@avr-size $@
+	@$(SIZE) $@
 
 $(HEX): $(BIN)
 	$(OBJCOPY) -j .text -j .data -O ihex $< $@
+endif
 
 local.mk:
 	touch $@
@@ -129,46 +106,15 @@ $(LAYERS_C): $(wildcard $(DEVICE)/template_layers.c) template_layers.c
 $(MACROS_C): $(wildcard $(DEVICE)/template_macros.c) template_macros.c
 	@[ ! -r $@ ] && cp -v -f $< $@ || echo NOTICE: $< is newer than $@ - silence with: touch $@
 
-burn: $(HEX)
-	$(SUDO) $(AVRDUDE) -c $(BURNER) $(if $(PORT),-P $(PORT) ,)$(if $(BPS),-b $(BPS) ,)-p $(MCU) -U flash:w:$< -v
-
-upload: $(HEX)
-	#$(SUDO) stty -f $(if $(PORT),$(PORT),/dev/ttyACM0) 1200
-	$(SUDO) $(AVRDUDE) -c $(UPLOAD_PROTOCOL) $(if $(PORT),-P $(PORT),-P /dev/ttyACM0) $(if $(BPS),-b $(BPS),) -p $(MCU) -U flash:w:$< -v
-
 reset:
 	$(SUDO) dfu-util -e
 
-dfu: $(HEX)
-	$(SUDO) dfu-util -e && sleep 2 || true
-	$(SUDO) dfu-programmer $(MCU) erase
-	$(SUDO) dfu-programmer $(MCU) flash $<
-	$(SUDO) dfu-programmer $(MCU) launch || $(SUDO) dfu-programmer $(MCU) reset
-
-fuses:
-	$(SUDO) $(AVRDUDE) -c $(BURNER) $(if $(PORT),-P $(PORT) ,)$(if $(BPS),-b (BPS) ,)-p $(MCU) -U efuse:w:0x$(EFUSE):m -U hfuse:w:0x$(HFUSE):m $(if $(LFUSE),-U lfuse:w:0x$(LFUSE):m,)
-
-unlock:
-	$(SUDO) $(AVRDUDE) -c $(BURNER) $(if $(PORT),-P $(PORT) ,)$(if $(BPS),-b $(BPS) ,)-p $(MCU) -U lock:w:0x3F:m -v
-
-lock:
-	$(SUDO) $(AVRDUDE) -c $(BURNER) $(if $(PORT),-P $(PORT) ,)$(if $(BPS),-b $(BPS) ,)-p $(MCU) -U lock:w:0x0F:m -v
-
-.ccls: Makefile local.mk $(DEVICE)/local.mk
-	@echo $(CC) >$@
-	@echo --target=avr >>$@
-	@echo $(CFLAGS) | awk '{ gsub(/["][^"]*["]/, "\"!SKIP!\""); for (i=1; i<=NF; i++) { if (!($$i ~ /!SKIP!/)) print $$i } }' >>$@
-	@echo -nostdinc >>$@
-	@[ -d /usr/lib/avr/include ] && echo -I/usr/lib/avr/include >>$@ || true
-	@[ -d /usr/local/avr/include ] && echo -I/usr/local/avr/include >>$@ || true
-	@echo | $(CC) $(CFLAGS) -E -Wp,-v - 2>&1 | awk '/#include .* search starts here:/ { output=1; next } !output { next } /^End/ || /^#/ { output=0 } output && $$1 ~ /^\// { sub(/^[ ]*/, ""); print "-I" $$0 }' >>$@
-	@echo -Wno-attributes >>$@
-	@echo -Wno-gnu-zero-variadic-macro-arguments >>$@
-	@cat $@
+dfu: $(DFU_TARGET)
+upload: dfu
 
 clean:
 	rm -f *.o
-	@[ -d ./$(BUILDDIR) ] && rm -f ./$(BUILDDIR)/*.o || true
+	@[ -d ./$(BUILDDIR) ] && rm -f ./$(BUILDDIR)/*.o ./$(BUILDDIR)/*.elf ./$(BUILDDIR)/*.map || true
 	@[ -e $(BUILDDIR) ] && rmdir $(BUILDDIR) || true
 	@[ -d ./release/build ] && rm -rf ./release/build || true
 
@@ -179,8 +125,9 @@ upload_release:
 	@./upload_release $(TAG)
 
 distclean: | clean
-	rm -f *.hex *.bin .ccls
-	rm -rf release
+	rm -f *.hex *.bin
+	find . -name '*.elf' -type f -delete
+	find . -name '*.map' -type f -delete
 	find . -name '*.o' -type f -delete
 	find . -depth -name 'build' -type d -exec rmdir '{}' ';'
 	@[ -e $(MACROS_C) -o -e $(LAYERS_C) ] && echo NOT deleting $(MACROS_C) and $(LAYERS_C) files! || true
@@ -189,4 +136,4 @@ backup:
 	cp $(MACROS_C) $(MACROS_C)~
 	cp $(LAYERS_C) $(LAYERS_C)~
 
-.PHONY: all clean distclean release upload_release burn fuses upload lock unlock bootloader backup dfu reset
+.PHONY: all clean distclean release upload_release backup dfu reset

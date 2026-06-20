@@ -1,14 +1,22 @@
 /**
  * usb_keys.h: USB keycodes
  *
- * Copied from various USB specifications and random websites. These seem to
- * work for my use cases, but no guarantees that either the naming or the
- * values are accurate.
+ * Copyright (c) 2021-2026 Kimmo Kulovesi
  *
- * Composed by Kimmo Kulovesi, https://arkku.dev/
- * Provided with absolutely no warranty, use at your own risk only.
- * Use and distribute freely, mark modified copies as such.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 #ifndef KK_USB_KEYS_H
 #define KK_USB_KEYS_H
 

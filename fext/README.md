@@ -35,7 +35,12 @@ key is not split. Short space splits on the right.
 You can also configure `SPLIT_LEFT_SHIFT` and `ISO_ENTER` independently of
 the `ISO_LAYOUT` setting, but by default both are controlled by that.
 
-# Uploading
+## Calibration
+
+Please see the [modelf77/README.md](../modelf77/README.md) for calibration
+information if you experience phantom keypresses or unresponsive keys.
+
+## Uploading
 
 To upload the firmware, you can use the same tools as originally. Once you have
 AAKBD firmware installed, and `-DENABLE_DFU_INTERFACE=1` enabled, you can also

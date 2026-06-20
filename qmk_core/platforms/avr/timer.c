@@ -1,5 +1,8 @@
 /*
+timer.c: AVR timer helpers, adapted for AAKBD compatibility.
+
 Copyright 2011 Jun Wako <wakojun@gmail.com>
+Copyright 2021 Kimmo Kulovesi
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -27,10 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 volatile uint32_t timer_count;
 static uint32_t   saved_ms;
 
-/** \brief timer initialization
- *
- * FIXME: needs doc
- */
 void timer_init(void) {
 #if TIMER_PRESCALER == 1
     uint8_t prescaler = _BV(CS00);
@@ -69,10 +68,6 @@ void timer_init(void) {
 #endif
 }
 
-/** \brief timer clear
- *
- * FIXME: needs doc
- */
 inline void timer_clear(void) {
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
         timer_count = 0;
@@ -97,10 +92,6 @@ void timer_restore(void) {
     }
 }
 
-/** \brief timer read
- *
- * FIXME: needs doc
- */
 inline uint16_t timer_read(void) {
     uint32_t t;
 
@@ -111,10 +102,6 @@ inline uint16_t timer_read(void) {
     return (t & 0xFFFF);
 }
 
-/** \brief timer read32
- *
- * FIXME: needs doc
- */
 inline uint32_t timer_read32(void) {
     uint32_t t;
 

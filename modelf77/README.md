@@ -59,7 +59,7 @@ compatible with this (unknown). For that, add the following to your `local.mk`:
 DEVICE_FLAGS += -DENABLE_GENERIC_HID_ENDPOINT=1
 ```
 
-# Uploading
+## Uploading
 
 To upload the firmware, you can use the same tools as originally. Once you have
 AAKBD firmware installed, and `-DENABLE_DFU_INTERFACE=1` enabled, you can also
@@ -70,6 +70,66 @@ dfu-util -e && sleep 2 && dfu-programmer atmega32u2 erase && dfu-programmer atme
 ```
 
 The above is also doable with `make dfu`.
+
+## Calibration
+
+The capacitive sensing matrix will auto-calibrate when powered up. Make sure
+you are not holding down any keys when powering up (the calibration takes about
+a quarter of a second, so the window is very small).
+
+If you observe phantom keypresses, you may need to adjust the debounce time
+in `local.mk`, e.g.:
+
+``` Make
+DEBOUNCE = 10
+```
+
+If this doesn't work or you are experiencing missed keypresses, it may be that
+your specific keyboard differs sufficiently from mine that the threshold offset
+is wrong.
+
+You can adjust it in the keyboard's [config.h](config.h) file:
+
+``` c
+#define CAPSENSE_CAL_THRESHOLD_OFFSET 20
+```
+
+Increasing this offset makes keypresses less sensitive, but making it too
+insensitive can cause missed keypresses or require a longer debounce duration
+because the lower sensitivity may cause the key to keep bouncing between
+pressed and not pressed states more. Lowering this offset makes keypresses more
+sensitive, i.e., if keys are not registering at all (and the hardware is fine),
+you can try lower values here.
+
+Please report to me if you had to adjust this value – the current values are
+determined empirically from my own keyboards and there may be sample variance.
+
+### Experimental Eager Debounce
+
+If you are _not_ experiencing any issues and wish to try to squeeze a couple of
+milliseconds more responsiveness out of the keyboard, you can try changing the
+debounce algorithm to eager:
+
+``` Make
+DEBOUNCE_TYPE = sym_eager_lone_press_g
+```
+
+This skips debouncing time entirely when no keys are currently held down
+(i.e., no crosstalk) and exactly one new key is pressed. So, in normal typing
+when you press one key at a time, the response is faster by the `DEBOUNCE`
+duration. However, in my experience this needs significantly longer `DEBOUNCE`
+(e.g. 10 ms or more) to avoid phantom presses when hitting the same key
+repeatedly (my manual test is to press every key three times rapidly and verify
+that exactly three symbols appear, then repeat this a few times per row).
+
+So, the trade-off is lone-key responsiveness vs multi-key responsiveness. To
+be honest, it's probably better to stick with the default `sym_defer_g`, which
+is also the QMK default and used by a lot of keyboards, but if it the idea of
+a few milliseconds extra delay for each keypress annoys you, this can help.
+
+> Note that for gaming, where you typically hold down multiple keys at once,
+> this does _not_ help at all, and indeed makes it worse if you have to
+> increase the debounce time.
 
 ## Note
 

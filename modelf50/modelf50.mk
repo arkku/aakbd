@@ -1,6 +1,5 @@
 KEYBOARD_NAME = "keyboards/xwhatsit/brand_new_model_f/f50/wcass/wcass"
 PRODUCT ?= "F50 Keyboard"
-DEBOUNCE ?= 5
 
 include modelf77/modelf-common.mk
 

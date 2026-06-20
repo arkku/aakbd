@@ -1,3 +1,26 @@
+/**
+ * progmem.h: Helper macros for program space stored values.
+ *
+ * The idea here is that the code is relatively easy to port to
+ * another platform by substituting this header and a few other
+ * things.
+ *
+ * Copyright (c) 2021-2026 Kimmo Kulovesi, https://arkku.dev/
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #ifndef AAKBD_PROGMEM_H
 #define AAKBD_PROGMEM_H
 
@@ -16,7 +39,7 @@
 #define strcmp_P(s1, s2) strcmp(s1, s2)
 #define strcpy_P(dest, src) strcpy(dest, src)
 #define strlen_P(src) strlen(src)
-#define fprintf_P(args...) fprintf(args...)
+#define fprintf_P(...) fprintf(__VA_ARGS__)
 #endif
 
 #endif

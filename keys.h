@@ -35,9 +35,19 @@
 #define ENABLE_KEYLOCK 1
 #endif
 
+// Standard USB LED bits (from the host computer).
 #define LED_NUM_LOCK_BIT                (1 << 0)
 #define LED_CAPS_LOCK_BIT               (1 << 1)
 #define LED_SCROLL_LOCK_BIT             (1 << 2)
+#define LED_COMPOSE_BIT                 (1 << 3)
+#define LED_KANA_BIT                    (1 << 4)
+
+// Virtual (locally set) LED bits. These just enable keyboards to show status
+// LED indicators through the `keyboard_host_leds_changed()` callback.
+#define LED_VIRTUAL_BOOT_PROTOCOL_BIT   (1 << 5)
+#define LED_VIRTUAL_USB_ACTIVE_BIT      (1 << 6)
+#define LED_VIRTUAL_USB_ERROR_BIT       (1 << 7)
+#define LED_VIRTUAL_BIT_MASK            (LED_VIRTUAL_BOOT_PROTOCOL_BIT | LED_VIRTUAL_USB_ACTIVE_BIT | LED_VIRTUAL_USB_ERROR_BIT)
 
 /// Processes the key. The argument `usbkey` must be a constant keycode to
 /// _uniquely_ identify a specific physical key. Mapping keys should be done
@@ -50,7 +60,7 @@
 void process_key(uint8_t usbkey, bool is_release);
 
 /// Reset all key state.
-void reset_keys(void);
+void reset_keys(bool is_wake_up);
 
 /// Keyboard error state, typically (almost exclusively) overflow.
 uint8_t keys_error(void);

@@ -1,9 +1,9 @@
-#ifndef KK_QMK_HOST_H
-#define KK_QMK_HOST_H
+/**
+ * host.h: AAKBD <-> QMK compatibility stub.
+ */
+#pragma once
 
 #include <stdint.h>
 #include <keys.h>
 
 #define host_keyboard_leds() keys_led_state()
-
-#endif

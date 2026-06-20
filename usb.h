@@ -1,13 +1,20 @@
 /**
  * usb.h: Helper definitions for implementing USB devices.
  *
- * Copied from various USB specifications and random websites. These seem to
- * work for my use cases, but no guarantees that either the naming or the
- * values are accurate.
+ * Copyright (c) 2021-2026 Kimmo Kulovesi
  *
- * Composed by Kimmo Kulovesi, https://arkku.dev/
- * Provided with absolutely no warranty, use at your own risk only.
- * Use and distribute freely, mark modified copies as such.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef KK_USB_H
@@ -49,7 +56,9 @@
 
 #define INTERFACE_NO_DESCRIPTOR             0x00
 
+#ifndef HID_USAGE_PAGE
 #define HID_USAGE_PAGE                      0x05
+#endif
 #define HID_USAGE_PAGE_WORD                 0x06
 #define HID_USAGE_PAGE_GENERIC_DESKTOP      0x01
 #define HID_USAGE_PAGE_KEYCODES             0x07
@@ -57,10 +66,16 @@
 #define HID_USAGE_PAGE_CONSUMER_DEVICES     0x0C
 #define HID_USAGE_PAGE_VENDOR_RESERVED      0xFF
 
+#ifndef HID_USAGE
 #define HID_USAGE                           0x09
+#endif
 #define HID_USAGE_WORD                      0x0A
+#ifndef HID_USAGE_KEYBOARD
 #define HID_USAGE_KEYBOARD                  0x06
+#endif
+#ifndef HID_USAGE_CONSUMER_CONTROL
 #define HID_USAGE_CONSUMER_CONTROL          0x01
+#endif
 
 #define HID_USAGE_PAGE_CONSUMER             0x0C
 
@@ -90,16 +105,32 @@
 #define HID_LOGICAL_MAXIMUM                 0x25
 #define HID_LOGICAL_MAXIMUM_WORD            0x26
 
+#ifndef HID_COLLECTION
 #define HID_COLLECTION                      0xA1
+#endif
+#ifndef HID_COLLECTION_APPLICATION
 #define HID_COLLECTION_APPLICATION          0x01
+#endif
 
+#ifndef HID_REPORT_SIZE
 #define HID_REPORT_SIZE                     0x75
+#endif
+#ifndef HID_REPORT_COUNT
 #define HID_REPORT_COUNT                    0x95
+#endif
+#ifndef HID_REPORT_ID
 #define HID_REPORT_ID                       0x85
+#endif
 
+#ifndef HID_INPUT
 #define HID_INPUT                           0x81
+#endif
+#ifndef HID_OUTPUT
 #define HID_OUTPUT                          0x91
+#endif
+#ifndef HID_FEATURE
 #define HID_FEATURE                         0xB1
+#endif
 #define HID_IO_ARRAY                        0x00
 #define HID_IO_CONSTANT                     0x01
 #define HID_IO_VARIABLE                     0x02
@@ -130,7 +161,9 @@
 #define INTERFACE_PROTOCOL_DFU_RUNTIME      0x01
 #define INTERFACE_PROTOCOL_VENDOR_SPECIFC   0xFF
 
+#ifndef HID_PROTOCOL_BOOT
 #define HID_PROTOCOL_BOOT                   0
+#endif
 #define HID_PROTOCOL_REPORT                 1
 
 #define HID_DESCRIPTOR_TYPE_REPORT          0x22

@@ -79,7 +79,12 @@ HAPTIC_ENABLE ?= 1
 
 The `template_layers.c` goes together with `modelf77/template_macros.c`.
 
-# Uploading
+## Calibration
+
+Please see the [modelf77/README.md](../modelf77/README.md) for calibration
+information if you experience phantom keypresses or unresponsive keys.
+
+## Uploading
 
 To upload the firmware, you can use the same tools as originally. Once you have
 AAKBD firmware installed, and `-DENABLE_DFU_INTERFACE=1` enabled, you can also

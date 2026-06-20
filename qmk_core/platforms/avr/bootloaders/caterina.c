@@ -20,7 +20,6 @@
 
 __attribute__((weak)) void bootloader_jump(void) {
     // this block may be optional
-    // TODO: figure it out
 
     uint16_t *const bootKeyPtr = (uint16_t *)0x0800;
 

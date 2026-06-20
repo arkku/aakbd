@@ -134,6 +134,12 @@ uint8_t usb_keyboard_led_state(void);
 /// Desired state of the keyboard LEDs as set over USB.
 extern volatile uint8_t usb_keyboard_leds;
 
+#if ENABLE_VIRTUAL_LEDS
+/// Locally-generated virtual status LEDs. These are bitwise OR:ed into the
+/// `usb_keyboard_leds` in `usb_keyboard_led_state()`.
+extern volatile uint8_t usb_virtual_leds;
+#endif
+
 /// The buffer for keys currently pressed. Terminated by a zero, hence one
 /// element more than required.
 extern uint8_t usb_keys_buffer[MAX_KEY_ROLLOVER + 1];

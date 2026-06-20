@@ -9,7 +9,7 @@
  * its state. (Of course `macros.c` can also add `static` variables for more
  * storage if needed.)
  *
- * Copyright (c) 2021 Kimmo Kulovesi, https://arkku.dev/
+ * Copyright (c) 2021-2026 Kimmo Kulovesi, https://arkku.dev/
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -200,8 +200,13 @@ static inline void layer_state_changed(uint8_t layer, bool is_enabled);
 ///   overrides or necessarily match the current state of the physical LEDs.
 static inline void keyboard_host_leds_changed(uint8_t leds);
 
-/// Called after reset. This can be used to customise the initial state of
-/// layers, etc. For example, configuration could be loaded from EEPROM, etc.
+/// Called after reset (start, manual reset, wake from sleep/suspend). This
+/// can be used to customise the initial state of layers, etc. For example,
+/// configuration could be loaded from EEPROM, etc.
+///
+/// - Note: When `RESET_LAYERS_ON_SUSPEND == 0` (the default), layer state is
+/// preserved across suspend (sleep). In that case this is called first, then
+/// `layer_state_changed` is called for every non-default active layer.
 static inline void handle_reset(void);
 
 /// Called approximately once every 10 milliseconds with an 8-bit time value.

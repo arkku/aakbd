@@ -1,5 +1,8 @@
-#ifndef KK_ERGODOX_KEYMAP_H
-#define KK_ERGODOX_KEYMAP_H
+/**
+ * device_keymap.h: Ergodox Ez -specific key aliases for easier remapping.
+ */
+
+#pragma once
 
 #include <keymap.h>
 #include <usb_keys.h>
@@ -18,5 +21,3 @@
 #define USB_KEY_ERGODOX_GRAVE_LAYER     USB_KEY_BACKTICK
 #define USB_KEY_ERGODOX_LEFT_DELETE     USB_KEY_TAB
 #define USB_KEY_ERGODOX_RIGHT_TAB       USB_KEY_DELETE
-
-#endif

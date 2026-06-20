@@ -1,5 +1,6 @@
 /*
 Copyright 2013 Jun Wako <wakojun@gmail.com>
+Copyright 2022 Kimmo Kulovesi
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -206,10 +207,14 @@ void     eeconfig_init_user_datablock(void);
     }                                              \
     void eeconfig_post_flush_##name(void) {}
 
+// Modified for AAKBD: added AVR-compatible EECONFIG defines at end.
+// Modern QMK does these with `offsetof` in the struct, we should probably
+// migrate to that as well.
+// See: quantum/nvm/eeprom/nvm_eeprom_eeconfig_internal.h in QMK
+
 #define EECONFIG_SIZE 35
 #define EECONFIG_KEYMAP_UPPER_BYTE ((uint8_t *) 34)
 
-// AAKBD compatibility defines from old QMK eeconfig.h
 #define EECONFIG_MAGIC              0xFEE9
 #define EECONFIG_MAGIC_NUMBER ((uint16_t) 0xFEE8)
 #define EECONFIG_MAGIC_NUMBER_OFF ((uint16_t) 0xFFFF)

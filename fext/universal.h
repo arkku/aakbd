@@ -1,4 +1,5 @@
 /* Copyright 2020 Purdea Andrei
+ * Copyright 2022 Kimmo Kulovesi (modified for AAKBD)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

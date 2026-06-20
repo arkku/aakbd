@@ -1,7 +1,7 @@
 /**
  * aakbd.h: USB keyboard implementation.
  *
- * Copyright (c) 2021-2022 Kimmo Kulovesi, https://arkku.dev/
+ * Copyright (c) 2021-2026 Kimmo Kulovesi, https://arkku.dev/
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -64,6 +64,11 @@ uint8_t current_10ms_tick_count(void);
 
 #define delay_milliseconds(x) _delay_ms(x)
 #define reset_watchdog_timer() wdt_reset()
+#elif defined(__arm__)
+#include "_wait.h"
+
+#define delay_milliseconds(ms) wait_ms(ms)
+#define reset_watchdog_timer() do {} while (0)
 #else
 #error "Platform not supported, edit aakbd.h accordingly."
 #endif

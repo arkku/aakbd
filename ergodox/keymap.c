@@ -1,13 +1,13 @@
+/**
+ * keymap.c: Base keymap for Ergodox Ez.
+ *
+ * Note that this is not really usable as is, but since key assignments MUST
+ * be unique it can't have duplicate keys on left/right. Use layers.c to map!
+ */
 #include "progmem.h"
 #include "ergodox_ez.h"
 #include "device_keymap.h"
 
-/// Note that AAKBD requires every key in the keymap to be unique. Also, the
-/// base keymap doesn't support extended keycodes. So, this map defines the
-/// keymap closely, but not exactly, matching the Ergodox Ez default layout.
-/// See `keymap.h` for macros to easily refer to the Ergodox keys when
-/// reassigning them. The `template_layers.c` in this directory also does
-/// the key assignments as per Ergodox default.
 const uint8_t keymaps[1][MATRIX_ROWS][MATRIX_COLS] PROGMEM = { [0] = LAYOUT_ergodox_pretty(
   /* Left hand ***********************************************       Right hand *************************************************/
   KC_EQL,  KC_1,    KC_2,    KC_3,    KC_4,    KC_5,  KC_F1,    /**/ KC_F5,   KC_6,   KC_7,    KC_8,    KC_9,    KC_0,    KC_MINS,

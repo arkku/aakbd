@@ -1,3 +1,7 @@
+/**
+ * debug.h: AAKBD NOP stubs for QMK compatibility.
+ */
+
 #pragma once
 
 #define debug_keyboard 0

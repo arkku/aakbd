@@ -1,11 +1,20 @@
-QMK_PLATFORM = avr
 BOOTLOADER_TYPE ?= dfu
 MCU ?= atmega32u2
 VENDOR_ID ?= 0x1209
 PRODUCT_ID ?= 0x4704
 MANUFACTURER ?= "Model F Labs"
-DEBOUNCE_TYPE = sym_defer_g
 XWHATSIT_CONTROLLER ?= wcass
+
+# The capacitive sensing can't use asymmetric debounce, or it will produce
+# phantom presses on other keys. Currently sym_defer_g is also the QMK default,
+# but let's set it here again in case the QMK default changes.
+DEBOUNCE_TYPE ?= sym_defer_g
+
+# Empirically tested on multiple "brand new Model F keyboards", a debounce of
+# 5 ms (the QMK default) is almost always enough, but 6 is safer. These aren't
+# really keyboards that you would normally game on so defaulting to the safer
+# value here, but please feel free to try lower values.
+DEBOUNCE ?= 6
 
 ISO_LAYOUT ?= 1
 SPLIT_BACKSPACE ?= 0
@@ -36,5 +45,4 @@ CONFIG_FLAGS ?= \
 	-DUSB_VENDOR_ID=$(VENDOR_ID) \
 	-DUSB_PRODUCT_ID=$(PRODUCT_ID) \
 	-DMANUFACTURER_STRING='$(MANUFACTURER)' \
-	-DPRODUCT_STRING='$(PRODUCT)' \
-	-DDEBOUNCE=$(DEBOUNCE)
+	-DPRODUCT_STRING='$(PRODUCT)'

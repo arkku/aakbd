@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <stdbool.h>
 
-/* FIXME: Add doxygen comments here. */
-
 #ifdef __cplusplus
 extern "C" {
 #endif

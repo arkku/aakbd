@@ -3,6 +3,9 @@
 #include "wait.h"
 #include "print.h"
 #include "debug.h"
+#if DEBOUNCE_DEBUG
+#include "debounce/debounce_debug.h"
+#endif
 
 #ifdef SPLIT_KEYBOARD
 #    include "split_common/split_util.h"
@@ -144,7 +147,7 @@ __attribute__((weak)) void matrix_slave_scan_user(void) {}
 
 __attribute__((weak)) void matrix_init(void) {
 #ifdef SPLIT_KEYBOARD
-    thisHand = isLeftHand ? 0 : (MATRIX_ROWS_PER_HAND);
+    thisHand = is_keyboard_left() ? 0 : (MATRIX_ROWS_PER_HAND);
     thatHand = MATRIX_ROWS_PER_HAND - thisHand;
 #endif
 
@@ -166,9 +169,15 @@ __attribute__((weak)) uint8_t matrix_scan(void) {
 
 #ifdef SPLIT_KEYBOARD
     changed = debounce(raw_matrix, matrix + thisHand, changed) | matrix_post_scan();
+#if DEBOUNCE_DEBUG
+    debounce_debug_update(raw_matrix, matrix + thisHand, MATRIX_ROWS_PER_HAND);
+#endif
 #else
     changed = debounce(raw_matrix, matrix, changed);
     matrix_scan_kb();
+#if DEBOUNCE_DEBUG
+    debounce_debug_update(raw_matrix, matrix, MATRIX_ROWS);
+#endif
 #endif
 
     return changed;

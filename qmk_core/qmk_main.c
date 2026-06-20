@@ -223,7 +223,7 @@ keyboard_task (void) {
     backlight_task();
 #endif
 #ifdef ENCODER_ENABLE
-    (void) encoder_read();
+    encoder_task();
 #endif
 #ifdef HAPTIC_ENABLE
     haptic_task();
@@ -238,8 +238,11 @@ protocol_task (void) {
     if (usb_is_suspended()) {
         while (usb_is_suspended()) {
             suspend_power_down();
+            usb_tick();
             if (suspend_wakeup_condition()) {
-                (void) usb_wake_up_host();
+                if (usb_wake_up_host()) {
+                    break;
+                }
             }
         }
         suspend_wakeup_init();
@@ -271,17 +274,13 @@ main (void) {
 
     protocol_init();
     keyboard_init();
-    reset_keys();
+    reset_keys(false);
 
     for (;;) {
         protocol_task();
         keyboard_task();
     }
 }
-
-#ifdef ENABLE_I2C
-#include "i2c_master.h"
-#endif
 
 static void
 shutdown_quantum (void) {
@@ -290,11 +289,6 @@ shutdown_quantum (void) {
 
     // Tear down USB
     usb_deinit();
-
-#ifdef ENABLE_I2C
-    // Note: The new i2c_master API handles stop internally
-    // No explicit i2c_stop() needed
-#endif
 
     delay_milliseconds(32);
 
@@ -306,14 +300,24 @@ shutdown_quantum (void) {
 #endif
 }
 
-void
-keyboard_reset (void) {
+static void
+keyboard_reset_or_wake (bool is_wake_up) {
     for (int_fast8_t row = 0; row < MATRIX_ROWS; ++row) {
         previous_matrix[row] = 0;
     }
     usb_keyboard_reset();
-    reset_keys();
+    reset_keys(is_wake_up);
     delay_milliseconds(32);
+}
+
+void
+keyboard_reset (void) {
+    keyboard_reset_or_wake(false);
+}
+
+void
+keyboard_wake_up (void) {
+    keyboard_reset_or_wake(true);
 }
 
 void
@@ -321,18 +325,6 @@ jump_to_bootloader (void) {
     shutdown_quantum();
     bootloader_jump();
 }
-
-#ifdef ENCODER_ENABLE
-#ifdef ENCODER_MAP_ENABLE
-#error "Do not define ENCODER_MAP_ENABLE, see encoder_update_kb instead."
-#endif
-
-bool
-encoder_update_kb(uint8_t index, bool clockwise) {
-    // To support encoder, simulate keypress from here or implement _user:
-    return encoder_update_user(index, clockwise);
-}
-#endif
 
 bool
 matrix_has_keys_pressed (void) {

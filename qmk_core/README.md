@@ -26,20 +26,36 @@ features to begin with.
 Porting Keyboards
 -----------------
 
-To port a QMK keyboard to AAKBD, first you need to check that it uses an AVR
-controller (preferably ATMEGA32U4 or ATMEGA32U2, but others may work). Other
-controllers have not (yet) been ported, so the USB implementation won't work.
-In theory you could reimplement the entire `avrusb.c`, but for now let's assume
-AVR.
+To port a QMK keyboard to AAKBD, the controller should be AVR (preferably
+ATMEGA32U4 or ATMEGA32U2) or ARM (STM32F3 with TinyUSB). The USB
+implementation uses `arch/avr/avrusb.c` for AVR or `arch/arm/tinyusb.c` for ARM.
 
-The makefile (e.g., `mykeyboard.mk`) should have at least the following:
+For AVR, the makefile (e.g., `mykeyboard.mk`) should have at least:
 
 ``` Make
-QMK_PLATFORM = avr
+include arch/avr/avr-common.mk
 include qmk_core/qmk_port.mk
 
-DEVICE_OBJS = mykeyboard.o avrusb.o $(QMK_CORE_OBJS)
+DEVICE_OBJS = mykeyboard.o $(QMK_CORE_OBJS)
 ```
+
+(`avr-common.mk` sets `ARCH = avr` and provides `avrusb.o` via `PLATFORM_OBJS`.)
+
+For ARM, the makefile should additionally include the architecture build rules:
+
+``` Make
+MCU_FAMILY = stm32f3
+include arch/arm/stm32-common.mk
+
+BOOTLOADER_TYPE = dfu
+include qmk_core/qmk_port.mk
+
+DEVICE_OBJS = mykeyboard.o matrix_gpio.o ... $(filter-out matrix.o keymap.o, $(QMK_CORE_OBJS))
+```
+
+(`stm32-common.mk` includes `arm-common.mk`, which sets `ARCH = arm` and provides
+the TinyUSB objects via `PLATFORM_OBJS`. `QMK_PLATFORM` is derived from `ARCH`
+automatically.)
 
 Then you need to port these files from QMK:
 

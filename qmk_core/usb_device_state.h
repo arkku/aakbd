@@ -1,3 +1,6 @@
+/**
+ * usb_device_state.h: QMK compatibility helpers for AAKBD.
+ */
 #pragma once
 
 #include <stdint.h>

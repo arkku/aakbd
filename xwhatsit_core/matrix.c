@@ -71,7 +71,7 @@ bool keyboard_scan_enabled = true;
 
 #if CAPSENSE_CAL_ENABLED
 #ifndef CAPSENSE_CAL_VERSION
-#define CAPSENSE_CAL_VERSION 4
+#define CAPSENSE_CAL_VERSION 5
 #endif
 
 // If this this number, or fewer (but non-zero), keys appear to be suspiciously
@@ -748,29 +748,16 @@ void calibrate_matrix(void) {
 
         uint_fast16_t bin_signal_level;
 
-        // Take the average of the bin extremities
-        bin_signal_level = cal_thresholds_max[bin] + cal_thresholds_min[bin];
-        #ifdef CAPSENSE_CONDUCTIVE_PLASTIC_IS_PUSHED_DOWN_ON_KEYPRESS
-            bin_signal_level += 1;
-        #endif
-        bin_signal_level /= 2;
-
         // Offset the level so as to be more lenient with the signal
         #ifdef CAPSENSE_CONDUCTIVE_PLASTIC_IS_PUSHED_DOWN_ON_KEYPRESS
+            bin_signal_level = cal_thresholds_max[bin];
             bin_signal_level += cal_threshold_offset;
-            if (bin_signal_level < cal_thresholds_max[bin]) {
-                // Wide bin: avoid unreliable keys at the upper end
-                bin_signal_level = cal_thresholds_max[bin];
-            }
         #else
+            bin_signal_level = cal_thresholds_min[bin];
             if (bin_signal_level < cal_threshold_offset) {
                 bin_signal_level = 0;
             } else {
                 bin_signal_level -= cal_threshold_offset;
-            }
-            if (bin_signal_level > cal_thresholds_min[bin]) {
-                // Wide bin: avoid unreliable keys at the lower end
-                bin_signal_level = cal_thresholds_min[bin];
             }
         #endif
 

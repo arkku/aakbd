@@ -1,3 +1,21 @@
+/*
+Copyright 2011, 2012, 2013 Jun Wako <wakojun@gmail.com>
+Copyright 2022 Kimmo Kulovesi (trimmed/tweaked for AAKBD)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #include "keyboard.h"
 #include "matrix.h"
 #include "timer.h"
@@ -18,33 +36,19 @@
 #ifdef ENCODER_ENABLE
 #include "encoder.h"
 #endif
+#include "bootloader.h"
+#ifdef BOOTMAGIC_ENABLE
+#include "bootmagic.h"
+#endif
 
 __attribute__((weak)) void keyboard_pre_init_user(void) {}
 
-/** \brief keyboard_pre_init_kb
- *
- * FIXME: needs doc
- */
 __attribute__((weak)) void keyboard_pre_init_kb(void) { keyboard_pre_init_user(); }
-
-/** \brief keyboard_post_init_user
- *
- * FIXME: needs doc
- */
 
 __attribute__((weak)) void keyboard_post_init_user() {}
 
-/** \brief keyboard_post_init_kb
- *
- * FIXME: needs doc
- */
-
 __attribute__((weak)) void keyboard_post_init_kb(void) { keyboard_post_init_user(); }
 
-/** \brief matrix_setup
- *
- * FIXME: needs doc
- */
 __attribute__((weak)) void matrix_setup(void) {}
 
 void quantum_init(void) {
@@ -71,6 +75,11 @@ void keyboard_setup(void) {
 void keyboard_init(void) {
     timer_init();
     matrix_init();
+
+#ifdef BOOTMAGIC_ENABLE
+    bootmagic();
+#endif
+
     quantum_init();
 
 #ifdef BACKLIGHT_ENABLE

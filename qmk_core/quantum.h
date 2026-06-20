@@ -1,11 +1,12 @@
 /* Copyright 2016-2018 Erez Zukerman, Jack Humbert, Yiancar
+ * Copyright 2021 Kimmo Kulovesi (trimmed down for AAKBD)
  *
  * Almost all content removed for porting keyboards from QMK to AAKBD.
  * Any problem are due to this and not the fault of the original authors.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * the Free Software Foundation, either version 2 of the License, or
  * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
@@ -29,7 +30,6 @@
 
 #include "timer.h"
 #include "config.h"
-#include "config_common.h"
 #include "gpio.h"
 #include "bitwise.h"
 #include "print.h"
@@ -38,6 +38,11 @@
 #include "eeconfig.h"
 
 #include <aakbd.h>
+
+#ifdef AW20216S_ENABLE
+#include "progmem.h"
+#include "aw20216s.h"
+#endif
 
 extern const uint8_t keymaps[1][MATRIX_ROWS][MATRIX_COLS];
 

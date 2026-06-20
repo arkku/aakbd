@@ -55,6 +55,20 @@ end
 
 Dir.mkdir(OUT_DIR) unless Dir.exist?(OUT_DIR)
 
+EXTRA_DIST = [
+  ['LICENSE',         'LICENSE.aakbd.txt'],
+  ['lib/CMSIS/LICENSE',     'LICENSE.CMSIS.txt'],
+  ['lib/STM32F3xx/LICENSE', 'LICENSE.STM32F3xx.txt'],
+  ['lib/tinyusb/LICENSE',   'LICENSE.tinyusb.txt'],
+  ['README.md',             'README.md'],
+]
+
+extra_dests = EXTRA_DIST.map do |src, dst|
+  dst_path = "#{OUT_DIR}/#{dst}"
+  FileUtils.cp(src, dst_path) unless File.file?(dst_path) && File.mtime(dst_path) >= File.mtime(src)
+  dst_path
+end
+
 device_hexes = Hash.new { |h, k| h[k] = [] }
 built = false
 
@@ -73,7 +87,7 @@ if built
   device_hexes.each do |device, hexes|
     next if hexes.empty?
     zip = "#{OUT_DIR}/#{device}.zip"
-    system("zip -jq #{zip} #{hexes.join(' ')}", exception: true)
+    system("zip -jq #{zip} #{hexes.join(' ')} #{extra_dests.join(' ')}", exception: true)
     puts "Created #{zip}"
   end
 end

@@ -1,5 +1,8 @@
-#ifndef KK_QMK_PORT_H
-#define KK_QMK_PORT_H
+/**
+ * qmk_port.h: QMK to AAKBD porting helper.
+ */
+
+#pragma once
 
 #include "quantum.h"
 #include <stdbool.h>
@@ -13,5 +16,3 @@ void protocol_post_init(void);
 bool matrix_has_keys_pressed(void);
 
 #define usb_keycode_for_matrix(row, column) pgm_read_byte(&keymaps[0][(row)][(column)])
-
-#endif

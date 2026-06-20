@@ -1,10 +1,38 @@
+/**
+ * generic_hid.h: USB Generic HID endpoint.
+ *
+ * The idea here is that the code is relatively easy to port to
+ * another platform by substituting this header and a few other
+ * things.
+ *
+ * Copyright (c) 2022-2026 Kimmo Kulovesi, https://arkku.dev/
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #ifndef KK_GENERIC_HID_H
 #define KK_GENERIC_HID_H
+
+#ifndef ENABLE_GENERIC_HID_ENDPOINT
+#define ENABLE_GENERIC_HID_ENDPOINT 0
+#endif
+
 /// By defining `ENABLE_GENERIC_HID_ENDPOINT` as 1, a device may get an
 /// additional HID endpoint for use with things like debugging and
 /// interfacing with a configuration software. The device library must then
 /// implement `handle_generic_hid_report` and `make_generic_hid_report`.
-#if defined(ENABLE_GENERIC_HID_ENDPOINT) && ENABLE_GENERIC_HID_ENDPOINT
+#if ENABLE_GENERIC_HID_ENDPOINT
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -73,7 +101,5 @@ bool send_generic_hid_report(uint8_t report_id, uint8_t count, const uint8_t rep
 /// Call `make_generic_hid_report` and send the report, if one is returned.
 bool make_and_send_generic_hid_report(void);
 
-#else
-#define ENABLE_GENERIC_HID_ENDPOINT 0
 #endif
 #endif

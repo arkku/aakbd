@@ -2,70 +2,153 @@
 
 AAKBD is a USB keyboard firmware. Remapping is expressed as *differences from the default named-key mapping*, not as complete positional layer definitions. Customisation is in C (`layers.c`, `macros.c`).
 
-Supported devices: `ps2usb`, `ergodox`, `modelf77`, `modelf62`, `modelf50`.
+Supported devices: `ps2usb`, `ergodox`, `modelf77`, `modelf62`, `modelf50`, `gmmkpro1`.
 
 ## Build
 
-Requires: `avr-gcc`, `avr-libc`, GNU `make`.
-
 ```sh
-make DEVICE=ps2usb       # default
-make DEVICE=ergodox
-make DEVICE=modelf77
+make DEVICE=modelf77       # AVR
+make DEVICE=gmmkpro1       # ARM (requires git submodule update --init)
 make clean
 make distclean
 ```
 
-Additional flash targets exist but should not be run automatically.
+Do not run `make upload`, `make dfu`, `make burn` or other hardware writes!
 
 ### Configuration
 
-Place `local.mk` in root (Git-ignored). Device overrides in `DEVICE/local.mk`. Config is `-D` defines via `CONFIG_FLAGS`. Options in `usbkbd_config.h`. Example:
+Place `local.mk` in project root. Device overrides in `DEVICE/local.mk`. Config is `-D` defines via `CONFIG_FLAGS`. Options in `usbkbd_config.h`. Example:
 ```make
 CONFIG_FLAGS = -DUSB_MAX_KEY_ROLLOVER=10
 ```
 
-DO NOT edit or delete user's `local.mk`, `layers.c`, `macros.c` without prompting.
+**Do not** edit or delete user's `local.mk`, `layers.c`, `macros.c` without prompting. They are gitignored so changes are unrecoverable!
 
-### First-time setup
+Everything must work with sane defaults without these files present. (But do not delete or move them out of the way on your own for testing, they are sacred user input.)
 
-`make` copies `DEVICE/template_layers.c` → `DEVICE/layers.c` and `template_macros.c` → `macros.c`. Edit these (Git-ignored). Templates are inactive until `LAYER_COUNT > 0`.
+## Makefile System
 
-`make .ccls` generates a `.ccls` file for clangd.
+### Hierarchy (most general → most specific)
 
-## Architecture
+A makefile should only know about things ABOVE it in this list. `local.mk` and `{device}/local.mk` sit at their respective level as user overrides.
 
-### Key processing pipeline
+1. **Root `Makefile`** — all AAKBD firmwares. Defines `OBJS = $(OBJ) usbkbd_descriptors.o usbkbd.o keys.o $(DEVICE_OBJS) $(PLATFORM_OBJS)`. Default `ARCH = avr`.
+2. **`arch/{arch}/{arch}-common.mk`** — architecture-specific (e.g., `arch/arm/arm-common.mk`, `arch/avr/avr-common.mk`). Sets `ARCH`, toolchain, MCU flags, `PLATFORM_OBJS`. Must NOT reference QMK.
+3. **`arch/arm/stm32-common.mk`** — STM32 MCU family specifics. Sets `MCU_FAMILY`, `MCU_OBJS`, linker script, CMSIS paths. Includes `arm-common.mk`.
+4. **`qmk_core/qmk_port.mk`** — QMK port bridge. Defines `QMK_CORE_OBJS` (keyboard.o, qmk_main.o, matrix_common.o, debounce, etc.), `COMMON_HEADERS`, vpath for QMK sources, `DEVICE_FLAGS`. Derives `QMK_PLATFORM` from `ARCH`.
+5. **`qmk_core/platforms/{arch}/qmk_{arch}.mk`** — Platform compiler flags and dep rules (included automatically by `qmk_port.mk` via `$(PLATFORM_DIR)/qmk_$(QMK_PLATFORM).mk`).
+6. **`{device}/{device}.mk`** — Keyboard-specific. Sets `MCU_FAMILY`/`BOOTLOADER_TYPE`, `DEVICE_OBJS`, `DEVICE_FLAGS`, includes the architecture and QMK layers above.
 
-`Physical key → process_key() → layer resolution → preprocess_press() hook → execute_macro() or standard processing → usb_keyboard_press/release() → usb_keyboard_send_if_needed()`
+Makefiles must be kept up to date with changes to files/dependencies.
 
-### Core files
+### Variables
+
+| Variable | Set by | Value | Notes |
+|----------|--------|-------|-------|
+| `ARCH` | `{arch}-common.mk` | `avr` / `arm` | Default `avr` in root Makefile; overridden by `arm-common.mk` |
+| `QMK_PLATFORM` | `qmk_port.mk` | `$(ARCH)` | Derived automatically: `QMK_PLATFORM ?= $(ARCH)` |
+| `MCU_FAMILY` | device `.mk` or `stm32-common.mk` | e.g., `stm32f3` | ARM only; selects MCU-specific startup code |
+| `PLATFORM_OBJS` | `{arch}-common.mk` | AVR: `avrusb.o`; ARM: `syscalls.o $(MCU_OBJS) $(TINYUSB_OBJS)` | Added to root `OBJS` |
+| `DEVICE_OBJS` | device `.mk` | Device-specific objects | May include `$(QMK_CORE_OBJS)` filtered |
+| `BOOTLOADER_TYPE` | device `.mk` | `dfu` / `halfkay` | Set in device `.mk` where `QMK_PLATFORM` is used |
+| `DEVICE_FLAGS` | device `.mk` / `qmk_port.mk` | Compiler flags | Prepend-only via `+=` |
+| `CC_FLAGS` | `Makefile` / `arm-common.mk` | Include paths, arch flags | Overridden by ARM; AVR uses `AVR_FLAGS` |
+| `CFLAGS` | Root `Makefile` | `$(CUSTOM_FLAGS) $(CC_FLAGS) $(DEVICE_FLAGS) $(CONFIG_FLAGS)` | Final compiler flags |
+
+### Build variable chain
+
+`DEVICE_FLAGS` → `CC_FLAGS` → `CFLAGS` (in root `Makefile`). `DEVICE_FLAGS` can be overridden via `local.mk` or command line. `CONFIG_FLAGS` provides user-facing `-D` definitions.
+
+### Include chain
+
+```
+device.mk → arch/{arch}/{arch}-common.mk → qmk_port.mk → qmk_{arch}.mk
+```
+
+For ARM with STM32: `device.mk → stm32-common.mk → arm-common.mk → qmk_port.mk → qmk_arm.mk`
+
+### Dependency rules
+
+All `.o` files must have dependencies defined in the one most relevant makefile (e.g., `qmk_port.mk` for platform-independent QMK files). Always maintain these dependencies when adding/removing header `#include`s and when adding new `.c` files. Use `$(COMMON_HEADERS)` where appropriate; it is ok if it adds more dependencies than are actually used.
+
+## File Layout
+
+### Root files
+
+These must remain compatible with all architectures and devices. Deviations from this must go into more specific directories.
 
 | File | Role |
 |------|------|
 | `keys.c` / `keys.h` | Key processing; includes `layers.c` and `macros.c` at compile time |
-| `keycodes.h` | 16-bit keycodes: modifier combos, layer ops, macros, tap/hold |
+| `keycodes.h` | 16-bit extended keycodes: modifier combos, layer ops, macros, tap/hold |
 | `layers.h` | `DEFINE_LAYER()` macro, PROGMEM storage |
 | `macros.h` | Helpers for macros and hooks |
 | `usbkbd.c` / `usbkbd.h` | USB HID report construction |
 | `usbkbd_config.h` | Compile-time options |
 | `usb_keys.h` | USB keycode enum |
-| `avrusb.h` | Low-level AVR USB macros |
-| `avrusb.c` | Low-level AVR USB driver (always use avrusb.h macros, no direct
-device / register access!) |
+| `generic_hid.h` | Generic HID endpoint support (default disabled) |
 | `main.h` | Interface each device main must implement |
 
-### Device directories
+### `arch/{arch}/` — Architecture-specific
 
-Each device (e.g., `ps2usb/`, `ergodox/`): `DEVICE.c` (main), `DEVICE.mk` (build vars), `template_layers.c` / `template_macros.c` (copied to untracked `layers.c`/`macros.c`).
+Do not reference QMK- or device-specific things from these files - these are universal for the architecture.
 
-`qmk_core/` — ported QMK driver code (matrix scanning, debounce, I2C). Used by ErgoDox and Model F devices.
+| Directory | Contents |
+|-----------|----------|
+| `arch/avr/` | AVR USB driver (`avrusb.c/h`), timer helpers, `avr-common.mk` (sets `ARCH = avr`, `PLATFORM_OBJS = avrusb.o`) |
+| `arch/arm/` | ARM toolchain, TinyUSB bridge (`tinyusb.c/h`), USB config (`tusb_config.h`), `arm-common.mk` (sets `ARCH = arm`, `PLATFORM_OBJS`, DFU targets) |
+| `arch/arm/stm32f3/` | STM32F3 clock init, vector table, linker script, TinyUSB hardware setup |
+
+### `qmk_core/` — QMK code and porting helpers
+
+Files to assist in porting keyboards from QMK. Use direct copies from QMK where possible, note in top comment if modified.
+
+| Directory | Contents |
+|-----------|----------|
+| `qmk_core/platforms/avr/` | AVR platform: timer, suspend, I2C, SPI, EEPROM, `qmk_avr.mk`, `qmk_port.c` |
+| `qmk_core/platforms/arm/` | ARM platform: GPIO macros, DWT timer, SPI, DFU bootloader, EEPROM stubs, `qmk_arm.mk`, `qmk_port.c` |
+| `qmk_core/drivers/` | Hardware drivers (AW20216S RGB LED, etc.) |
+| `qmk_core/debounce/` | Debounce algorithms (selected by `DEBOUNCE_TYPE`) |
+
+`qmk_core/qmk_main.c` is the `main()` file. QMK provides keyboard hardware config (matrix scanning, drivers), whereas AAKBD provides the USB hardware and keyboard software layers.
+
+### `lib/` — Unmodified vendor originals
+
+No modifications allowed! Include LICENSE if adding a new library.
+
+| Directory | Contents |
+|-----------|----------|
+| `lib/CMSIS/` | ARM CMSIS-Core (Apache 2.0) |
+| `lib/STM32F3xx/` | STM32F3 CMSIS (ST BSD) |
+| `lib/tinyusb/` | TinyUSB USB stack (git submodule, MIT) |
+
+### `DEVICE/` — Keyboard-specific
+
+Each device (e.g., `ps2usb/`, `ergodox/`, `gmmkpro1/`, `modelf77/`):
+
+| File | Role |
+|------|------|
+| `README.md` | Human-readable info about the device and its configuration |
+| `DEVICE.c` | Main program |
+| `DEVICE.mk` | Build variables; includes architecture + QMK layers |
+| `config.h` | Matrix pins and other QMK config |
+| `template_layers.c` / `template_macros.c` | Example files, copied to untracked `layers.c`/`macros.c` |
+| `keymap.c` | QMK keymap — matrix positions → unique keycodes |
+| `led_map.c` / `led_map.h` | Keycode-to-LED mapping (RGB keyboards) |
+
+## Key Processing
+
+### Pipeline
+
+```
+Physical key → process_key() → layer resolution → preprocess_press() hook → execute_macro() or standard processing → usb_keyboard_press/release() → usb_keyboard_send_if_needed()
+```
 
 ### Layer system
 
-- Layer 0: implicit default (physical key → USB keycode, device-defined)
+- Layer 0: implicit default (physical key → *unique* USB keycode, device-defined)
 - Layers 1–31: user-defined overlays in PROGMEM (sparse, only mapped keys)
-- `LAYER_COUNT` = highest used layer number
+- `LAYER_COUNT` = highest used layer number (inclusive, layer 0 is not counted)
 - Base layer (default 1): always active; layers below are suppressed
 - Transparent = pass through to next lower active layer
 
@@ -81,10 +164,10 @@ DEFINE_LAYER(1) {
 
 ### Macros
 
-`MACRO(name)` where `name` is in `enum macro` in `layers.c`. Implementation in `execute_macro()`:
 ```c
 void execute_macro(uint8_t macro_number, bool is_release, uint8_t physical_key, uint8_t *restrict data);
 ```
+
 `*data` persists one byte from press to release per key. Helpers: `register_key()`, `add_strong_modifiers()`, `add_weak_modifiers()`, `clear_strong_modifiers()`, `usb_keyboard_simulate_keypress()`.
 
 ### Hooks in macros.c
@@ -98,4 +181,14 @@ void execute_macro(uint8_t macro_number, bool is_release, uint8_t physical_key, 
 
 ### Memory constraints
 
-AVR targets: ATMEGA32U4 (~2.5 KB RAM, 32 KB flash) or ATMEGA32U2 (1 KB RAM, 32 KB flash). Layers in PROGMEM via `DEFINE_LAYER`. Key buffer + modifier state + layer mask ≈ 100 bytes RAM.
+| Target | Flash | RAM | Notes |
+|--------|-------|-----|-------|
+| ATMEGA32U4 | 32 KB | ~2.5 KB | Layers in PROGMEM |
+| ATMEGA32U2 | 32 KB | 1 KB | AVR: key buffer + modifier state + layer mask ≈ 100 bytes RAM |
+| STM32F303CC | 256 KB | 32 KB | No PROGMEM needed — const in `.rodata` |
+
+## Coding Rules
+
+- All architectures and devices must continue to work at all times (but no need to test building every device during focused development, just do a regression test once all other tasks are done and verified)
+- Prefer to fail at compile time for unsupported configurations rather than providing a default, if the default might be incorrect
+- Do not hide issues by forcing configuration options where the issue doesn't occur, unless those configuration options are inherently part of the device spec

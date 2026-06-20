@@ -4,7 +4,7 @@
  * This does all the work of managing layers, executing macros, handling
  * remapping, keeping track of modifiers, etc.
  *
- * Copyright (c) 2021-2022 Kimmo Kulovesi, https://arkku.dev/
+ * Copyright (c) 2021-2026 Kimmo Kulovesi, https://arkku.dev/
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -854,11 +854,13 @@ postprocess:
 }
 
 void
-reset_keys (void) {
+reset_keys (bool is_wake_up) {
 #if LAYER_COUNT > 0
     clear_weak_modifiers();
     clear_strong_modifiers();
-    reset_layers();
+    if (!is_wake_up || RESET_LAYERS_ON_SUSPEND) {
+        reset_layers();
+    }
     pending_release = 0;
 #endif
     usb_keyboard_release_all_keys();
@@ -872,6 +874,21 @@ reset_keys (void) {
     }
 #if LAYER_COUNT > 0
     handle_reset();
+
+#if !RESET_LAYERS_ON_SUSPEND
+    if (is_wake_up) {
+        // Re-trigger layer hooks after suspend.
+        for (uint8_t layer = 1; layer <= LAYER_COUNT; ++layer) {
+            if (layer == DEFAULT_BASE_LAYER) {
+                if (!is_layer_active(layer)) {
+                    layer_state_changed(layer, false);
+                }
+            } else if (is_layer_active(layer)) {
+                layer_state_changed(layer, true);
+            }
+        }
+    }
+#endif
 #endif
 }
 

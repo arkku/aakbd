@@ -1,8 +1,11 @@
-#ifndef KK_QMK_ACTION_H
-#define KK_QMK_ACTION_H
+/**
+ * action.h: AAKBD compatibility header.
+ */
+
+#pragma once
 
 #include <quantum.h>
 
 #define clear_keyboard() keyboard_reset()
 
-#endif
+void keyboard_wake_up(void);

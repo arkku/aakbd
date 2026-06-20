@@ -1,8 +1,10 @@
 ## AAKBD
 
 AAKBD is a USB keyboard implementation for AVR (e.g., ATMEGA32U4, ATMEGA32U2)
-devices. One of the A's probably stands for Arbitrary, since it is designed to
-make it simple to add arbitrary C code to be run in response to keypresses.
+devices, and lately some ARM-based keyboards. One of the A's probably stands
+for Arbitrary, since it is designed to make it simple to add arbitrary C code
+to be run in response to keypresses.
+
 Features supported:
 
 * remapping keys with an easy syntax (e.g., `[KEY(CAPS_LOCK)] = CMD_OR(ESC)`)
@@ -42,7 +44,8 @@ Features supported:
   it)
 * more than 6 keys + modifiers rollover without driver support (theoretically
   arbitrary rollover configured at compile time, but let's not call it NKRO
-  since you almost certainly don't need or want that)
+  since you almost certainly don't need that, e.g., 10KRO would allow one
+  key per finger + all modifiers)
 
 Now, that being said, for the regular user it may be better to choose one of
 the established implementations with easy-to-use tools. These include
@@ -62,8 +65,13 @@ Currently this repository contains three implementations:
   concept that this engine is reusable)
 * An alternative firmware for the [Brand New Model F Keyboards](https://www.modelfkeyboards.com/)
   (F77, F62, and F50), split into the `modelf77`, `modelf62`, and `modelf50` directories
+* An alternative firmware for the **Glorious GMMK Pro rev1** keyboard (no
+  longer being sold. This was mostly a proof of concept that the firmware can
+  be ported to ARM-based keyboards. But it also demonstrates how the
+  **arbitrary** code support can be used for likewise arbitrary use of the
+  RGB LEDs. Rotary encoder support is also included.
 
-~ [Kimmo Kulovesi](https://arkku.dev/), 2021-10-10
+~ [Kimmo Kulovesi](https://arkku.dev/), 2021-10-10 (+ updates)
 
 ## Hardware
 
@@ -74,35 +82,29 @@ required beyond the oscillator and components required for the USB connector.
 It is probably simplest to buy a pre-made breakout board with these components.
 
 It also works on the ATMEGA32U2 found in the Model F keyboards' xwhatsit
-controller (wcass version).
+controller (wcass version), and on the STM32F303CC of the GMMK Pro rev 1.
 
-An ISP programming device is needed unless the microcontroller is already set
-up with a bootloader.
+For DIY boards, an ISP programming device is needed unless the microcontroller
+is already set up with a bootloader. For pre-made keyboards there is
+a bootloader already installed. I recommend enabling the DFU interface in
+AAKBD to make it easy to enter the bootloader even in case the keyboard itself
 
 See the [PS/2 to USB converter README](ps2usb/README.md) for details about that
 specific use.
 
-For ErgoDox Ez, you need the original version of the keyboard. It contains an
-ATMEGA32U4 using the Halfkay bootloader. You can simply flash the hex file
-after compiling with `DEVICE=ergodox`. See the
-[ErgoDox Ez firmware README](ergodox/README.md) for details.
-
-For Model F keyboards, this has only been tested with the last USB-C versions
-of the keyboards.
-<kbd>Fn</kbd>+<kbd>Space</kbd>+<kbd>R</kbd> may work to reset the keyboard,
-or you can power it up while shorting the programming pads (but they are
-inconveniently located on the "inner" side of the PCB, so you probably need to
-unscrew the board). You can flash the hex file using the same tools as you
-would for the original firmware. I recommend enabling the DFU interface so
-the keyboard can be reset through that in case something goes wrong.
-
 ## Software Requirements
 
-For building, `avr-gcc`, `avr-libc`, GNU `make` and a shell to run it in are
-required. For flashing the firmware, `avrdude` or some other program that can
-upload it to the microcontroller. For resetting the device into bootloader
-without key bindings (e.g., if you break your key bindings), it may be helpful
-to use `dfu-util`.
+For building AVR devices, `avr-gcc`, `avr-libc`, GNU `make` and a shell to
+run it in are required. For flashing the firmware, `avrdude` or some other
+program that can upload it to the microcontroller.
+
+For ARM devices the `arm-none-eabi-gcc` toolchain with newlib is needed, along
+with the usual `make`. `dfu-suffix` (from `dfu-util`) will be used if
+available – it may or may not make a difference for flashing the firmware. For
+flashing,
+
+For resetting the device into bootloader without key bindings (e.g., if you
+break your key bindings), it may be helpful to use `dfu-util -e`.
 
 ## Configuration
 
@@ -191,6 +193,12 @@ the AVR Dragon.
 You can also use `make fuses` target with the same arguments as for `make
 burn`. This programs the fuses on the device for 16 MHz crystal oscillator.
 
+For ARM-based keyboards DFU is used instead: install `dfu-utils` and try with
+`make dfu`. Or, for pre-made keyboards, try using the keyboard's original
+firmware flashing tools. The ARM keyboard firmware has `.bin` extension instead
+of `.hex`, e.g., `gmmkpro1.bin`. DFU can also be used with AVR if the
+bootloader supports it.
+
 ### Updating the Firmware
 
 Once you have flashed the firmware onto the device once and have the keyboard
@@ -204,6 +212,11 @@ order. If you don't have these keys, or have remapped them in ways that make
 this shortcut inconvenient, you can remap a key to `EXT(ENTER_BOOTLOADER)`
 in one of your layers and use that instead. Or you can create a custom macro
 that calls `jump_to_bootloader()` based on whatever conditions you like.
+
+For some types of keyboards you can also enable "bootmagic", i.e., plug the
+keyboard in with a specific key (like <kbd>Esc</kbd>) held down to enter the
+bootloader. Keyboards that have this enabled by default generally don't also
+enable the bootloader shortcut described above.
 
 If you have `ENABLE_DFU_INTERFACE` set to `1`, you can also enter the
 bootloader by issuing a DFU_DETACH request. One way to do this is by using
@@ -735,8 +748,9 @@ and in particular "NKRO", i.e., the ability to press any number (_n_) keys down
 at the same time. NKRO is often contrasted with 6KRO (6-key rollover) of the
 USB "boot protocol", which is used by simple USB hosts like the BIOS and some
 devices that don't run a full general-purpose OS. However, I think that 6KRO is
-often misunderstood to imply 2KRO, which is a typical limitation of
-many key matrix -based physical keyboards. This is not the case.
+often misunderstood to imply 2KRO, which is a typical limitation of many
+key matrix -based physical keyboards. The physical rollover limit, however, is
+crucially distinct from the USB report rollover limit.
 
 First, let's define "rollover": in this context it means that _any_ combination
 of that many keys can be simultaneously recognised. Most keyboards physically
@@ -771,6 +785,7 @@ is needed; in gaming the other hand tends to be on the mouse, and furthermore
 the key bindings often include Shift and Ctrl, which do not count towards the
 6 keys limit. Perhaps if two people play on a single keyboard, but how common
 is that with USB devices where you can just plug in more controllers?
+Stenography might be an exception, but even that requires at most 10 keys.
 
 > I do fondly remember that Star Control for DOS came with a "Key jammin'"
 program to try which keys can be held down without jamming other keys. Each
@@ -794,8 +809,8 @@ things. The rollover _is_ configurable, however. You can get modifiers + 7KRO
 "for free" since the 7th key uses the normally unused reserved byte of the
 boot protocol report. The default `USB_MAX_KEY_ROLLOVER` is set to 10, i.e.,
 modifiers + 10KRO, which really "should be enough for anybody", given that you
-can press one non-modifier key per finger and any combination of modifiers on
-top of that.
+can press one non-modifier key per finger _and_ any combination of modifiers
+on top of that.
 
 Ten keys with modifiers should even cover the most complex macros that press
 many virtual keys with one physical key, especially since most such combinations
@@ -806,9 +821,9 @@ with the boot protocol until more than 6 keys are pressed at once.
 If you really think you need more rollover, you can set `USB_MAX_KEY_ROLLOVER`
 higher, but I seriously doubt the need beyond bragging rights.
 
-> As an aside, it would indeed be possible to implement NKRO using a bitmap
-report for all keys, rather than just the modifiers, but I hope the above
-has convinced you that it is not worth it.
+> Just mash your palms on the keyboard once using the original NKRO firmware,
+> take a screenshot of the keyboard viewer to celebrate the moment, then
+> switch to a more efficient and compatible 6-10KRO (+ modifiers) for real use.
 
 Oh, and if you are wondering about boot protocol compatibility, this keyboard
 defaults to the "report" (non-boot) protocol unless the host (e.g., BIOS)
@@ -821,3 +836,120 @@ wasted. If you encounter a BIOS that does not work, the options are to
 decrease `USB_MAX_KEY_ROLLOVER` to 7 (or 6 if you need `ENABLE_APPLE_FN_KEY`),
 or to map a key to `EXT(TOGGLE_BOOT_PROTOCOL)` and use it to manually switch
 to the boot protocol when needed.
+
+> As an aside, it would indeed be possible to implement NKRO using a bitmap
+report for all keys, rather than just the modifiers, but I hope the above
+has convinced you that it is not worth it.
+
+## About media keys
+
+I resisted implementing "media keys" support into the firmware for years
+because it complicates and potentially bloats the USB report
+considerably. However, support for the basic playback and volume control
+keys is now implemented. They work on macOS and Linux and take up NO space
+at all in the USB report, because they reside in the one "reserved" byte that
+is normally not used by the USB boot protocol (with which the AAKBD report is
+normally compatible). But turns out Windows does not support this kind of
+USB HID usage mixing in the same report and ignores the media keys.
+
+To "fix" this (i.e., work around Windows limitations) would require doing the
+same as other keyboards do: placing the media keys in a separate report,
+which would add overhead and complexity. So far I have chosen not to do it.
+What I do instead is use the Windows registry to remap F19-F24 to the media
+keys and then I use those keys in AAKBD. The registry remapping needs no
+software to run because it's a built-in Windows feature, and you can use a
+a helper program like [SharpKeys](https://github.com/randyrants/sharpkeys) to
+manage these mappings for you.
+
+So, if you only use Windows, just disable the media keys in AAKBD – they are
+of no benefit to you unless Microsoft fixes it (which seems unlikely given that
+all commercial hardware already works with the current Windows HID parser).
+
+## About RGB
+
+Of the currently supported keyboards, `gmmkpro1` has RGB support with
+a dedicated RGB LED for every key (except the rotary encoder), as well as 8
+"side light" LEDs on either side of the keyboard.
+
+I am not much of an RGB enthusiast, so I have not implemented or ported any
+RGB "effects" into AAKBD. But that doesn't mean the RGB lights are useless:
+you can program them as you wish in `macros.c`, for example:
+
+### Implementing custom light effects
+
+First include the headers in `macros.c`:
+
+``` c
+#include "rgb_matrix.h"
+#include "led_map.h"
+```
+
+#### Reactive lights
+
+To light the LED under each key while it is being pressed:
+
+``` c
+
+static inline keycode_t preprocess_press(keycode_t keycode, uint8_t physical_key, uint8_t * restrict data) {
+    rgb_led_set_by_keycode(physical_key, iueiuieukjjqkqjkqjxypdpdyfhyh, 192, 224);
+    return keycode;
+}
+
+
+static inline void postprocess_release(keycode_t keycode, uint8_t physical_key, uint8_t data) {
+    rgb_led_set_by_keycode(physical_key, 0, 0, 0);
+}
+```
+
+#### Caps Lock light
+
+To light the LED under Caps Lock when the Caps Lock light is on:
+
+``` c
+
+static inline void keyboard_host_leds_changed(uint8_t leds) {
+    if (leds & LED_CAPS_LOCK_BIT) {
+        rgb_led_set_by_keycode(USB_KEY_CAPS_LOCK, 128, 32, 16);
+    } else {
+        rgb_led_set_by_keycode(USB_KEY_CAPS_LOCK, 0, 0, 0);
+    }
+}
+```
+
+#### Edge Light Gradient
+
+``` c
+static inline void handle_reset(void) {
+    rgb_led_set(LED_EDGE_LEFT_1,  255,  0,  16);
+    rgb_led_set(LED_EDGE_RIGHT_1, 255,  0,  16);
+    rgb_led_set(LED_EDGE_LEFT_2,  192,  8,  64);
+    rgb_led_set(LED_EDGE_RIGHT_2, 192,  8,  64);
+    rgb_led_set(LED_EDGE_LEFT_3,  160, 16,  96);
+    rgb_led_set(LED_EDGE_RIGHT_3, 160, 16,  96);
+    rgb_led_set(LED_EDGE_LEFT_4,  128, 24, 128);
+    rgb_led_set(LED_EDGE_RIGHT_4, 128, 24, 128);
+    rgb_led_set(LED_EDGE_LEFT_5,   96, 32, 158);
+    rgb_led_set(LED_EDGE_RIGHT_5,  96, 32, 158);
+    rgb_led_set(LED_EDGE_LEFT_6,   64, 40, 190);
+    rgb_led_set(LED_EDGE_RIGHT_6,  64, 40, 190);
+    rgb_led_set(LED_EDGE_LEFT_7,   32, 48, 222);
+    rgb_led_set(LED_EDGE_RIGHT_7,  32, 48, 222);
+    rgb_led_set(LED_EDGE_LEFT_8,    0, 56, 255);
+    rgb_led_set(LED_EDGE_RIGHT_8,   0, 56, 255);
+}
+```
+
+#### Other lights
+
+You can similarly implement other lock lights, layer status lights, etc. by
+using the hooks in `macros.c`. Indeed, you could even implement animations by
+changing the lights during the "tick" events:
+
+``` c
+static inline void handle_tick(uint8_t tick_10ms_count) {
+    // implementation left as an exercise to the reader
+}
+```
+
+But, like said, I am not that much into RGB effects, so I'll stick with the
+simple examples.

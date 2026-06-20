@@ -1,10 +1,8 @@
-QMK_PLATFORM = avr
-
+include arch/avr/avr-common.mk
 include qmk_core/qmk_port.mk
 
 XWHATSIT_DIR = xwhatsit_core
 KEYBOARD_NAME ?= xwhatsit
-DEBOUNCE_TYPE ?= sym_defer_g
 DEVICE_VERSION ?= 0x0001
 ENABLE_GENERIC_HID_OUTPUT ?= 1
 
@@ -16,7 +14,7 @@ DEVICE_FLAGS += -DGENERIC_HID_REPORT_SIZE=32 -DGENERIC_HID_FEATURE_SIZE=16 -DGEN
 
 COMMON_HEADERS += post_config.h xwhatsit_port.h
 
-DEVICE_OBJS ?= xwhatsit.o avrusb.o $(QMK_CORE_OBJS) util_comm.o eeconfig.o
+DEVICE_OBJS ?= xwhatsit.o $(QMK_CORE_OBJS) util_comm.o
 
 ifeq (1,$(ERASE_CALIBRATION))
 DEVICE_FLAGS = -DERASE_CALIBRATION_ON_START=1 -DCAPSENSE_CAL_VERSION=0
