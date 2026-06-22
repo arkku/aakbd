@@ -70,7 +70,7 @@ host_fingerprint_observe (uint16_t wLength) {
 #if HOST_FINGERPRINT_RING_SIZE > 0
         fingerprint_count = HOST_FINGERPRINT_RING_SIZE + (HOST_FINGERPRINT_MAX_COUNT % HOST_FINGERPRINT_RING_SIZE) + 1;
 #else
-        fingerprint_count = HOST_FINGERPRINT_MIN_COUNT;
+        fingerprint_count = HOST_FINGERPRINT_MIN_COUNT + (HOST_FINGERPRINT_MAX_COUNT % HOST_FINGERPRINT_MIN_COUNT) + 1;
 #endif
     }
 }
