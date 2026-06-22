@@ -2,15 +2,17 @@
 #include "keymap.h"
 
 #define DEFAULT_BASE_LAYER 1
-#define WINDOWS_LAYER 2
-#define NUM_LOCK_LAYER 3
-#define FN_LAYER 4
+#define APPLE_LAYER 2
+#define LINUX_LAYER 3
+#define NUM_LOCK_LAYER 4
+#define FN_LAYER 5
 
 #define LAYER_COUNT FN_LAYER
 
 enum macro {
     MACRO_NOP,
     MACRO_FALLTHROUGH,
+    MACRO_CYCLE_OS_LAYERS,
     MACRO_SAVE_CALIBRATION,
     MACRO_UNSAVE_CALIBRATION,
     MACRO_DEBUG_CALIBRATION,
@@ -24,61 +26,45 @@ enum macro {
 /// Layer 1 is the default base layer. Only the differences to the default
 /// mapping need to be defined here.
 DEFINE_LAYER(DEFAULT_BASE_LAYER) {
-#if ENABLE_APPLE_FN_KEY
-    // Insert does nothing useful on Mac
-    [KEY(F1)] = KEY_APPLE_FN,
-#else
-    [KEY(F1)] = KEY(BACKSPACE),
-#endif
-
+    [KEY(F1)] = KEY(INSERT),
     [KEY(F2)] = KEY(DELETE),
     [KEY(F5)] = KEY(HOME),
     [KEY(F6)] = KEY(END),
     [KEY(F9)] = KEY(PAGE_UP),
     [KEY(F10)] = KEY(PAGE_DOWN),
 
+    [KEY(KP_D)] = KEY(PRINT_SCREEN),
+    [KEY(KP_E)] = KEY(SCROLL_LOCK),
+    [KEY(KP_F)] = LAYER_OR_PLAIN_KEY(FN_LAYER, KEY(PAUSE)),
+
     [KEY(F3)] = KEY(F16),
     [KEY(F7)] = KEY(F17),
     [KEY(F11)] = KEY(F18),
 
-#if ENABLE_MEDIA_KEYS
-    [KEY(F4)] = KEY(VOLUME_MUTE),
-    [KEY(F8)] = KEY(VOLUME_DOWN),
-    [KEY(F12)] = KEY(VOLUME_UP),
-#else
-    [KEY(F4)] = KEY(F10),
-    [KEY(F8)] = KEY(F11),
-    [KEY(F12)] = KEY(F12),
-#endif
+    [KEY(F4)] = KEY(F19),
+    [KEY(F8)] = KEY(F20),
+    [KEY(F12)] = KEY(F21),
 
-#if ENABLE_MEDIA_KEYS
-    [KEY(KP_A)] = KEY(PREVIOUS_TRACK),
-    [KEY(KP_B)] = KEY(PLAY_PAUSE),
-    [KEY(KP_C)] = KEY(NEXT_TRACK),
-#else
-    [KEY(KP_A)] = KEY(F7),
-    [KEY(KP_B)] = KEY(F8),
-    [KEY(KP_C)] = KEY(F9),
-#endif
+    [KEY(KP_A)] = KEY(F22),
+    [KEY(KP_B)] = KEY(F23),
+    [KEY(KP_C)] = KEY(F24),
 
-    [KEY(F13)] = KEY(F1),
-    [KEY(F14)] = KEY(F2),
-    [KEY(F15)] = KEY(F3),
-    [KEY(F16)] = KEY(F4),
-    
-    [KEY(F17)] = KEY(F5),
-    [KEY(F18)] = KEY(F6),
-    [KEY(F19)] = KEY(F7),
-    [KEY(F20)] = KEY(F8),
+    // The F-keys arranged in groups of 3 with F1-F9 same as the keypad 1-9
+    [KEY(F13)] = KEY(F10),
+    [KEY(F17)] = KEY(F11),
+    [KEY(F21)] = KEY(F12),
 
-    [KEY(F21)] = KEY(F9),
-    [KEY(F22)] = KEY(F10),
-    [KEY(F23)] = KEY(F11),
-    [KEY(F24)] = KEY(F12),
+    [KEY(F14)] = KEY(F7),
+    [KEY(F18)] = KEY(F8),
+    [KEY(F22)] = KEY(F9),
 
-    [KEY(KP_D)] = KEY(F13),
-    [KEY(KP_E)] = KEY(F14),
-    [KEY(KP_F)] = LAYER_OR_PLAIN_KEY(FN_LAYER, KEY(F15)),
+    [KEY(F15)] = KEY(F4),
+    [KEY(F19)] = KEY(F5),
+    [KEY(F23)] = KEY(F6),
+
+    [KEY(F16)] = KEY(F1),
+    [KEY(F20)] = KEY(F2),
+    [KEY(F24)] = KEY(F3),
 
 #if SPLIT_PAD_PLUS
     // If the plus is split, use the Mac layout (but change = to backspace)
@@ -95,28 +81,48 @@ DEFINE_LAYER(DEFAULT_BASE_LAYER) {
 };
 #endif
 
-#if LAYER_COUNT >= WINDOWS_LAYER
-DEFINE_LAYER(WINDOWS_LAYER) {
-    [KEY(F1)] = KEY(INSERT),
+#if LAYER_COUNT >= LINUX_LAYER
+DEFINE_LAYER(LINUX_LAYER) {
+#if ENABLE_MEDIA_KEYS
+    [KEY(F4)] = KEY(VOLUME_MUTE),
+    [KEY(F8)] = KEY(VOLUME_DOWN),
+    [KEY(F12)] = KEY(VOLUME_UP),
+    [KEY(KP_A)] = KEY(PREVIOUS_TRACK),
+    [KEY(KP_B)] = KEY(PLAY_PAUSE),
+    [KEY(KP_C)] = KEY(NEXT_TRACK),
+#endif
+};
+#endif
 
-    // Windows doesn't seem to support the way my media keys are currently
-    // implemented (both Mac and Linux do), so I'm just binding otherwise
-    // unused F-keys there and using SharpKeys to remap them in the registry
-    [KEY(F4)] = KEY(F19),
-    [KEY(F8)] = KEY(F20),
-    [KEY(F12)] = KEY(F21),
+#if LAYER_COUNT >= APPLE_LAYER
+DEFINE_LAYER(APPLE_LAYER) {
+#if ENABLE_APPLE_FN_KEY
+    // Insert does nothing useful on Mac
+    [KEY(F1)] = KEY_APPLE_FN,
+#else
+    [KEY(F1)] = KEY(DELETE),
+#endif
 
-    [KEY(KP_A)] = KEY(F22),
-    [KEY(KP_B)] = KEY(F23),
-    [KEY(KP_C)] = KEY(F24),
+    // On Mac the Print Screen, Scroll Lock, and Pause/Break don't really
+    // exist so let's just put F13-F15 here for more comfortable bindings
+    [KEY(KP_D)] = KEY(F13),
+    [KEY(KP_E)] = KEY(F14),
+    [KEY(KP_F)] = LAYER_OR_PLAIN_KEY(FN_LAYER, KEY(F15)),
 
-    [KEY(KP_D)] = KEY(PRINT_SCREEN),
-    [KEY(KP_E)] = KEY(SCROLL_LOCK),
-    [KEY(KP_F)] = LAYER_OR_PLAIN_KEY(FN_LAYER, KEY(PAUSE)),
-
-#if SPLIT_PAD_PLUS
-    // The KP_EQUALS key doesn't seem to work on Windows
-    [KEY(KP_DIVIDE)] = KEY(BACKSPACE),
+#if ENABLE_MEDIA_KEYS
+    [KEY(F4)] = KEY(VOLUME_MUTE),
+    [KEY(F8)] = KEY(VOLUME_DOWN),
+    [KEY(F12)] = KEY(VOLUME_UP),
+    [KEY(KP_A)] = KEY(PREVIOUS_TRACK),
+    [KEY(KP_B)] = KEY(PLAY_PAUSE),
+    [KEY(KP_C)] = KEY(NEXT_TRACK),
+#else
+    [KEY(F4)] = KEY(F10),
+    [KEY(F8)] = KEY(F11),
+    [KEY(F12)] = KEY(F12),
+    [KEY(KP_A)] = KEY(F7),
+    [KEY(KP_B)] = KEY(F8),
+    [KEY(KP_C)] = KEY(F9),
 #endif
 };
 #endif
@@ -154,20 +160,17 @@ DEFINE_LAYER(NUM_LOCK_LAYER) {
 
 #if LAYER_COUNT >= FN_LAYER
 DEFINE_LAYER(FN_LAYER) {
-    [KEY(F1)] = LAYER_TOGGLE(WINDOWS_LAYER),
+    [KEY(F1)] = MACRO(MACRO_CYCLE_OS_LAYERS),
     [KEY(NUM_LOCK)] = LAYER_TOGGLE(NUM_LOCK_LAYER),
 
     [KEY(KP_ENTER)] = EXT(ENTER_BOOTLOADER),
 
 #if ENABLE_SIMULATED_TYPING
-    [KEY(F13)] = EXT(PRINT_DEBUG_INFO),
-    [KEY(F14)] = MACRO(MACRO_DEBUG_CALIBRATION),
+    [KEY(F5)] = EXT(PRINT_DEBUG_INFO),
+    [KEY(F9)] = MACRO(MACRO_DEBUG_CALIBRATION),
 #endif
 
-    [KEY(F5)] = MACRO(MACRO_SAVE_CALIBRATION),
-    [KEY(F8)] = MACRO(MACRO_UNSAVE_CALIBRATION),
-
-    [KEY(F17)] = MACRO(MACRO_SAVE_CALIBRATION),
-    [KEY(F20)] = MACRO(MACRO_UNSAVE_CALIBRATION),
+    [KEY(KP_A)] = MACRO(MACRO_SAVE_CALIBRATION),
+    [KEY(KP_B)] = MACRO(MACRO_UNSAVE_CALIBRATION),
 };
 #endif

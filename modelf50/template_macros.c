@@ -75,7 +75,7 @@ static inline void press_strong_apple_fn() {
 static inline keycode_t preprocess_press(keycode_t keycode, uint8_t physical_key, uint8_t * restrict data) {
 #if ENABLE_APPLE_FN_KEY
     if (physical_key >= KEY(F13) && physical_key <= KEY(F24)
-        && !(is_layer_active(WINDOWS_LAYER) || is_layer_active(FN_LAYER))
+        && is_layer_active(APPLE_LAYER) && !is_layer_active(FN_LAYER)
     ) {
         // Use as F-keys (F1-F12, which have been moved to the second block)
         if (is_strong_apple_fn_pressed()) {
@@ -155,6 +155,19 @@ static void execute_macro(uint8_t macro_number, bool is_release, uint8_t physica
 
     case MACRO_FALLTHROUGH:
         register_key(physical_key, is_release);
+        break;
+
+    case MACRO_CYCLE_OS_LAYERS:
+        if (is_release) {
+            if (is_layer_active(APPLE_LAYER)) {
+                disable_layer(APPLE_LAYER);
+                enable_layer(LINUX_LAYER);
+            } else if (is_layer_active(LINUX_LAYER)) {
+                disable_layer(LINUX_LAYER);
+            } else {
+                enable_layer(APPLE_LAYER);
+            }
+        }
         break;
 
     case MACRO_SAVE_CALIBRATION:
@@ -240,3 +253,29 @@ static inline void handle_tick(uint8_t tick_10ms_count) {
 /// Called when USB host LED state changes.
 static inline void keyboard_host_leds_changed(uint8_t leds) {
 }
+
+#if ENABLE_HOST_FINGERPRINT
+#include "host_fingerprint.h"
+
+void host_os_fingerprint_updated(uint8_t fingerprint) {
+    switch (host_fingerprint_os_guess()) {
+        case HOST_OS_LINUX:
+            disable_layer(APPLE_LAYER);
+            enable_layer(LINUX_LAYER);
+            host_fingerprint_stop_notifications();
+            break;
+        case HOST_OS_MACOS:
+            disable_layer(LINUX_LAYER);
+            enable_layer(APPLE_LAYER);
+            host_fingerprint_stop_notifications();
+            break;
+        case HOST_OS_WINDOWS:
+            disable_layer(LINUX_LAYER);
+            disable_layer(APPLE_LAYER);
+            host_fingerprint_stop_notifications();
+            break;
+        default:
+            break;
+    }
+}
+#endif
