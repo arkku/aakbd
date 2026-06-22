@@ -189,6 +189,12 @@
 #define DEBOUNCE_DEBUG 0
 #endif
 
+#ifndef ENABLE_HOST_FINGERPRINT
+/// Enable USB host (computer operating system) fingerprinting. Needs to be
+/// supported by the USB implementation.
+#define ENABLE_HOST_FINGERPRINT 0
+#endif
+
 #ifndef ENABLE_SIMULATED_TYPING
 /// Enable function to simulate typing. This is required for the
 /// `ENABLE_DEBUG_SHORTCUT` option and for macros that wish to utilise it.

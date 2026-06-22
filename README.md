@@ -46,6 +46,8 @@ Features supported:
   arbitrary rollover configured at compile time, but let's not call it NKRO
   since you almost certainly don't need that, e.g., 10KRO would allow one
   key per finger + all modifiers)
+* USB host fingerprinting for operating system (macOS, Windows, Linux)
+  detection (works quite accurately for these three major operating systems)
 
 Now, that being said, for the regular user it may be better to choose one of
 the established implementations with easy-to-use tools. These include
@@ -865,7 +867,73 @@ So, if you only use Windows, just disable the media keys in AAKBD – they are
 of no benefit to you unless Microsoft fixes it (which seems unlikely given that
 all commercial hardware already works with the current Windows HID parser).
 
-## About RGB
+## Host OS Fingerprinting
+
+Turns out it's possible to make fairly accurate guess about which operating
+system (OS) the USB host (computer) is running by "fingerprinting" the string
+descriptor requests, in particular the `wLength` field. This is supported in
+AAKBD, but disabled by default because it is only useful for custom handling.
+For example, you could toggle the keyboard layout (layers) according to whether
+the keyboard is plugged into a Mac or a PC.
+
+How this works is you add `-DENABLE_HOST_FINGERPRINT=1` to either
+`DEVICE_FLAGS` or `CONFIG_FLAGS` (e.g., in your `local.mk`):
+
+``` Make:
+DEVICE_FLAGS += -DENABLE_HOST_FINGERPRINT=1
+```
+
+Then, in your `macros.c`, set up the handler for it, e.g.:
+
+``` c
+#if ENABLE_HOST_FINGERPRINT
+#include "host_fingerprint.h"
+
+void host_os_fingerprint_updated(uint8_t fingerprint) {
+    switch (host_fingerprint_os_guess()) {
+        case HOST_OS_LINUX:
+            // fallthrough
+        case HOST_OS_WINDOWS:
+            enable_layer(WINDOWS_LAYER);
+            host_fingerprint_stop_notifications();
+            break;
+        case HOST_OS_MACOS:
+            disable_layer(WINDOWS_LAYER);
+            host_fingerprint_stop_notifications();
+            break;
+        default:
+            break;
+    }
+}
+#endif
+```
+
+The above example enables the `WINDOWS_LAYER` on Windows and Linux, and
+disables it on macOS. It also stops the fingerprint notifications (i.e., this
+function call) from happening again until the USB connection is reset, which
+is just an optimization preventing the layer from toggling in the middle of
+typing if something would happen to trigger it.
+
+It is also possible to define `HOST_FINGERPRINT_RING_SIZE` to set the number
+of previous `wLength` values seen (in a ring buffer). The fingerprint is based
+on these values, but basically the only thing being checked right now is
+whether all of them are 255 (Linux), none of them are 255 (macOS), or a mix
+thereof (Windows). If you want to try to analyze the requests in more detail
+than that, use the simulated typing and the `EXT(PRINT_DEBUG_INFO)` binding to
+have the keyboard "type" the debug info into a text editor. There should be a
+line starting with `OS`, followed by the numerical value of the fingerprint,
+and then as many actually seen `wLength` values as are available, up to the
+limit of `HOST_FINGERPRINT_RING_SIZE`. Maybe you can find some patterns in
+them beyond just the simple OS fingerprint and use them however you wish
+(see the functions in [host_fingerprint.h](host_fingerprint.h) for how to
+access them).
+
+The fingerprinting concept is based on
+[keyboard.io FingerprintUSBHost](https://github.com/keyboardio/FingerprintUSBHost),
+but the implementation doesn't use any of their code, and mine _may_ be more
+reliable in detecting macOS.
+
+## RGB LED support
 
 Of the currently supported keyboards, `gmmkpro1` has RGB support with
 a dedicated RGB LED for every key (except the rotary encoder), as well as 8

@@ -22,6 +22,20 @@ PLATFORM_OBJS = avrusb.o
 vpath %.c arch/avr
 vpath %.h arch/avr
 
+HEX ?= $(BIN:.bin=.hex)
+
+$(HEX): $(BIN)
+	$(OBJCOPY) -j .text -j .data -O ihex $< $@
+
+all: $(HEX)
+
+# AVR link rule (prerequisites added by root rule after device .mk is included)
+$(BIN): | $(BUILDDIR)
+	@echo $(CC) $(LDFLAGS) -s -o $@ ...
+	@$(CC) $(LDFLAGS) -s -o $@ $+
+	@chmod a-x $@
+	@$(SIZE) $@
+
 # LFUSE configures the clock speed; it is probably correct out of the box if
 # you use a ready-made board. If not, `make fuses LFUSE=CE` for a 16 MHz
 # crystal oscillator.
@@ -40,8 +54,6 @@ BURNER ?= dragon_isp
 #PORT ?= /dev/ttyUSB0
 # Burner speed
 #BPS ?= 115200
-
-BOARD ?= NONE
 
 # Protocol for the bootloader, e.g., make upload PORT=/dev/cu.usbmodem1401
 UPLOAD_PROTOCOL ?= avr109

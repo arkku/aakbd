@@ -19,7 +19,7 @@ endif
 TINYUSB_DIR = lib/tinyusb/src
 
 CC_FLAGS += -I$(TINYUSB_DIR) -Iarch/arm
-TINYUSB_OBJS = tinyusb.o tusb.o usbd.o hid_device.o dfu_rt_device.o \
+TINYUSB_OBJS = tinyusb.o tusb.o hid_device.o dfu_rt_device.o \
                $(MCU_DCD_OBJ) fsdev_common.o tusb_fifo.o
 
 vpath %.c arch/arm
@@ -31,7 +31,27 @@ vpath %.c $(TINYUSB_DIR)/class/dfu
 vpath %.c $(TINYUSB_DIR)/common
 vpath %.c $(TINYUSB_DIR)/$(MCU_TUSB_PORT)
 
-HEX =
+# usbd.c from tinyusb needs to be patched to support host fingerprint
+ifeq (0,$(ENABLE_HOST_FINGERPRINT))
+	TINYUSB_OBJS += usbd.o
+	DEVICE_FLAGS += -DENABLE_HOST_FINGERPRINT=0
+else
+	TINYUSB_OBJS += usbd_patched.o
+ifeq (1,$(ENABLE_HOST_FINGERPRINT))
+	DEVICE_FLAGS += DENABLE_HOST_FINGERPRINT=1
+endif
+endif
+
+# No .hex output for ARM by default
+HEX ?=
+
+# ARM hex conversion from the ELF (produced by the device link rule)
+TARGET_ELF ?= $(BUILDDIR)/$(DEVICE).elf
+ifneq (,$(HEX))
+all: $(HEX)
+$(HEX): $(TARGET_ELF)
+	$(OBJCOPY) -O ihex $< $@
+endif
 
 PLATFORM_OBJS = syscalls.o $(MCU_OBJS) $(TINYUSB_OBJS)
 
@@ -66,8 +86,25 @@ dfuarm: $(BIN)
 $(TINYUSB_DIR)/tusb.h:
 	git submodule update --init
 
-$(BUILDDIR)/tinyusb.o: tinyusb.c tinyusb.h usb_hardware.h usbkbd.h usbkbd_config.h usbkbd_descriptors.h aakbd.h generic_hid.h $(COMMON_HEADERS) $(TINYUSB_DIR)/tusb.h
+# ARM link rule (prerequisites added by root rule after device .mk is included)
+TARGET_ELF ?= $(BUILDDIR)/$(DEVICE).elf
 
-$(BUILDDIR)/tusb.o $(BUILDDIR)/usbd.o $(BUILDDIR)/hid_device.o \
-$(BUILDDIR)/dfu_rt_device.o $(BUILDDIR)/fsdev_common.o $(BUILDDIR)/tusb_fifo.o \
-$(BUILDDIR)/dcd_stm32_fsdev.o: $(TINYUSB_DIR)/tusb.h
+$(BIN): | $(BUILDDIR)
+	$(CC) $(LDFLAGS) -Wl,-Map=$(BUILDDIR)/$(DEVICE).map -o $(TARGET_ELF) $(filter %.o, $^) $(LDLIBS)
+	$(SIZE) $(TARGET_ELF)
+	$(OBJCOPY) -O binary $(TARGET_ELF) $@
+	@[ -n "$(DFU_SUFFIX)" ] && which "$(DFU_SUFFIX)" >/dev/null 2>&1 && \
+		$(DFU_SUFFIX) $(DFU_SUFFIX_ARGS) -a $@ || true
+	@chmod a-x $@
+
+USBD_PATCHED = $(BUILDDIR)/usbd_patched.c
+$(USBD_PATCHED): $(TINYUSB_DIR)/device/usbd.c | $(BUILDDIR)
+	@echo Patching $< to $@
+	@sed -e '0,/^#include/s/^#include/#include "host_fingerprint.h"\n#include/' \
+	    -e '/uint8_t const\* desc_str = (uint8_t const\*) tud_descriptor_string_cb(desc_index, p_request->wIndex);/i\#if ENABLE_HOST_FINGERPRINT\n    host_fingerprint_observe(p_request->wLength);\n#endif' $< > $@
+	@grep -q '^#if ENABLE_HOST_FINGERPRINT' $@ || { echo "Error: patch not applied" >&2; exit 1; }
+
+$(BUILDDIR)/tinyusb.o: tinyusb.c tinyusb.h usb_hardware.h usbkbd.h usbkbd_config.h usbkbd_descriptors.h aakbd.h generic_hid.h $(COMMON_HEADERS) $(TINYUSB_DIR)/tusb.h
+$(BUILDDIR)/usbd_patched.o: $(USBD_PATCHED) host_fingerprint.h $(TINYUSB_DIR)/tusb.h $(COMMON_HEADERS)
+$(BUILDDIR)/usbd.o: usbd.c $(TINYUSB_DIR)/tusb.h
+$(BUILDDIR)/tusb.o $(BUILDDIR)/usbd.o $(BUILDDIR)/hid_device.o $(BUILDDIR)/dfu_rt_device.o $(BUILDDIR)/fsdev_common.o $(BUILDDIR)/tusb_fifo.o $(BUILDDIR)/dcd_stm32_fsdev.o: $(TINYUSB_DIR)/tusb.h

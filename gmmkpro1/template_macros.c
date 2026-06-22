@@ -9,6 +9,8 @@
 
 #include "config.h"
 #include "led_map.h"
+#include "timer.h"
+#include "matrix.h"
 
 #ifndef KK_LAYERS_H
 #include "layers.c"
@@ -145,12 +147,29 @@ static void execute_macro(uint8_t macro_number, bool is_release, uint8_t physica
         register_key(*data, is_release);
         break;
 
+    case MACRO_DEBUG_MATRIX:
+        if (!is_release) {
+            uint16_t scan_time = timer_read();
+            for (int_fast8_t i = 100; i; --i) {
+                (void) matrix_scan();
+            }
+            scan_time = timer_elapsed(scan_time);
+            fprintf_P(usb_kbd_type, PSTR("Scan time %u.%02u ms\n"), scan_time / 100, scan_time % 100);
+        }
+        break;
+
     default:
         break;
     }
 }
 
-static void led_set_gradient(const bool is_reversed) {
+enum gradient {
+    GRADIENT_RED_BLUE,
+    GRADIENT_GREEN_BLUE,
+    GRADIENT_BLUE_WHITE,
+};
+
+static void led_set_gradient(bool is_reversed, enum gradient scheme) {
     static const uint8_t left[8] = {
         LED_EDGE_LEFT_1, LED_EDGE_LEFT_2, LED_EDGE_LEFT_3, LED_EDGE_LEFT_4,
         LED_EDGE_LEFT_5, LED_EDGE_LEFT_6, LED_EDGE_LEFT_7, LED_EDGE_LEFT_8,
@@ -159,29 +178,73 @@ static void led_set_gradient(const bool is_reversed) {
         LED_EDGE_RIGHT_1, LED_EDGE_RIGHT_2, LED_EDGE_RIGHT_3, LED_EDGE_RIGHT_4,
         LED_EDGE_RIGHT_5, LED_EDGE_RIGHT_6, LED_EDGE_RIGHT_7, LED_EDGE_RIGHT_8,
     };
-    rgb_led_set(left[is_reversed  ? 7 : 0], 255,  0,  16);
-    rgb_led_set(right[is_reversed ? 7 : 0], 255,  0,  16);
-    rgb_led_set(left[is_reversed  ? 6 : 1], 192,  8,  64);
-    rgb_led_set(right[is_reversed ? 6 : 1], 192,  8,  64);
-    rgb_led_set(left[is_reversed  ? 5 : 2], 160, 16,  96);
-    rgb_led_set(right[is_reversed ? 5 : 2], 160, 16,  96);
-    rgb_led_set(left[is_reversed  ? 4 : 3], 128, 24, 128);
-    rgb_led_set(right[is_reversed ? 4 : 3], 128, 24, 128);
-    rgb_led_set(left[is_reversed  ? 3 : 4],  96, 32, 158);
-    rgb_led_set(right[is_reversed ? 3 : 4],  96, 32, 158);
-    rgb_led_set(left[is_reversed  ? 2 : 5],  64, 40, 190);
-    rgb_led_set(right[is_reversed ? 2 : 5],  64, 40, 190);
-    rgb_led_set(left[is_reversed  ? 1 : 6],  32, 48, 222);
-    rgb_led_set(right[is_reversed ? 1 : 6],  32, 48, 222);
-    rgb_led_set(left[is_reversed  ? 0 : 7],   0, 56, 255);
-    rgb_led_set(right[is_reversed ? 0 : 7],   0, 56, 255);
+
+    switch (scheme) {
+        default:
+            // fallthrough
+        case GRADIENT_RED_BLUE:
+            rgb_led_set(left[is_reversed  ? 7 : 0], 255,  0,  16);
+            rgb_led_set(right[is_reversed ? 7 : 0], 255,  0,  16);
+            rgb_led_set(left[is_reversed  ? 6 : 1], 192,  8,  64);
+            rgb_led_set(right[is_reversed ? 6 : 1], 192,  8,  64);
+            rgb_led_set(left[is_reversed  ? 5 : 2], 160, 16,  96);
+            rgb_led_set(right[is_reversed ? 5 : 2], 160, 16,  96);
+            rgb_led_set(left[is_reversed  ? 4 : 3], 128, 24, 128);
+            rgb_led_set(right[is_reversed ? 4 : 3], 128, 24, 128);
+            rgb_led_set(left[is_reversed  ? 3 : 4],  96, 32, 158);
+            rgb_led_set(right[is_reversed ? 3 : 4],  96, 32, 158);
+            rgb_led_set(left[is_reversed  ? 2 : 5],  64, 40, 190);
+            rgb_led_set(right[is_reversed ? 2 : 5],  64, 40, 190);
+            rgb_led_set(left[is_reversed  ? 1 : 6],  32, 48, 222);
+            rgb_led_set(right[is_reversed ? 1 : 6],  32, 48, 222);
+            rgb_led_set(left[is_reversed  ? 0 : 7],   0, 56, 255);
+            rgb_led_set(right[is_reversed ? 0 : 7],   0, 56, 255);
+            break;
+        case GRADIENT_GREEN_BLUE:
+            rgb_led_set(left[is_reversed  ? 7 : 0],  0, 255,  16);
+            rgb_led_set(right[is_reversed ? 7 : 0],  0, 255,  16);
+            rgb_led_set(left[is_reversed  ? 6 : 1],  0, 192,  64);
+            rgb_led_set(right[is_reversed ? 6 : 1],  0, 192,  64);
+            rgb_led_set(left[is_reversed  ? 5 : 2],  0, 160,  96);
+            rgb_led_set(right[is_reversed ? 5 : 2],  0, 160,  96);
+            rgb_led_set(left[is_reversed  ? 4 : 3],  0, 128, 128);
+            rgb_led_set(right[is_reversed ? 4 : 3],  0, 128, 128);
+            rgb_led_set(left[is_reversed  ? 3 : 4],  0,  96, 158);
+            rgb_led_set(right[is_reversed ? 3 : 4],  0,  96, 158);
+            rgb_led_set(left[is_reversed  ? 2 : 5],  0,  64, 190);
+            rgb_led_set(right[is_reversed ? 2 : 5],  0,  64, 190);
+            rgb_led_set(left[is_reversed  ? 1 : 6],  0,  32, 222);
+            rgb_led_set(right[is_reversed ? 1 : 6],  0,  32, 222);
+            rgb_led_set(left[is_reversed  ? 0 : 7],  0,  16, 255);
+            rgb_led_set(right[is_reversed ? 0 : 7],  0,  16, 255);
+            break;
+        case GRADIENT_BLUE_WHITE:
+            rgb_led_set(left[is_reversed  ? 7 : 0],  32,  32, 222);
+            rgb_led_set(right[is_reversed ? 7 : 0],  32,  32, 222);
+            rgb_led_set(left[is_reversed  ? 6 : 1],  64,  64, 190);
+            rgb_led_set(right[is_reversed ? 6 : 1],  64,  64, 190);
+            rgb_led_set(left[is_reversed  ? 5 : 2],  96,  96, 158);
+            rgb_led_set(right[is_reversed ? 5 : 2],  96,  96, 158);
+            rgb_led_set(left[is_reversed  ? 4 : 3], 128, 128, 128);
+            rgb_led_set(right[is_reversed ? 4 : 3], 128, 128, 128);
+            rgb_led_set(left[is_reversed  ? 3 : 4],  96,  96, 158);
+            rgb_led_set(right[is_reversed ? 3 : 4],  96,  96, 158);
+            rgb_led_set(left[is_reversed  ? 2 : 5],  64,  64, 190);
+            rgb_led_set(right[is_reversed ? 2 : 5],  64,  64, 190);
+            rgb_led_set(left[is_reversed  ? 1 : 6],  16,  32, 222);
+            rgb_led_set(right[is_reversed ? 1 : 6],  16,  32, 222);
+            rgb_led_set(left[is_reversed  ? 0 : 7],   0,  16, 255);
+            rgb_led_set(right[is_reversed ? 0 : 7],   0,  16, 255);
+            break;
+    }
+
 }
 
 static inline void handle_reset(void) {
 #if ENABLE_APPLE_FN_KEY
     is_weak_apple_fn_pressed = false;
 #endif
-    led_set_gradient(false);
+    led_set_gradient(false, ENABLE_HOST_FINGERPRINT ? GRADIENT_BLUE_WHITE : GRADIENT_RED_BLUE);
 
     // Safeguard (probably unnecessary) against momentary layers being left
     // on (e.g., when preserving active layers after wake from suspend)
@@ -193,6 +256,12 @@ static inline void handle_reset(void) {
 static inline void layer_state_changed(uint8_t layer, bool is_enabled) {
     if (is_enabled) {
         switch (layer) {
+        case LINUX_LAYER:
+            led_set_gradient(false, GRADIENT_GREEN_BLUE);
+            break;
+        case WINDOWS_LAYER:
+            led_set_gradient(true, GRADIENT_RED_BLUE);
+            break;
         case APPLE_FN_LAYER:
             break;
         case WINDOWS_FN_LAYER:
@@ -203,6 +272,12 @@ static inline void layer_state_changed(uint8_t layer, bool is_enabled) {
         }
     } else {
         switch (layer) {
+        case LINUX_LAYER:
+            led_set_gradient(is_layer_active(WINDOWS_LAYER), GRADIENT_RED_BLUE);
+            break;
+        case WINDOWS_LAYER:
+            led_set_gradient(false, is_layer_active(LINUX_LAYER) ? GRADIENT_GREEN_BLUE : GRADIENT_RED_BLUE);
+            break;
         case APPLE_FN_LAYER:
             (void) release_weak_apple_fn();
             break;
@@ -213,13 +288,13 @@ static inline void layer_state_changed(uint8_t layer, bool is_enabled) {
             break;
         }
     }
-
-    if (layer == WINDOWS_LAYER) {
-        led_set_gradient(is_enabled);
-    }
 }
 
 static inline void handle_tick(uint8_t tick_10ms_count) {
+}
+
+void os_fingerprint_updated(uint8_t evidence) {
+    (void) evidence;
 }
 
 void handle_encoder_rotation(bool is_clockwise) {
@@ -237,3 +312,30 @@ void handle_encoder_rotation(bool is_clockwise) {
         }
     }
 }
+
+#if ENABLE_HOST_FINGERPRINT
+#include "host_fingerprint.h"
+
+void host_os_fingerprint_updated(uint8_t fingerprint) {
+    switch (host_fingerprint_os_guess()) {
+        case HOST_OS_LINUX:
+            disable_layer(WINDOWS_LAYER);
+            enable_layer(LINUX_LAYER);
+            host_fingerprint_stop_notifications();
+            break;
+        case HOST_OS_WINDOWS:
+            disable_layer(LINUX_LAYER);
+            enable_layer(WINDOWS_LAYER);
+            host_fingerprint_stop_notifications();
+            break;
+        case HOST_OS_MACOS:
+            disable_layer(LINUX_LAYER);
+            disable_layer(WINDOWS_LAYER);
+            led_set_gradient(false, GRADIENT_RED_BLUE);
+            host_fingerprint_stop_notifications();
+            break;
+        default:
+            break;
+    }
+}
+#endif

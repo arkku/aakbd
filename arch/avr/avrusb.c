@@ -35,6 +35,9 @@
 #include "generic_hid.h"
 #include "keys.h"
 #include "progmem.h"
+#if ENABLE_HOST_FINGERPRINT
+#include "host_fingerprint.h"
+#endif
 
 // MARK: - Configuration
 
@@ -515,6 +518,9 @@ usb_tick (void) {
             generic_report_unlock();
         }
 #endif // ^ ENABLE_GENERIC_HID_ENDPOINT
+#if ENABLE_HOST_FINGERPRINT
+        host_fingerprint_notify_if_needed();
+#endif
     }
 }
 
@@ -643,6 +649,11 @@ ISR(USB_COM_vect) {
 
     if ((type & USB_REQUEST_TYPE_MASK) == USB_REQUEST_TYPE_STANDARD) {
         if (request == USB_REQUEST_GET_DESCRIPTOR) {
+#if ENABLE_HOST_FINGERPRINT
+            if (MSB(value) == DESCRIPTOR_TYPE_STRING) {
+                host_fingerprint_observe(length);
+            }
+#endif
             const char *data;
             uint8_t desc_length = usb_descriptor_length_and_data(value, index, &data);
 

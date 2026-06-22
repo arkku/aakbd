@@ -59,6 +59,9 @@
 #include "aakbd.h"
 #include "keys.h"
 #include "generic_hid.h"
+#if ENABLE_HOST_FINGERPRINT
+#include "host_fingerprint.h"
+#endif
 
 // MARK: - TinyUSB Configuration
 
@@ -120,6 +123,11 @@ update_virtual_leds (void) {
 #endif
 }
 
+static void
+usb_devices_reset (void) {
+    usb_keyboard_reset();
+}
+
 void
 usb_init (void) {
     tinyusb_hardware_init();
@@ -131,6 +139,7 @@ usb_init (void) {
     tusb_init(TINYUSB_CFG_RHPORT, &rh_init);
 
     usb_descriptors_init();
+    usb_devices_reset();
 
     local_configuration = 0;
     usb_error = 0;
@@ -200,6 +209,9 @@ usb_tick (void) {
             usb_status |= USB_STATUS_JUMP_TO_BOOTLOADER;
         }
     }
+#endif
+#if ENABLE_HOST_FINGERPRINT
+    host_fingerprint_notify_if_needed();
 #endif
 }
 

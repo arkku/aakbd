@@ -24,10 +24,9 @@ TARGET = $(DEVICE)
 endif
 
 BIN ?= $(DEVICE:=.bin)
-HEX ?= $(BIN:.bin=.hex)
 OBJ = $(DEVICE:=.o)
 
-OBJS = $(OBJ) usbkbd_descriptors.o usbkbd.o keys.o $(DEVICE_OBJS) $(PLATFORM_OBJS)
+OBJS = $(OBJ) usbkbd_descriptors.o usbkbd.o keys.o host_fingerprint.o $(DEVICE_OBJS) $(PLATFORM_OBJS)
 
 BUILDDIR ?= $(DEVICE)/build
 
@@ -58,11 +57,10 @@ ifndef ARCH
 $(error ARCH not set. Make sure arch/$(ARCH)/$(ARCH)-common.mk gets included.)
 endif
 
-ifneq (,$(HEX))
-all: $(HEX)
-else
 all: $(BIN)
-endif
+
+# Object prerequisites for the link rule (added after all variables are resolved)
+$(BIN): $(addprefix $(BUILDDIR)/, $(OBJS))
 
 OBJECT_FILES = $(OBJS:%.o=$(BUILDDIR)/%.o)
 
@@ -70,6 +68,7 @@ $(BUILDDIR)/avrusb.o: avrusb.h usb_hardware.h usbkbd.h usbkbd_config.h usb.h usb
 $(BUILDDIR)/usbkbd.o: usbkbd.h usb_hardware.h usbkbd_config.h usb.h usbkbd_descriptors.h usb_keys.h generic_hid.h aakbd.h progmem.h local.mk
 $(BUILDDIR)/usbkbd_descriptors.o: usbkbd_descriptors.h usbkbd_config.h usb.h usb_keys.h generic_hid.h progmem.h aakbd.h local.mk
 $(BUILDDIR)/keys.o: keys.h keycodes.h usbkbd.h usbkbd_config.h aakbd.h usb_keys.h layers.h macros.h progmem.h $(MACROS_C) $(LAYERS_C)
+$(BUILDDIR)/host_fingerprint.o: host_fingerprint.h usbkbd_config.h
 $(OBJECT_FILES): Makefile $(DEVICE)/$(DEVICE).mk $(wildcard local.mk) $(wildcard $(DEVICE)/local.mk)
 
 $(BUILDDIR)/%.o: %.c | $(BUILDDIR)
@@ -78,18 +77,6 @@ $(BUILDDIR)/%.o: %.c | $(BUILDDIR)
 # Suppress some warnings here to allow more convenient layer init
 $(BUILDDIR)/keys.o: keys.c
 	$(CC) $(CFLAGS) -Wno-pedantic -Wno-override-init -Wno-type-limits -c $< -o $@
-
-# AVR: link to .bin
-ifneq (,$(HEX))
-$(BIN): $(OBJECT_FILES)
-	@echo $(CC) $(LDFLAGS) -s -o $@ ...
-	@$(CC) $(LDFLAGS) -s -o $@ $+
-	@chmod a-x $@
-	@$(SIZE) $@
-
-$(HEX): $(BIN)
-	$(OBJCOPY) -j .text -j .data -O ihex $< $@
-endif
 
 local.mk:
 	touch $@
@@ -114,7 +101,7 @@ upload: dfu
 
 clean:
 	rm -f *.o
-	@[ -d ./$(BUILDDIR) ] && rm -f ./$(BUILDDIR)/*.o ./$(BUILDDIR)/*.elf ./$(BUILDDIR)/*.map || true
+	@[ -d ./$(BUILDDIR) ] && rm -f ./$(BUILDDIR)/*.o ./$(BUILDDIR)/*.elf ./$(BUILDDIR)/*.map ./$(BUILDDIR)/*.c ./$(BUILDDIR)/*.h || true
 	@[ -e $(BUILDDIR) ] && rmdir $(BUILDDIR) || true
 	@[ -d ./release/build ] && rm -rf ./release/build || true
 
@@ -126,10 +113,7 @@ upload_release:
 
 distclean: | clean
 	rm -f *.hex *.bin
-	find . -name '*.elf' -type f -delete
-	find . -name '*.map' -type f -delete
-	find . -name '*.o' -type f -delete
-	find . -depth -name 'build' -type d -exec rmdir '{}' ';'
+	find . -depth -name 'build' -type d -exec rm -rf '{}' ';'
 	@[ -e $(MACROS_C) -o -e $(LAYERS_C) ] && echo NOT deleting $(MACROS_C) and $(LAYERS_C) files! || true
 
 backup:

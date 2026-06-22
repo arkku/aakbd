@@ -29,6 +29,9 @@
 #include "usb_hardware.h"
 #include "generic_hid.h"
 #include "progmem.h"
+#if ENABLE_HOST_FINGERPRINT
+#include "host_fingerprint.h"
+#endif
 #if DEBOUNCE_DEBUG
 #include "debounce/debounce_debug.h"
 #endif
@@ -68,8 +71,18 @@ volatile uint8_t key_error = 0;
 
 // MARK: - Keyboard
 
+#if defined(__arm__) && ENABLE_SIMULATED_TYPING
+static int debug_kbd_write(void *cookie, const char *buf, int len);
+#endif
+
 void
 usb_keyboard_reset (void) {
+#if defined(__arm__) && ENABLE_SIMULATED_TYPING
+    if (!usb_kbd_type) {
+        usb_kbd_type = funopen(NULL, NULL, debug_kbd_write, NULL, NULL);
+        setvbuf(usb_kbd_type, NULL, _IOLBF, 0);
+    }
+#endif
     usb_keyboard_leds = 0;
     usb_keyboard_protocol = HID_PROTOCOL_REPORT;
     usb_keyboard_release_all_keys();
@@ -405,13 +418,6 @@ usb_keyboard_type_debug_report (void) {
 
     usb_keyboard_release_all_keys();
 
-#if defined(__arm__)
-    if (!usb_kbd_type) {
-        usb_kbd_type = funopen(NULL, NULL, debug_kbd_write, NULL, NULL);
-        setvbuf(usb_kbd_type, NULL, _IOLBF, 0);
-    }
-#endif
-
     (void) fprintf_P(
         usb_kbd_type,
         PSTR("M %d A%u %u@%u %d$%d ^%u *%c%c%c %c %u\n"),
@@ -431,6 +437,17 @@ usb_keyboard_type_debug_report (void) {
 
 #if DEBOUNCE_DEBUG
     debounce_debug_print_histogram();
+#endif
+
+#if ENABLE_HOST_FINGERPRINT
+    if (host_fingerprint_count()) {
+        (void) fprintf_P(usb_kbd_type, PSTR("OS #%u"), (unsigned int) host_fingerprint_bits());
+        for (uint8_t i = 0; i < host_fingerprint_wlength_count(); ++i) {
+            (void) fprintf_P(usb_kbd_type, PSTR(" %u"), (unsigned int) host_fingerprint_get_wlength_at(i));
+        }
+        (void) fflush(usb_kbd_type);
+        (void) usb_keyboard_simulate_keypress(USB_KEY_RETURN, 0);
+    }
 #endif
 
     usb_keyboard_release_all_keys();

@@ -37,18 +37,6 @@ include qmk_core/qmk_port.mk
 # QMK core objects for ARM (matrix_gpio.o replaces matrix.o, keymap.o already in DEVICE_OBJS)
 DEVICE_OBJS += $(filter-out matrix.o keymap.o, $(QMK_CORE_OBJS))
 
-# Combined object references and link rule
-DEVICE_OBJ_REFS = $(addprefix $(BUILDDIR)/, $(OBJS))
-TARGET_ELF = $(BUILDDIR)/$(DEVICE).elf
-
-$(BIN): $(DEVICE_OBJ_REFS) | $(BUILDDIR)
-	$(CC) $(LDFLAGS) -Wl,-Map=$(BUILDDIR)/$(DEVICE).map -o $(TARGET_ELF) $^ $(LDLIBS)
-	$(SIZE) $(TARGET_ELF)
-	$(OBJCOPY) -O binary $(TARGET_ELF) $@
-	@[ -n "$(DFU_SUFFIX)" ] && which "$(DFU_SUFFIX)" >/dev/null 2>&1 && \
-		$(DFU_SUFFIX) $(DFU_SUFFIX_ARGS) -a $@ || true
-	@chmod a-x $@
-
 # Keymap dependency
 $(BUILDDIR)/keymap.o: gmmkpro1.h usb_keys.h $(COMMON_HEADERS)
 $(BUILDDIR)/led_map.o: led_map.h aw20216s.h rgb_matrix.h usb_keys.h $(COMMON_HEADERS)
