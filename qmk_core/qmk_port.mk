@@ -33,7 +33,7 @@ KEYMAP_FILE = keymap
 endif
 endif
 
-QMK_CORE_OBJS = keyboard.o led.o qmk_port.o qmk_main.o $(KEYMAP_FILE).o matrix_common.o matrix.o timer.o bitwise.o suspend.o suspend_core.o $(BOOTLOADER_TYPE).o $(DEBOUNCE_TYPE).o platform.o bootmagic.o eeconfig.o
+QMK_CORE_OBJS = keyboard.o led.o qmk_port.o qmk_main.o $(KEYMAP_FILE).o matrix_common.o timer.o bitwise.o suspend.o suspend_core.o $(BOOTLOADER_TYPE).o $(DEBOUNCE_TYPE).o platform.o bootmagic.o eeconfig.o
 
 ifneq ($(DEBOUNCE_TYPE),none)
 DEVICE_FLAGS += -DDEBOUNCE=$(DEBOUNCE)
@@ -49,7 +49,7 @@ $(BUILDDIR)/qmk_main.o: keys.h led.h aakbd.h usb_hardware.h usbkbd.h usbkbd_conf
 $(BUILDDIR)/$(KEYMAP_FILE).o: keymap.h
 $(BUILDDIR)/keyboard.o: keyboard.h led.h $(COMMON_HEADERS)
 $(BUILDDIR)/led.o: keys.h led.h debug.h host.h $(COMMON_HEADERS)
-$(BUILDDIR)/matrix.o: matrix.h debounce.h debug.h action_layer.h $(COMMON_HEADERS)
+$(BUILDDIR)/matrix_gpio.o: matrix.h debounce.h debug.h $(COMMON_HEADERS)
 $(BUILDDIR)/matrix_common.o: debounce.h debug.h $(COMMON_HEADERS)
 ifeq ($(QMK_PLATFORM),avr)
 $(BUILDDIR)/i2c_master.o: i2c_master.h $(COMMON_HEADERS)
@@ -73,7 +73,6 @@ $(BUILDDIR)/debounce_debug.o: matrix.h debounce.h usbkbd.h $(COMMON_HEADERS)
 
 $(BUILDDIR)/encoder.o: encoder.h $(COMMON_HEADERS)
 $(BUILDDIR)/rgb_matrix.o: rgb_matrix.h $(COMMON_HEADERS)
-$(BUILDDIR)/matrix_gpio.o: debounce.h $(COMMON_HEADERS)
 $(BUILDDIR)/aw20216s.o: aw20216s.h spi_master.h $(COMMON_HEADERS)
 $(BUILDDIR)/bootmagic.o: bootmagic.h matrix.h keyboard.h wait.h eeconfig.h bootloader.h $(COMMON_HEADERS)
 $(BUILDDIR)/spi_master.o: spi_master.h $(COMMON_HEADERS)

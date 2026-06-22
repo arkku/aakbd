@@ -34,12 +34,8 @@ vpath %.c $(TINYUSB_DIR)/$(MCU_TUSB_PORT)
 # usbd.c from tinyusb needs to be patched to support host fingerprint
 ifeq (0,$(ENABLE_HOST_FINGERPRINT))
 	TINYUSB_OBJS += usbd.o
-	DEVICE_FLAGS += -DENABLE_HOST_FINGERPRINT=0
 else
 	TINYUSB_OBJS += usbd_patched.o
-ifeq (1,$(ENABLE_HOST_FINGERPRINT))
-	DEVICE_FLAGS += DENABLE_HOST_FINGERPRINT=1
-endif
 endif
 
 # No .hex output for ARM by default
@@ -90,7 +86,7 @@ $(TINYUSB_DIR)/tusb.h:
 TARGET_ELF ?= $(BUILDDIR)/$(DEVICE).elf
 
 $(BIN): | $(BUILDDIR)
-	$(CC) $(LDFLAGS) -Wl,-Map=$(BUILDDIR)/$(DEVICE).map -o $(TARGET_ELF) $(filter %.o, $^) $(LDLIBS)
+	$(CC) $(LDFLAGS) -Wl,-Map=$(BUILDDIR)/$(DEVICE).map -o $(TARGET_ELF) $^ $(LDLIBS)
 	$(SIZE) $(TARGET_ELF)
 	$(OBJCOPY) -O binary $(TARGET_ELF) $@
 	@[ -n "$(DFU_SUFFIX)" ] && which "$(DFU_SUFFIX)" >/dev/null 2>&1 && \

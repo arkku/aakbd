@@ -57,6 +57,14 @@ ifndef ARCH
 $(error ARCH not set. Make sure arch/$(ARCH)/$(ARCH)-common.mk gets included.)
 endif
 
+ifeq (0,$(ENABLE_HOST_FINGERPRINT))
+	DEVICE_FLAGS += -DENABLE_HOST_FINGERPRINT=0
+else
+ifeq (1,$(ENABLE_HOST_FINGERPRINT))
+	DEVICE_FLAGS += -DENABLE_HOST_FINGERPRINT=1
+endif
+endif
+
 all: $(BIN)
 
 # Object prerequisites for the link rule (added after all variables are resolved)

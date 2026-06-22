@@ -6,12 +6,12 @@ DEBOUNCE ?= 8
 DEBOUNCE_TYPE = sym_eager_pr
 KEYBOARD_NAME = ergodox_ez
 MCU ?= atmega32u4
-
 BOOTLOADER_TYPE = halfkay
+
 include arch/avr/avr-common.mk
 include qmk_core/qmk_port.mk
 
-DEVICE_OBJS = ergodox_ez.o $(QMK_CORE_OBJS) i2c_master.o
+DEVICE_OBJS = ergodox_ez.o matrix.o $(QMK_CORE_OBJS) i2c_master.o
 DEVICE_FLAGS += -DBOOTLOADER_HALFKAY -DBOOTLOADER_SIZE=512 -DENABLE_I2C=1
 DEVICE_FLAGS += -DGENERIC_HID_REPORT_SIZE=22 -DGENERIC_HID_FEATURE_SIZE=2
 
