@@ -16,6 +16,7 @@
 enum macro {
     MACRO_NOP,
     MACRO_FALLTHROUGH,
+    MACRO_CYCLE_OS_LAYERS,
     MACRO_WEAK_APPLE_FN,
     MACRO_IPAD_A_O,
     MACRO_IPAD_AE_OE,
@@ -122,7 +123,7 @@ DEFINE_LAYER(WINDOWS_LAYER) {
 DEFINE_LAYER(APPLE_FN_LAYER) {
     [KEY(TAB)] = KEY(CAPS_LOCK),
 
-    [KEY(CAPS_LOCK)] = LAYER_TOGGLE(WINDOWS_LAYER),
+    [KEY(CAPS_LOCK)] = MACRO(MACRO_CYCLE_OS_LAYERS),
     [KEY(SPACE)] = LAYER_ON_HOLD(FN_SPACE_LAYER),
 
     [KEY(LEFT_SHIFT)] = KEY(LEFT_SHIFT),
@@ -146,8 +147,6 @@ DEFINE_LAYER(APPLE_FN_LAYER) {
     [KEY(EQUALS)] = KEY(F12),
     [KEY(OPEN_BRACKET)] = KEY(F11),
     [KEY(CLOSE_BRACKET)] = KEY(F12),
-
-    [KEY(SLASH)] = KEY(RIGHT_SHIFT),
 
     [KEY(BACKSPACE)] = KEY(DELETE),
 
@@ -188,8 +187,6 @@ DEFINE_LAYER(WINDOWS_FN_LAYER) {
     [KEY(LEFT_WIN)] = KEY(LEFT_WIN),
     [KEY(LEFT_ALT)] = KEY(LEFT_ALT),
 
-    [KEY(SLASH)] = KEY(RIGHT_SHIFT),
-
     [KEY(Q)] = KEY(HOME),
     [KEY(W)] = KEY(UP_ARROW),
     [KEY(E)] = KEY(END),
@@ -202,10 +199,10 @@ DEFINE_LAYER(WINDOWS_FN_LAYER) {
     [KEY(G)] = KEY(INSERT),
     [KEY(H)] = KEY(DELETE),
     [KEY(L)] = KEY(NUM_LOCK),
-    [KEY(SEMICOLON)] = KEY(PAUSE_BREAK),
 
     [KEY(O)] = KEY(SCROLL_LOCK),
     [KEY(P)] = KEY(PRINT_SCREEN),
+    [KEY(SEMICOLON)] = KEY(PAUSE_BREAK),
 
     // Our current media key implementation does not work in Windows
     // because Windows doesn't correctly parse the descriptor. Remap these:

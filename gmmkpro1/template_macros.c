@@ -24,6 +24,7 @@ static inline void keyboard_host_leds_changed(uint8_t leds) {
     const bool is_error = (leds & LED_VIRTUAL_USB_ERROR_BIT) != 0;
     const bool is_active = (leds & LED_VIRTUAL_USB_ACTIVE_BIT) != 0;
     const bool is_boot = (leds & LED_VIRTUAL_BOOT_PROTOCOL_BIT) != 0;
+    const bool is_fn = is_layer_active(APPLE_FN_LAYER);
 
     if (leds & LED_NUM_LOCK_BIT) {
         rgb_led_set_by_keycode(USB_KEY_ESC, is_error ? 16 : 8, is_boot ? 128 : 32, is_active ? 64 : 32);
@@ -31,7 +32,9 @@ static inline void keyboard_host_leds_changed(uint8_t leds) {
         rgb_led_set_by_keycode(USB_KEY_ESC, is_error ? 64 : 0, is_boot ? 128 :  0, is_active ? 32 : 0);
     }
     if (leds & LED_CAPS_LOCK_BIT) {
-        rgb_led_set_by_keycode(USB_KEY_CAPS_LOCK, 16, 128, 64);
+        rgb_led_set_by_keycode(USB_KEY_CAPS_LOCK, 16, 128, is_fn ? 196 : 64);
+    } else if (is_fn) {
+        rgb_led_set_by_keycode(USB_KEY_CAPS_LOCK, 32, 64, 128);
     } else {
         rgb_led_set_by_keycode(USB_KEY_CAPS_LOCK, 0, 0, 0);
     }
@@ -98,6 +101,19 @@ static void execute_macro(uint8_t macro_number, bool is_release, uint8_t physica
 
     case MACRO_FALLTHROUGH:
         register_key(physical_key, is_release);
+        break;
+
+    case MACRO_CYCLE_OS_LAYERS:
+        if (is_release) {
+            if (is_layer_active(WINDOWS_LAYER)) {
+                disable_layer(WINDOWS_LAYER);
+                enable_layer(LINUX_LAYER);
+            } else if (is_layer_active(LINUX_LAYER)) {
+                disable_layer(LINUX_LAYER);
+            } else {
+                enable_layer(WINDOWS_LAYER);
+            }
+        }
         break;
 
     case MACRO_WEAK_APPLE_FN:
@@ -257,12 +273,16 @@ static inline void layer_state_changed(uint8_t layer, bool is_enabled) {
     if (is_enabled) {
         switch (layer) {
         case LINUX_LAYER:
-            led_set_gradient(false, GRADIENT_GREEN_BLUE);
-            break;
+            if (!is_layer_active(WINDOWS_LAYER)) {
+                led_set_gradient(false, GRADIENT_GREEN_BLUE);
+                break;
+            }
+            // fallthrough
         case WINDOWS_LAYER:
             led_set_gradient(true, GRADIENT_RED_BLUE);
             break;
         case APPLE_FN_LAYER:
+            keyboard_host_leds_changed(usb_keyboard_led_state());
             break;
         case WINDOWS_FN_LAYER:
             enable_layer(APPLE_FN_LAYER);
@@ -280,6 +300,7 @@ static inline void layer_state_changed(uint8_t layer, bool is_enabled) {
             break;
         case APPLE_FN_LAYER:
             (void) release_weak_apple_fn();
+            keyboard_host_leds_changed(usb_keyboard_led_state());
             break;
         case WINDOWS_FN_LAYER:
             disable_layer(APPLE_FN_LAYER);
