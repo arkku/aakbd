@@ -26,7 +26,7 @@
 typedef uint16_t keycode_t;
 
 /// Plain key, no modifiers.
-#define KEY(name)                   PASTE(USB_KEY_, name)
+#define KEY(name)                   USB_KEY_##name
 
 /// Plain key, no modifiers.
 #define PLAIN(name)                 KEY(name)
