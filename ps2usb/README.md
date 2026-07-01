@@ -29,6 +29,31 @@ pins are driven high (i.e., unconnected is fine).
 
 No other components are needed, apart from the physical connectors.
 
+## Keyboard Compatibility
+
+The PS/2 keyboard protocol has three different keycode sets. Set 2 is the
+default and used by all Microsoft operating systems. This means many cheaper
+(or just newer) PS/2 keyboards _only_ support the Set 2, because nothing else
+has been required.
+
+However, the Set 3 is more sensible: every key has a simple, unique press
+(make) and release (break) code (one byte). Meanwhile Set 2 has a number of
+"extended" keycodes (extra byte in the sequence) and some weird logic for
+some keys (e.g., holding down the Pause key can't be detected because it sends
+a the press and release at the same time, and this press and release also
+includes the Num Lock press and release, which has to be specifically ignored
+or pressing Pause will toggle Num Lock).
+
+This `ps2usb` tries to use Set 3 keycodes by default. Hopefully keyboards that
+do not support them will report an error and this will fall back to Set 3. But
+it's entirely possible that some keyboards report success for Set 3, yet do not
+actually support it, or just go into an error state. In that case you need to
+manually default to Set 2, e.g., in local.mk:
+
+``` Make
+DEVICE_FLAGS += -DPS2USB_PREFERRED_KEYCODE_SET=2
+```
+
 ## Configuration
 
 Set `DEVICE` to `ps2usb` either in `local.mk` (in the project root directory),

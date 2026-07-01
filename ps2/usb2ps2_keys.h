@@ -1,7 +1,7 @@
 /**
- * ps2usb_keys.h: PS/2 scancode to USB mapping (sets 2 and 3).
+ * usb2ps2_keys.h: USB to PS/2 scancode lookup.
  *
- * Copyright (c) 2021 Kimmo Kulovesi, https://arkku.dev/
+ * Copyright (c) 2026 Kimmo Kulovesi, https://arkku.dev/
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,21 +16,19 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-#ifndef KK_PS2_USB_KEYCODES_H
-#define KK_PS2_USB_KEYCODES_H
+#ifndef KK_USB2PS2_KEYS_H
+#define KK_USB2PS2_KEYS_H
 
 #include <stdint.h>
 #include <stdbool.h>
 
-/// Return the USB keycode corresponding to the same physical key in a
-/// typical USB keyboard as the PS/2 key given as argument. This should _not_
-/// be used for remapping - rather see `process_key` in `keys.h`.
-uint8_t usb_keycode_for_ps2_keycode(uint8_t ps2_code, uint8_t scancode_set);
+#include "usbkbd_config.h"
 
-/// Lookup an extended (0xE0-prefix) PS/2 scancode. Works regardless of the
-/// active scancode set since extended key scancodes are the same in sets 2
-/// and 3.
-uint8_t usb_keycode_for_ps2_extended_keycode(uint8_t ps2_code);
+/// Look up the scancode for a USB keycode in the given scancode set.
+/// Returns the scancode byte, or 0 if unmapped.
+uint8_t ps2_scancode_for_usb_keycode(uint8_t usb_keycode, uint8_t set);
+
+/// Returns true if the key needs an E0 prefix in the given set.
+bool is_extended_ps2_key(uint8_t usb_keycode, uint8_t set);
 
 #endif

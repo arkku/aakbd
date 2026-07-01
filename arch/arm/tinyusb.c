@@ -157,6 +157,13 @@ usb_bus_attach (void) {
 }
 
 void
+usb_bus_detach (void) {
+    if (tusb_inited()) {
+        tud_disconnect();
+    }
+}
+
+void
 usb_tick (void) {
     tud_task();
 

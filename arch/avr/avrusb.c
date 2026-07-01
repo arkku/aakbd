@@ -165,6 +165,11 @@ usb_bus_attach (void) {
     usb_attach();
 }
 
+void
+usb_bus_detach (void) {
+    usb_detach();
+}
+
 static INLINE void
 usb_init_endpoint (const uint8_t num, const uint8_t type, const uint8_t size, const uint8_t flags) {
     usb_set_endpoint(num);

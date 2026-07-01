@@ -27,10 +27,16 @@
 #include "usb_keys.h"
 #include "keycodes.h"
 
-#include <layers.c> // Yes, including .c
+#ifndef LAYERS_INCLUDE
+#define LAYERS_INCLUDE <layers.c>
+#endif
+#include LAYERS_INCLUDE
 
 #if LAYER_COUNT > 0
-#include <macros.c> // Yes, including .c
+#ifndef MACROS_INCLUDE
+#define MACROS_INCLUDE <macros.c>
+#endif
+#include MACROS_INCLUDE
 #endif
 
 #ifndef DEFAULT_BASE_LAYER

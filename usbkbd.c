@@ -23,6 +23,12 @@
 
 #define USB_KEYBOARD_ACCESS_STATE 1
 #include "usbkbd.h"
+
+#if ENABLE_PS2_DEVICE
+#include "ps2_output.h"
+static uint8_t ps2_modifier_flags = 0;
+#endif
+
 #include "aakbd.h"
 #include "usb.h"
 #include "usb_keys.h"
@@ -89,6 +95,16 @@ usb_keyboard_reset (void) {
     usb_keyboard_updated = true;
 }
 
+static inline int_fast8_t
+next_free_buffer_index (const uint8_t key) {
+    int_fast8_t i = 0;
+    while (keys_buffer[i] && keys_buffer[i] != key) {
+        // Find the first empty spot or duplicate entry to overwrite
+        ++i;
+    }
+    return i;
+}
+
 void
 usb_keyboard_press (const uint8_t key) {
     if (key <= KEY_MAX_ERROR_CODE) {
@@ -97,12 +113,23 @@ usb_keyboard_press (const uint8_t key) {
         }
         return;
     }
-    if (key < MODIFIERS_START) {
-        int_fast8_t i = 0;
-        while (keys_buffer[i] && keys_buffer[i] != key) {
-            // Find the first empty spot or duplicate entry to overwrite
-            ++i;
+
+#if ENABLE_PS2_DEVICE
+    if (ps2_output_is_scanning()) {
+#if !ENABLE_PS2_NKRO
+        if (key >= MODIFIERS_START || next_free_buffer_index(key) != MAX_KEY_ROLLOVER)
+#endif
+        {
+            ps2_press_key(key);
+            if (IS_MODIFIER(key)) {
+                ps2_modifier_flags |= MODIFIER_BIT(key);
+            }
         }
+    }
+#endif
+
+    if (key < MODIFIERS_START) {
+        const int_fast8_t i = next_free_buffer_index(key);
         if (i >= usb_keyboard_rollover && !key_error) {
             key_error = KEY_ERROR_OVERFLOW;
         }
@@ -124,6 +151,15 @@ usb_keyboard_press (const uint8_t key) {
 
 void
 usb_keyboard_release (const uint8_t key) {
+#if ENABLE_PS2_DEVICE
+    if (ps2_output_is_scanning()) {
+        ps2_release_key(key);
+        if (IS_MODIFIER(key)) {
+            ps2_modifier_flags &= ~MODIFIER_BIT(key);
+        }
+    }
+#endif
+
     if (key < MODIFIERS_START) {
         bool found = false;
         uint8_t *w = keys_buffer;
@@ -204,18 +240,62 @@ is_virtual_pressed (const uint8_t key) {
 void
 usb_keyboard_release_all_keys (void) {
     for (int_fast8_t i = 0; i < MAX_KEY_ROLLOVER; ++i) {
+#if ENABLE_PS2_DEVICE
+        if (keys_buffer[i]) {
+            ps2_release_key(keys_buffer[i]);
+        }
+#endif
         keys_buffer[i] = 0;
     }
     usb_keys_modifier_flags = 0;
     usb_keys_extended_flags = 0;
     key_error = 0;
     usb_keyboard_updated = true;
+
+#if ENABLE_PS2_DEVICE
+    {
+        uint8_t mods = ps2_modifier_flags;
+        uint8_t key = MODIFIERS_START;
+        uint8_t bit = 1;
+        while (mods) {
+            if (mods & bit) {
+                ps2_release_key(key);
+                mods &= ~bit;
+            }
+            ++key;
+            bit <<= 1;
+        }
+        ps2_modifier_flags = 0;
+
+        ps2_output_clear_keys(false);
+    }
+#endif
+
 }
 
 bool
 usb_keyboard_simulate_keypress (const uint8_t key, const uint8_t mods) {
     const uint8_t old_mods = usb_keys_modifier_flags;
     const uint8_t old_extended = usb_keys_extended_flags;
+
+#if ENABLE_PS2_DEVICE
+    if (ps2_output_is_scanning()) {
+        usb_keyboard_set_modifiers(mods);
+        usb_keyboard_press(key);
+
+        uint8_t timeout = SIMULATED_KEYPRESS_TIME_MS;
+        do {
+            ps2_output_task();
+            delay_milliseconds(1);
+        } while (timeout-- && ps2_output_is_scanning());
+
+        usb_keyboard_release(key);
+        ps2_output_task();
+        usb_keyboard_set_modifiers(old_mods);
+        usb_keys_extended_flags = old_extended;
+        return ps2_output_is_scanning();
+    }
+#endif
 
     usb_keys_modifier_flags = mods;
     usb_keyboard_press(key);
@@ -462,6 +542,28 @@ usb_keyboard_modifiers (void) {
 
 void
 usb_keyboard_set_modifiers (const uint8_t modifier_flags) {
+#if ENABLE_PS2_DEVICE
+    if (ps2_output_is_scanning()) {
+        uint8_t unsent_mods = modifier_flags ^ ps2_modifier_flags;
+        uint8_t key = MODIFIERS_START;
+        uint8_t bit = 1;
+        while (unsent_mods) {
+            if (unsent_mods & bit) {
+                unsent_mods ^= bit;
+
+                if (modifier_flags & bit) {
+                    ps2_press_key(key);
+                } else {
+                    ps2_release_key(key);
+                }
+            }
+            ++key;
+            bit <<= 1;
+        }
+        ps2_modifier_flags = modifier_flags;
+    }
+#endif
+
     if (usb_keys_modifier_flags != modifier_flags) {
         if (modifier_flags == (SHIFT_BIT | RIGHT_SHIFT_BIT) && !(usb_keys_modifier_flags & RIGHT_SHIFT_BIT)) {
 #if ENABLE_BOOTLOADER_SHORTCUT

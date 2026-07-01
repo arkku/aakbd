@@ -62,7 +62,9 @@ dfuarm: $(BIN)
 	$(SUDO) dfu-util -e && sleep 1 || true
 	$(SUDO) dfu-util -w $(DFU_ARGS) -D $<
 
-.PHONY: dfuarm
+upload: dfuarm
+
+.PHONY: dfuarm upload
 
 .ccls: Makefile local.mk $(DEVICE)/local.mk
 	@echo $(CC) >$@

@@ -1,14 +1,15 @@
 ## Overview
 
-AAKBD is a USB keyboard firmware. Remapping is expressed as *differences from the default named-key mapping*, not as complete positional layer definitions. Customisation is in C (`layers.c`, `macros.c`).
+AAKBD is a USB and PS/2 keyboard firmware. Remapping is expressed as *differences from the default named-key mapping*, not as complete positional layer definitions. Customisation is in C (`layers.c`, `macros.c`, `layers_$(MODEL).c`, `macros_$(MODEL).c`).
 
-Supported devices: `ps2usb`, `ergodox`, `modelf77`, `modelf62`, `modelf50`, `gmmkpro1`.
+Supported devices: `ps2usb`, `ergodox`, `modelf77`, `modelf62`, `modelf50`, `gmmkpro1`, `fext`.
 
 ## Build
 
 ```sh
 make DEVICE=modelf77       # AVR
 make DEVICE=gmmkpro1       # ARM (requires git submodule update --init)
+make MODEL=foo             # Optional: pick layers_foo.c / macros_foo.c if they exist
 make clean
 make distclean
 ```
@@ -22,7 +23,7 @@ Place `local.mk` in project root. Device overrides in `DEVICE/local.mk`. Config 
 CONFIG_FLAGS = -DUSB_MAX_KEY_ROLLOVER=10
 ```
 
-**Do not** edit or delete user's `local.mk`, `layers.c`, `macros.c` without prompting. They are gitignored so changes are unrecoverable!
+**Do not** edit or delete user's `local.mk`, `layers.c`, `macros.c`, `layers_*.c`, `macros_*.c` without prompting. They are gitignored so changes are unrecoverable! Even if prompted, never overwrite large parts without taking a backup.
 
 Everything must work with sane defaults without these files present. (But do not delete or move them out of the way on your own for testing, they are sacred user input.)
 
@@ -54,6 +55,7 @@ Makefiles must be kept up to date with changes to files/dependencies.
 | `DEVICE_FLAGS` | device `.mk` / `qmk_port.mk` | Compiler flags | Prepend-only via `+=` |
 | `CC_FLAGS` | `Makefile` / `arm-common.mk` | Include paths, arch flags | Overridden by ARM; AVR uses `AVR_FLAGS` |
 | `CFLAGS` | Root `Makefile` | `$(CUSTOM_FLAGS) $(CC_FLAGS) $(DEVICE_FLAGS) $(CONFIG_FLAGS)` | Final compiler flags |
+| `MODEL` | User (command line / `local.mk`) | Free-form string | Picks `layers_$(MODEL).c` / `macros_$(MODEL).c`; change forces clean rebuild |
 
 ### Build variable chain
 
@@ -83,11 +85,39 @@ These must remain compatible with all architectures and devices. Deviations from
 | `keycodes.h` | 16-bit extended keycodes: modifier combos, layer ops, macros, tap/hold |
 | `layers.h` | `DEFINE_LAYER()` macro, PROGMEM storage |
 | `macros.h` | Helpers for macros and hooks |
-| `usbkbd.c` / `usbkbd.h` | USB HID report construction |
+| `usbkbd.c` / `usbkbd.h` | USB HID report construction; includes PS/2 output calls for simulated typing |
 | `usbkbd_config.h` | Compile-time options |
 | `usb_keys.h` | USB keycode enum |
 | `generic_hid.h` | Generic HID endpoint support (default disabled) |
 | `main.h` | Interface each device main must implement |
+
+### `ps2/` — PS/2 protocol implementation
+
+Shared PS/2 host and device mode code. Referenced via `-Ips2` when either is enabled.
+
+| File | Role |
+|------|------|
+| `kk_ps2_device.c/h` | PS/2 device-mode (delay-based) bit-banging I/O, 11-clock send / 12-clock receive |
+| `kk_ps2_host.c/h` | PS/2 host-mode (interrupt-based) — moved from `ps2usb/` |
+| `kk_ps2_avr.h` | AVR pin macros and helpers (CLOCK/DATA GPIO) |
+| `kk_ps2.h` | Shared command/reply constants |
+| `ps2_keys.h` | PS/2 scancode enum (shared between host and device modes) |
+| `ps2_output.c/h` | PS/2 device-mode output orchestration: async command handler, key event queue, scancode set management, repeat |
+| `usb2ps2_keys.c/h` | USB→PS/2 scancode tables for sets 1/2/3 |
+| `ps2_output_test.c` | Unit tests for `ps2_output.c` |
+| `kk_ps2_device_test.c` | Edge-by-edge device I/O tests |
+| `gen_test_runner.sh` | Auto-generates test runner scanning `test_*` functions |
+| `Makefile` | Build rules for both test binaries |
+| `ps2_keys.h` | PS/2 scancode enum (shared between host and device modes) |
+
+#### Testing PS/2 output (on host, no hardware needed)
+
+```sh
+make -C ps2 test          # ps2_output.c unit tests
+make -C ps2 device_test   # kk_ps2_device_test.c unit tests
+```
+
+The test outputs contain only errors and final result, **do not filter**.
 
 ### `arch/{arch}/` — Architecture-specific
 
@@ -144,6 +174,14 @@ Each device (e.g., `ps2usb/`, `ergodox/`, `gmmkpro1/`, `modelf77/`):
 Physical key → process_key() → layer resolution → preprocess_press() hook → execute_macro() or standard processing → usb_keyboard_press/release() → usb_keyboard_send_if_needed()
 ```
 
+### PS/2 output
+
+In PS/2 device mode (ENABLE_PS2_DEVICE=1), key events are queued via `ps2_press_key()` / `ps2_release_key()` and processed asynchronously by `ps2_output_task()`. The queue holds 10 events (5 key press+release pairs). `ps2_output_task()` drains the queue, sends scancodes, handles repeat, and processes incoming host commands.
+
+- Simulated typing (`usb_keyboard_simulate_keypress()`) calls `ps2_output_task()` after each press and release to keep the queue drained.
+- Repeat is implemented in firmware with configurable delay and rate via the F3 command.
+- All three scancode sets are supported; Sets 1 and 3 can be disabled to save space.
+
 ### Layer system
 
 - Layer 0: implicit default (physical key → *unique* USB keycode, device-defined)
@@ -192,3 +230,4 @@ void execute_macro(uint8_t macro_number, bool is_release, uint8_t physical_key, 
 - All architectures and devices must continue to work at all times (but no need to test building every device during focused development, just do a regression test once all other tasks are done and verified)
 - Prefer to fail at compile time for unsupported configurations rather than providing a default, if the default might be incorrect
 - Do not hide issues by forcing configuration options where the issue doesn't occur, unless those configuration options are inherently part of the device spec
+- C-code formatting: `.clang-format` at project root

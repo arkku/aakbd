@@ -35,6 +35,10 @@ endif
 
 QMK_CORE_OBJS = keyboard.o led.o qmk_port.o qmk_main.o $(KEYMAP_FILE).o matrix_common.o timer.o bitwise.o suspend.o suspend_core.o $(BOOTLOADER_TYPE).o $(DEBOUNCE_TYPE).o platform.o bootmagic.o eeconfig.o
 
+ifneq ($(NO_CONFIG_CHECK),1)
+QMK_CORE_OBJS += config_check.o
+endif
+
 ifneq ($(DEBOUNCE_TYPE),none)
 DEVICE_FLAGS += -DDEBOUNCE=$(DEBOUNCE)
 
@@ -76,3 +80,5 @@ $(BUILDDIR)/rgb_matrix.o: rgb_matrix.h $(COMMON_HEADERS)
 $(BUILDDIR)/aw20216s.o: aw20216s.h spi_master.h $(COMMON_HEADERS)
 $(BUILDDIR)/bootmagic.o: bootmagic.h matrix.h keyboard.h wait.h eeconfig.h bootloader.h $(COMMON_HEADERS)
 $(BUILDDIR)/spi_master.o: spi_master.h $(COMMON_HEADERS)
+
+$(BUILDDIR)/config_check.o: gpio.h $(COMMON_HEADERS)

@@ -34,6 +34,10 @@ void usb_init(void);
 /// - Precondition: `usb_init()` must be called first.
 void usb_bus_attach(void);
 
+/// Disconnect from the USB bus.
+/// - Note: This is safe to call without `usb_init()`.
+void usb_bus_detach(void);
+
 /// Must be called from the main loop to run the USB system.
 void usb_tick(void);
 

@@ -1,9 +1,21 @@
 ## AAKBD
 
-AAKBD is a USB keyboard implementation for AVR (e.g., ATMEGA32U4, ATMEGA32U2)
-devices, and lately some ARM-based keyboards. One of the A's probably stands
-for Arbitrary, since it is designed to make it simple to add arbitrary C code
-to be run in response to keypresses.
+AAKBD is a USB and PS/2 keyboard implementation for AVR (e.g., ATMEGA32U4,
+ATMEGA32U2) devices, and lately some ARM-based keyboards. It's relatively
+easy to port keyboards from the [QMK](https://github.com/qmk/qmk_firmware)
+firmware to AAKBD – in that case QMK is used to handle the keyboard's
+hardware, while AAKBD has its own (completely different) keypress processing
+and USB HID implementation.
+
+One of the A's probably stands for Arbitrary, since it is designed to make
+it simple to add arbitrary C code to be run in response to keypresses. This
+doesn't mean that you would have to write C code, or even know C, to use and
+configure this firmware – the basic layer/keymap syntax can easily be learned
+by example. However, if you _do_ wish to implement something custom, you can
+do so *arbitrarily* (like "when connected to a computer detected as running
+macOS, activate this layer and set these RGB LEDs, and when my on-Fn-key-hold
+layer is active, also simulate holding down the Apple Fn key but release it
+when other keys are pressed so that it doesn't become a modifier to them").
 
 Features supported:
 
@@ -48,20 +60,30 @@ Features supported:
   key per finger + all modifiers)
 * USB host fingerprinting for operating system (macOS, Windows, Linux)
   detection (works quite accurately for these three major operating systems)
+* PS/2 keyboard output with full scancode set 1/2/3 support and USB + PS/2
+  on the same connector with autodetection support (currently only implemented
+  on AVR and requires physically adding a PS/2 connector or wiring the pins
+  to share the USB connector for use with a passive adapter)
+* PS/2 keyboard input for conversion to USB (requires DIY hardware)
 
 Now, that being said, for the regular user it may be better to choose one of
-the established implementations with easy-to-use tools. These include
-[QMK](https://github.com/qmk/qmk_firmware) and
-[TMK](https://github.com/tmk/tmk_keyboard). However, for a more technically
-inclined person, _AAKBD_ may be more straightforward. In particular, the
-key maps (layers) are based on changing the default, named, keys rather than
-on a positional matrix. So, for any keyboard that has some kind of natural
-naming/mapping for the keys, remapping is simply a listing of the differences,
-rather than a set of complete layers with all positions listed.
+the established implementations with easy-to-use tools and configuration
+utilities / websites. However, for a more technically inclined person,
+_AAKBD_ may even be more straightforward as it is just C code and Make.
+In particular, the key maps (layers) are based on changing the default,
+named, keys rather than on a positional matrix. So, for any keyboard that
+has some kind of natural naming/mapping for the keys, remapping is simply a
+listing of the differences, rather than a set of complete layers with all
+positions listed. That is, if all you want to do is map a couple of keys,
+you only have to define those keys, not list the entire layout from scratch.
+If you want to add a layer that changes a couple of keys when activated,
+just list those changes in that layer and map the layer toggle to either the
+first layer or activate it automatically based on detected operating system
+that the keyboard is plugged in to.
 
-Currently this repository contains three implementations:
-* A PS/2 to USB keyboard converter (which I made to convert an IBM Model
-  M keyboard to USB, but it should work with any PS/2 keyboard)
+Currently this repository contains these implementations:
+* A [PS/2 to USB converter](ps2usb/README.md) (which I made to convert
+  an IBM Model M keyboard to USB, but it should work with any PS/2 keyboard)
 * An alternative firmware for the OG [ErgoDox Ez](https://ergodox-ez.com)
   (which I happen to have from an old job, and decided to port as a proof of
   concept that this engine is reusable)
@@ -73,40 +95,30 @@ Currently this repository contains three implementations:
   **arbitrary** code support can be used for likewise arbitrary use of the
   RGB LEDs. Rotary encoder support is also included.
 
+The `ps2usb` PS/2 to USB converter is entirely my own, the others are based
+on QMK for the keyboard hardware access while using my own USB and key
+processing. So, all the AAKBD configurability and features are supported
+on the QMK-based keyboards, even if not supported in QMK. It should be fairly
+easy to port other keyboards from QMK to AAKBD – let me know if you want help
+with that!
+
 ~ [Kimmo Kulovesi](https://arkku.dev/), 2021-10-10 (+ updates)
-
-## Hardware
-
-The implementation has been tested with ATMEGA32U4 running at 5V with a
-16 MHz crystal oscillator. The physical keyboard needs to be connected to
-something other than USB, but apart from that there is no additional hardware
-required beyond the oscillator and components required for the USB connector.
-It is probably simplest to buy a pre-made breakout board with these components.
-
-It also works on the ATMEGA32U2 found in the Model F keyboards' xwhatsit
-controller (wcass version), and on the STM32F303CC of the GMMK Pro rev 1.
-
-For DIY boards, an ISP programming device is needed unless the microcontroller
-is already set up with a bootloader. For pre-made keyboards there is
-a bootloader already installed. I recommend enabling the DFU interface in
-AAKBD to make it easy to enter the bootloader even in case the keyboard itself
-
-See the [PS/2 to USB converter README](ps2usb/README.md) for details about that
-specific use.
 
 ## Software Requirements
 
 For building AVR devices, `avr-gcc`, `avr-libc`, GNU `make` and a shell to
-run it in are required. For flashing the firmware, `avrdude` or some other
-program that can upload it to the microcontroller.
+run it in are required. For flashing the firmware, `avrdude`, `dfu-programmer`,
+or some other program that can upload it to the microcontroller. The same
+program probably works that is used to flash the original firmware of your
+keyboard. For DFU-based firmwares, `dfu-util` seems more reliable for making
+the keyboard enter bootloader than `dfu-programmer`, but you can also bind a
+key combination to enter the bootloader.
 
 For ARM devices the `arm-none-eabi-gcc` toolchain with newlib is needed, along
-with the usual `make`. `dfu-suffix` (from `dfu-util`) will be used if
-available – it may or may not make a difference for flashing the firmware. For
-flashing,
-
-For resetting the device into bootloader without key bindings (e.g., if you
-break your key bindings), it may be helpful to use `dfu-util -e`.
+with the usual `make`. For flashing, `dfu-util` is needed. The separate program
+`dfu-suffix` (from `dfu-util`, but not always installed by default) will be
+used if available – it may or may not make a difference for flashing the
+firmware.
 
 ## Configuration
 
@@ -162,12 +174,25 @@ i.e., `ps2usb/local.mk`. Although, if you don't wish to do other customisation
 than to set `DEVICE`, you can just run `make` from the device subdirectory,
 i.e., running `make` in `ps2usb` will make the PS/2 to USB converter.
 
+If you have multiple of the same keyboard and wish to maintain different
+combinations for them (and it becomes too complicated to manage with the C
+preprocessor), you can have `layers_foo.c` and/or `macros_foo.c` instead of
+the plain ones (`foo` is any arbitrary name you want to give it). Then build
+it with `make MODEL=foo`. Admittedly this is a very niche use case, but it
+does help avoid juggling multiple `layers.c` files manually.
+
 ## Flashing Firmware
 
 You can upload the produced firmware (such as `ps2usb.hex`) to the
 microcontroller by either an ISP programmer device or by means of an existing
 bootloader. I recommend using a bootloader, since that allows you to reset the
 device with a keyboard shortcut and simply upload with:
+
+``` sh
+make dfu
+```
+
+Or, for AVR without a DFU-compliant bootloader, with:
 
 ``` sh
 make upload PORT=/dev/ttyUSB0
@@ -183,6 +208,16 @@ To initially get your device into bootloader mode, you need to short the reset
 stays in the bootloader after reset may be extremely short. Reset it twice in
 a row to extend the time.
 
+For ARM-based keyboards DFU is the default. Install `dfu-utils` and try with
+`make dfu`. Or, for pre-made keyboards, try using the keyboard's original
+firmware flashing tools. The ARM keyboard firmware has `.bin` extension instead
+of `.hex`, e.g., `gmmkpro1.bin`. DFU can also be used with AVR if the
+bootloader supports it.
+
+If you don't know what bootloader is there, just try the various possibilities
+(without any other USB devices plugged in so you don't accidentally flash a
+different device if it would just happen to use a compatible bootloader).
+
 With an ISP, hook up the device to the programmer and instead use:
 
 ``` sh
@@ -195,37 +230,33 @@ the AVR Dragon.
 You can also use `make fuses` target with the same arguments as for `make
 burn`. This programs the fuses on the device for 16 MHz crystal oscillator.
 
-For ARM-based keyboards DFU is used instead: install `dfu-utils` and try with
-`make dfu`. Or, for pre-made keyboards, try using the keyboard's original
-firmware flashing tools. The ARM keyboard firmware has `.bin` extension instead
-of `.hex`, e.g., `gmmkpro1.bin`. DFU can also be used with AVR if the
-bootloader supports it.
 
 ### Updating the Firmware
 
 Once you have flashed the firmware onto the device once and have the keyboard
-working, updating the firmware is much simpler than the initial upload
-(provided that a bootloader is installed).
+working, updating the firmware can be much simpler than the initial upload
+to a blank device (provided that a bootloader is installed).
 
-If your keyboard has both left and right Shift keys as well as
-Scroll Lock _mapped_, you can enter the bootloader by pressing
-<kbd>Left Shift</kbd> <kbd>Scroll Lock</kbd> <kbd>Right Shift</kbd> in that
-order. If you don't have these keys, or have remapped them in ways that make
-this shortcut inconvenient, you can remap a key to `EXT(ENTER_BOOTLOADER)`
-in one of your layers and use that instead. Or you can create a custom macro
-that calls `jump_to_bootloader()` based on whatever conditions you like.
+If you have `ENABLE_DFU_INTERFACE` set to `1` (the default), you can just use
+`make dfu` to do the reset and flash both, if your bootloader supports DFU and
+you have [dfu-util](http://dfu-util.sourceforge.net) installed.
 
-For some types of keyboards you can also enable "bootmagic", i.e., plug the
-keyboard in with a specific key (like <kbd>Esc</kbd>) held down to enter the
-bootloader. Keyboards that have this enabled by default generally don't also
-enable the bootloader shortcut described above.
+For simply resetting the keyboard it doesn't actually matter whether your
+bootloader supports DFU: the DFU reset is handled by AAKBD and will still enter
+the bootloader, allowing other utilities to upload the firmware.
 
-If you have `ENABLE_DFU_INTERFACE` set to `1`, you can also enter the
-bootloader by issuing a DFU_DETACH request. One way to do this is by using
-[dfu-util](http://dfu-util.sourceforge.net) and the command `dfu-util -e`.
-It doesn't actually matter whether your bootloader supports DFU: this will
-still enter the bootloader. Using a DFU bootloader just enables you to upload
-the firmware via DFU as well.
+You can also map a key to `EXT(ENTER_BOOTLOADER)`, e.g., I typically put this
+behind Fn (which activates `FN_LAYER` on hold) and then Space (which activates
+`FN_SPACE_LAYER` when pressed from the `FN_LAYER`), and then a key like
+<kbd>R</kbd> for reset. So, <kbd>Fn</kbd> + <kbd>Space</kbd> + <kbd>R</kbd>
+(in that order) to reset. (But TBH I don't even remember the last time I
+didn't just use DFU to reset.)
+
+For some types of keyboards you can enable "bootmagic", i.e., plug the keyboard
+in with a specific key (like <kbd>Esc</kbd>) held down to enter the
+bootloader. Some keyboards may also default to <kbd>Left Shift</kbd> +
+<kbd>Scroll Lock</kbd> + <kbd>Right Shift</kbd> (in that order) as a special
+shortcut, give it a try.
 
 ## Key Mapping
 
@@ -1021,3 +1052,27 @@ static inline void handle_tick(uint8_t tick_10ms_count) {
 
 But, like said, I am not that much into RGB effects, so I'll stick with the
 simple examples.
+
+## PS/2 Output
+
+AAKBD also supports PS/2 keyboard output as an alternative to USB. These two
+can't be active at the same time - PS/2 will be autodetected on power-up and
+selected. Otherwise USB will be used. USB support is always built into the
+firmware, but you can definitely use a keyboard only with PS/2 if you prefer,
+although you still need to connect to USB for flashing the firmware (hence it
+can't be disabled entirely).
+
+None of the currently supported keyboards come natively with a PS/2 output, so
+you need to wire one yourself. You can either get a PS/2 female connector and
+wire power, ground, and two free GPIO pins to it, or you can wire two free
+GPIO pins to the USB connector's D+ and D- pins (ideally through resistors)
+and use a passive USB to PS/2 adapter (these light green dongles used to come
+with early USB mice – they are purely passive adapters and can be used even
+though they have a picture of a mouse on them, just plug into the PS/2
+keyboard port).
+
+For details on wiring and configuration see the [PS/2 README.md](ps2/README.md)
+in the `ps2` subdirectory. The PS/2 output supports all three scancode sets and
+all standard commands (unlike many later commercial keyboards). I have tested
+mine on an actual IBM PS/2 system, and it doesn't even complain about it not
+being an IBM keyboard (it does complain about several third-party keyboards).

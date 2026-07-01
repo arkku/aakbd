@@ -13,6 +13,8 @@ ARFLAGS=rcs
 CC_FLAGS=-I$(DEVICE) -I. -Iarch/$(ARCH)
 LD_FLAGS=
 
+MODEL ?=
+
 # Default goal must be the first target in the Makefile
 all:
 
@@ -30,14 +32,46 @@ OBJS = $(OBJ) usbkbd_descriptors.o usbkbd.o keys.o host_fingerprint.o $(DEVICE_O
 
 BUILDDIR ?= $(DEVICE)/build
 
-vpath %.c . $(DEVICE) arch/$(ARCH)
-vpath %.h . $(DEVICE) arch/$(ARCH)
+MODEL_FILE = $(BUILDDIR)/model
+MODEL_OLD := $(wildcard $(MODEL_FILE))
+ifneq ($(MODEL_OLD),)
+MODEL_SAVED := $(file < $(MODEL_FILE))
+ifneq ($(MODEL_SAVED),$(MODEL))
+# Delete *.o on MODEL change, as there may be different config from that
+$(shell rm -f $(BUILDDIR)/*.o $(MODEL_FILE))
+endif
+endif
+
+vpath %.c . $(DEVICE) arch/$(ARCH) ps2
+vpath %.h . $(DEVICE) arch/$(ARCH) ps2
 
 ifneq (,$(CUSTOM_DIR))
 CUSTOM_FLAGS += -I$(CUSTOM_DIR)
 MACROS_C = $(CUSTOM_DIR)/macros.c
 LAYERS_C = $(CUSTOM_DIR)/layers.c
 else # ^ CUSTOM_DIR
+ifneq (,$(MODEL))
+ifneq (,$(wildcard $(DEVICE)/macros_$(MODEL).c))
+MACROS_C = $(DEVICE)/macros_$(MODEL).c
+DEVICE_FLAGS += -DMACROS_INCLUDE='<macros_$(MODEL).c>'
+else
+ifneq (,$(wildcard $(DEVICE)/macros.c))
+MACROS_C = $(DEVICE)/macros.c
+else
+MACROS_C = macros.c
+endif
+endif
+ifneq (,$(wildcard $(DEVICE)/layers_$(MODEL).c))
+LAYERS_C = $(DEVICE)/layers_$(MODEL).c
+DEVICE_FLAGS += -DLAYERS_INCLUDE='<layers_$(MODEL).c>'
+else
+ifneq (,$(wildcard $(DEVICE)/layers.c))
+LAYERS_C = $(DEVICE)/layers.c
+else
+LAYERS_C = layers.c
+endif
+endif
+else # ^ MODEL
 ifneq (,$(wildcard $(DEVICE)/macros.c))
 MACROS_C = $(DEVICE)/macros.c
 else
@@ -47,6 +81,7 @@ ifneq (,$(wildcard $(DEVICE)/layers.c))
 LAYERS_C = $(DEVICE)/layers.c
 else
 LAYERS_C = layers.c
+endif
 endif
 endif
 
@@ -65,7 +100,17 @@ ifeq (1,$(ENABLE_HOST_FINGERPRINT))
 endif
 endif
 
+ifeq (0,$(ENABLE_PS2_DEVICE))
+	DEVICE_FLAGS += -DENABLE_PS2_DEVICE=0
+else
+ifeq (1,$(ENABLE_PS2_DEVICE))
+	DEVICE_FLAGS += -DENABLE_PS2_DEVICE=1 -Ips2
+	DEVICE_OBJS += ps2_output.o usb2ps2_keys.o kk_ps2_device.o
+endif
+endif
+
 all: $(BIN)
+	@mkdir -p $(BUILDDIR) && echo '$(MODEL)' > $(MODEL_FILE)
 
 # Object prerequisites for the link rule (added after all variables are resolved)
 $(BIN): $(addprefix $(BUILDDIR)/, $(OBJS))
@@ -77,6 +122,10 @@ $(BUILDDIR)/usbkbd.o: usbkbd.h usb_hardware.h usbkbd_config.h usb.h usbkbd_descr
 $(BUILDDIR)/usbkbd_descriptors.o: usbkbd_descriptors.h usbkbd_config.h usb.h usb_keys.h generic_hid.h progmem.h aakbd.h local.mk
 $(BUILDDIR)/keys.o: keys.h keycodes.h usbkbd.h usbkbd_config.h aakbd.h usb_keys.h layers.h macros.h progmem.h $(MACROS_C) $(LAYERS_C)
 $(BUILDDIR)/host_fingerprint.o: host_fingerprint.h usbkbd_config.h
+$(BUILDDIR)/ps2_output.o: ps2/ps2_output.c ps2/ps2_output.h ps2/usb2ps2_keys.h ps2/kk_ps2_device.h ps2/kk_ps2_avr.h $(COMMON_HEADERS)
+$(BUILDDIR)/usb2ps2_keys.o: ps2/usb2ps2_keys.c ps2/usb2ps2_keys.h progmem.h usb_keys.h ps2/kk_ps2.h ps2/ps2_keys.h $(COMMON_HEADERS)
+$(BUILDDIR)/kk_ps2_device.o: ps2/kk_ps2_device.c ps2/kk_ps2_device.h ps2/kk_ps2.h ps2/kk_ps2_avr.h usbkbd_config.h $(COMMON_HEADERS)
+$(BUILDDIR)/kk_ps2_host.o: ps2/kk_ps2_host.c ps2/kk_ps2_host.h ps2/kk_ps2.h ps2/kk_ps2_avr.h usbkbd_config.h $(COMMON_HEADERS)
 $(OBJECT_FILES): Makefile $(DEVICE)/$(DEVICE).mk $(wildcard local.mk) $(wildcard $(DEVICE)/local.mk)
 
 $(BUILDDIR)/%.o: %.c | $(BUILDDIR)
@@ -105,10 +154,9 @@ reset:
 	$(SUDO) dfu-util -e
 
 dfu: $(DFU_TARGET)
-upload: dfu
 
 clean:
-	rm -f *.o
+	rm -f *.o *.gcda *.gcno
 	@[ -d ./$(BUILDDIR) ] && rm -f ./$(BUILDDIR)/*.o ./$(BUILDDIR)/*.elf ./$(BUILDDIR)/*.map ./$(BUILDDIR)/*.c ./$(BUILDDIR)/*.h || true
 	@[ -e $(BUILDDIR) ] && rmdir $(BUILDDIR) || true
 	@[ -d ./release/build ] && rm -rf ./release/build || true

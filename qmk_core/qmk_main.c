@@ -25,6 +25,10 @@
 #include <keys.h>
 #include <aakbd.h>
 
+#if ENABLE_PS2_DEVICE
+#include "ps2_output.h"
+#endif
+
 #include "quantum.h"
 #include "qmk_port.h"
 #include "keyboard.h"
@@ -33,6 +37,8 @@
 #include "platforms/bootloader.h"
 #include "platforms/timer.h"
 #include "platforms/suspend.h"
+
+#define USB_ENUMERATION_TIMEOUT_MS  1200U
 
 #ifdef BACKLIGHT_ENABLE
 #include "backlight.h"
@@ -64,7 +70,11 @@ current_10ms_tick_count (void) {
 
 #ifdef HAPTIC_ENABLE
 static uint8_t haptic_usb_is_configured = 0;
+#if ENABLE_PS2_DEVICE
+#define haptic_is_powered() (!HAPTIC_OFF_IN_LOW_POWER || (haptic_usb_is_configured && !usb_is_suspended()) || is_ps2_scanning_enabled)
+#else
 #define haptic_is_powered() (!HAPTIC_OFF_IN_LOW_POWER || (haptic_usb_is_configured && !usb_is_suspended()))
+#endif
 
 static void
 process_haptic (uint8_t key, bool pressed) {
@@ -135,20 +145,65 @@ kbd_input (void) {
 
 static void
 protocol_init (void) {
+#if ENABLE_PS2_DEVICE && ENABLE_FALLBACK_TO_PS2_FROM_USB
+    // The timer is needed for the fallback, well, timer.
+    // It is also called later in keyboard_init(), which resets it later.
+    timer_init();
+#endif
     protocol_pre_init();
-    usb_init();
-    previous_tick_count = timer_read();
+
+#if ENABLE_PS2_DEVICE
+    for (;;) {
+        // Reset any previous USB attempt
+        usb_bus_detach();
+        usb_deinit();
+
+        // Try PS/2 first
+        ps2_device_init();
+        if (ps2_device_host_detected()) {
+            ps2_output_init();
+
+            // NOTE: PS/2 and USB can't both be active at once. Make sure this is
+            // the only place where either `usb_init()` or `ps2_output_init()` is
+            // called and that they are mutually exclusive.
+            protocol_post_init();
+            return;
+        }
+#endif
+        usb_init();
+        previous_tick_count = timer_read();
+
+        protocol_post_init();
+
+        // Must be called with interrupts enabled so the USB ISRs can handle
+        // the USB reset and the first SETUP immediately:
+        usb_bus_attach();
 
 #ifdef HAPTIC_ENABLE
-    haptic_usb_is_configured = usb_is_configured();
-    haptic_notify_usb_device_state_change();
+        haptic_usb_is_configured = usb_is_configured();
+        haptic_notify_usb_device_state_change();
 #endif
 
-    protocol_post_init();
+#if ENABLE_PS2_DEVICE
+#if ENABLE_FALLBACK_TO_PS2_FROM_USB
+        // Wait for USB to enumerate; loop back to try PS/2 on timeout
+        {
+            uint16_t usb_start = timer_read();
+            while (!usb_is_ok()) {
+                if (TIMER_DIFF_FAST(timer_read(), usb_start) >= USB_ENUMERATION_TIMEOUT_MS) {
+                    break;
+                }
+            }
+        }
 
-    // Must be called with interrupts enabled so the USB ISRs can handle
-    // the USB reset and the first SETUP immediately:
-    usb_bus_attach();
+        if (!usb_is_ok()) {
+            protocol_pre_init();
+            continue;
+        }
+#endif
+        break;
+    }
+#endif
 }
 
 void
@@ -208,6 +263,10 @@ keyboard_task (void) {
 #endif
     }
 
+#if ENABLE_PS2_DEVICE
+    ps2_output_task();
+#endif
+
     (void) kbd_input();
 
 #ifdef RGBLIGHT_ENABLE
@@ -234,6 +293,11 @@ keyboard_task (void) {
 
 static inline void
 protocol_task (void) {
+#if ENABLE_PS2_DEVICE
+    if (ps2_output_is_initialized()) {
+        return;
+    }
+#endif
 #ifndef NO_USB_STARTUP_CHECK
     if (usb_is_suspended()) {
         while (usb_is_suspended()) {
@@ -287,9 +351,10 @@ shutdown_quantum (void) {
     keyboard_reset();
     usb_keyboard_send_report();
 
-    // Tear down USB
+#if ENABLE_PS2_DEVICE
+    ps2_output_shutdown();
+#endif
     usb_deinit();
-
     delay_milliseconds(32);
 
 #ifdef HAPTIC_ENABLE
@@ -322,6 +387,15 @@ keyboard_wake_up (void) {
 
 void
 jump_to_bootloader (void) {
+#if ENABLE_PS2_DEVICE
+    // If the PS/2 is active and USB isn't, jumping to the bootloader (which
+    // only works over USB) accomplishes nothing useful, and in case the PS/2
+    // pins are shorted to the USB D+ and D- pins the bootloader activating
+    // USB is not optimal.
+    if (ps2_output_is_active() && !usb_is_configured()) {
+        return;
+    }
+#endif
     shutdown_quantum();
     bootloader_jump();
 }

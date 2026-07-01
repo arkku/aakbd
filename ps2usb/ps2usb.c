@@ -17,10 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef F_CPU
-/// Crystal frequency.
-#define F_CPU   16000000UL
-#endif
+#include "ps2usb.h"
 
 #include <stdio.h>
 #include <stdint.h>
@@ -40,9 +37,12 @@
 #include <keys.h>
 
 #include "led.h"
-#include "kk_ps2.h"
+#include "kk_ps2_host.h"
+#define KK_KEYCODES_INCLUDE_DUPLICATES 1
+#include "ps2_keys.h"
 #include "ps2usb_keys.h"
 #include "progmem.h"
+#include "usb_keys.h"
 
 #ifndef MAX_ERROR_COUNT
 /// The maximum number of PS/2 protocol errors before we will try to reset the
@@ -51,6 +51,7 @@
 #endif
 
 static bool is_kbd_ready = false;
+static uint8_t scancode_set = 2;
 static volatile uint8_t kbd_error_count = 0;
 static bool error_handled = false;
 static volatile uint8_t kbd_idle_10ms_count = 0;
@@ -62,6 +63,10 @@ static uint8_t kbd_led_state = 0U;
 #define KEY_FLAG_OVERFLOW       ((uint8_t) (1U << 2))
 #define KEY_FLAG_ERROR          ((uint8_t) (1U << 3))
 #define KEY_FLAG_INVALID_STATE  ((uint8_t) (1U << 4))
+#define KEY_FLAG_E1_PREFIX      ((uint8_t) (1U << 5))
+
+/// Scancode byte after E1 prefix in Set 2 Pause sequence
+#define SET2_PAUSE_SCANCODE     ((uint8_t) 0x14U)
 
 /// The keycode prefix before a break (release) event.
 #define KBD_BREAK_PREFIX        ((uint8_t) 0xF0U)
@@ -106,6 +111,11 @@ current_10ms_tick_count (void) {
 
 #define BOOT_KEY_SKIP_BOOTLOADER  0
 #define BOOT_KEY_GO_TO_BOOTLOADER 0x7777U
+
+#if PS2USB_DEBUG_SCANCODES
+bool is_debug_active = true;
+static bool debug_f0_seen = false;
+#endif
 
 volatile uint16_t * const boot_key_pointer = (volatile uint16_t *) 0x0800U;
 
@@ -152,13 +162,51 @@ kbd_recv_byte (void) {
         byte = ps2_recv_timeout(10);
     } while (byte == EOF && attempts_remaining--);
 
+#if PS2USB_DEBUG_COMMANDS
+    if (byte != EOF && is_debug_active) {
+        (void) fprintf_P(usb_kbd_type, PSTR(" %02X"), (uint8_t) byte);
+    }
+#endif
+
     return byte;
 }
+
+#if PS2USB_DEBUG_COMMANDS
+static int
+send_cmd (const uint8_t cmd) {
+    if (is_debug_active) {
+        (void) fprintf_P(usb_kbd_type, PSTR(" %02x!"), cmd);
+        int reply = ps2_command(cmd);
+        (void) fprintf_P(usb_kbd_type, PSTR(" %02X"), (uint8_t) reply);
+        return reply;
+    } else {
+        return ps2_command(cmd);
+    }
+}
+
+static int
+send_cmd_arg (const uint8_t cmd, const uint8_t arg) {
+    int reply = send_cmd(cmd);
+    if (reply != PS2_REPLY_ACK) {
+        return reply;
+    }
+    return send_cmd(arg);
+}
+
+static bool
+send_cmd_arg_ack (const uint8_t cmd, const uint8_t arg) {
+    return send_cmd_arg(cmd, arg) == PS2_REPLY_ACK;
+}
+#else
+#define send_cmd(cmd)               ps2_command(cmd)
+#define send_cmd_arg(cmd, arg)      ps2_command_arg(cmd, arg)
+#define send_cmd_arg_ack(cmd, arg)  ps2_command_arg_ack(cmd, arg)
+#endif
 
 static uint8_t
 kbd_set_leds (uint8_t new_state) {
     if (kbd_led_state != new_state) {
-        if (ps2_command_arg_ack(PS2_COMMAND_SET_LEDS, new_state)) {
+        if (send_cmd_arg_ack(PS2_COMMAND_SET_LEDS, new_state)) {
             kbd_led_state = new_state;
         }
     }
@@ -170,6 +218,7 @@ key_flag (const uint8_t byte) {
     switch (byte) {
     case KBD_BREAK_PREFIX:      return KEY_FLAG_IS_RELEASE;
     case KBD_EXTENDED_PREFIX:   return KEY_FLAG_IS_EXTENDED;
+    case PS2_PAUSE_PREFIX:      return KEY_FLAG_E1_PREFIX;
     case 0x00:                  return KEY_FLAG_OVERFLOW;
     case PS2_COMMAND_RESET:     return KEY_FLAG_ERROR;
     case PS2_REPLY_TEST_PASSED: // fallthrough
@@ -179,6 +228,36 @@ key_flag (const uint8_t byte) {
     }
 }
 
+#if PS2USB_DEBUG_COMMANDS
+static uint8_t debug_led_state = 0;
+
+static void
+debug_cmd (const uint8_t cmd) {
+    (void) send_cmd(cmd);
+}
+
+static void
+debug_cmd_arg (const uint8_t cmd, const uint8_t arg) {
+    (void) send_cmd_arg(cmd, arg);
+}
+
+static void
+debug_per_key (const uint8_t cmd) {
+    (void) send_cmd(cmd);
+    ps2_send_byte(KEY_H);
+    ps2_send_byte(KEY_CAPS_LOCK);
+    ps2_send_byte(KEY_RIGHT_CTRL);
+    ps2_send_byte(KEY_PAUSE_BREAK);
+    (void) send_cmd(PS2_COMMAND_ENABLE);
+}
+
+static void
+debug_led_toggle (const uint8_t bit) {
+    debug_led_state ^= bit;
+    (void) send_cmd_arg(PS2_COMMAND_SET_LEDS, debug_led_state);
+}
+#endif
+
 static bool
 kbd_input (void) {
     bool have_changes = false;
@@ -187,26 +266,81 @@ kbd_input (void) {
 
     while (ps2_bytes_available() && ps2_is_ok()) {
         uint8_t key = ps2_get_byte();
+
+#if PS2USB_DEBUG_SCANCODES
+        if (is_debug_active) {
+            (void) fprintf_P(usb_kbd_type, PSTR(" %02X"), key);
+
+            if (key == 0xF0) {
+                debug_f0_seen = true;
+            } else if (!debug_f0_seen && key < 0xF0) {
+                switch (key) {
+#if PS2USB_DEBUG_COMMANDS
+                case KEY_0: debug_cmd_arg(PS2_COMMAND_SET_SCAN_CODES, 0x00); break;
+                case KEY_2: debug_cmd(PS2_COMMAND_ID); break;
+                case KEY_3: debug_cmd_arg(PS2_COMMAND_SET_SCAN_CODES, 0x03); break;
+                case KEY_4: debug_cmd(PS2_COMMAND_ENABLE); break;
+                case KEY_5:
+                    debug_cmd(PS2_COMMAND_DISABLE);
+                    debug_cmd(PS2_COMMAND_ENABLE);
+                    break;
+                case KEY_6: debug_cmd(PS2_COMMAND_SET_DEFAULTS); break;
+                case KEY_7: debug_cmd(PS2_COMMAND_SET_ALL_KEYS_TYPEMATIC); break;
+                case KEY_8: debug_cmd(PS2_COMMAND_SET_ALL_KEYS_MAKE_BREAK); break;
+                case KEY_9: debug_cmd(PS2_COMMAND_SET_ALL_KEYS_MAKE); break;
+                case KEY_A: debug_cmd(PS2_COMMAND_SET_ALL_KEYS_NORMAL); break;
+                case KEY_B: debug_per_key(PS2_COMMAND_SET_KEY_TYPEMATIC); break;
+                case KEY_C: debug_per_key(PS2_COMMAND_SET_KEY_MAKE_BREAK); break;
+                case KEY_D: debug_per_key(PS2_COMMAND_SET_KEY_MAKE); break;
+                case KEY_E: debug_cmd(PS2_COMMAND_RESEND); break;
+                case KEY_F: debug_cmd(PS2_COMMAND_RESET); break;
+                case KEY_G: debug_cmd(PS2_COMMAND_ECHO); break;
+                case KEY_N: debug_led_toggle(PS2_LED_NUM_LOCK_BIT); break;
+                case KEY_M: debug_led_toggle(PS2_LED_CAPS_LOCK_BIT); break;
+                case KEY_COMMA: debug_led_toggle(PS2_LED_SCROLL_LOCK_BIT); break;
+#endif
+                case KEY_F11:
+                case KEY_F11_SET2:
+                    (void) fprintf_P(usb_kbd_type, PSTR(" !!"));
+                    is_debug_active = false;
+                    break;
+                default:
+                    break;
+                }
+            } else {
+                debug_f0_seen = false;
+            }
+            continue;
+        }
+#endif
+
         const uint8_t prefix_flag = key_flag(key);
         if (prefix_flag) {
-            // The byte was a prefix modifying the next scancode
             kbd_key_state |= prefix_flag;
             continue;
         }
 
-        // This is the actual keycode, modified by kbd_key_state
-
         const bool is_key_release = (kbd_key_state & KEY_FLAG_IS_RELEASE) != 0;
         const bool is_extended = (kbd_key_state & KEY_FLAG_IS_EXTENDED) != 0;
+
+        const bool is_e1_prefix = (kbd_key_state & KEY_FLAG_E1_PREFIX) != 0;
         kbd_key_state = 0U;
 
-        if (is_extended) {
-            // Ignore extended keycodes, we should not get them in set 3
+        if (is_e1_prefix) {
+            if (key == SET2_PAUSE_SCANCODE) {
+                if (!is_key_release) {
+                    usb_keyboard_simulate_keypress(USB_KEY_PAUSE_BREAK, 0);
+                    kbd_key_state |= KEY_FLAG_E1_PREFIX;
+                }
+                have_changes = true;
+            }
             continue;
         }
 
         have_changes = true;
-        process_key(usb_keycode_for_ps2_keycode(key), is_key_release);
+        process_key(is_extended ? usb_keycode_for_ps2_extended_keycode(key)
+                                : usb_keycode_for_ps2_keycode(key, scancode_set),
+                    is_key_release);
     }
 
     if (kbd_key_state & KEY_FLAG_OVERFLOW) {
@@ -229,13 +363,35 @@ kbd_configure (void) {
     int_fast8_t attempts_remaining = 3;
 
     do {
-        if (ps2_command_arg_ack(PS2_COMMAND_SET_SCAN_CODES, 3U)
-            && ps2_command_ack(PS2_COMMAND_ENABLE)
-            && ps2_command_ack(PS2_COMMAND_SET_ALL_KEYS_MAKE_BREAK)
-        ) {
+        int reply = send_cmd_arg(PS2_COMMAND_SET_SCAN_CODES, PS2USB_PREFERRED_KEYCODE_SET);
+        if (reply == PS2_REPLY_ACK) {
+            reply = send_cmd(PS2_COMMAND_ENABLE);
+        }
+        if (reply == PS2_REPLY_ACK && PS2USB_PREFERRED_KEYCODE_SET == 3) {
+            reply = send_cmd(PS2_COMMAND_SET_ALL_KEYS_MAKE_BREAK);
+        }
+        if (reply == PS2_REPLY_ACK) {
+            scancode_set = PS2USB_PREFERRED_KEYCODE_SET;
             is_kbd_ready = true;
             return true;
-        } else if (!ps2_is_ok()) {
+        }
+        if (!ps2_is_ok()) {
+            ps2_enable();
+        }
+    } while (attempts_remaining--);
+
+    attempts_remaining = 3;
+    do {
+        int reply = send_cmd_arg(PS2_COMMAND_SET_SCAN_CODES, PS2USB_FALLBACK_KEYCODE_SET);
+        if (reply == PS2_REPLY_ACK) {
+            reply = send_cmd(PS2_COMMAND_ENABLE);
+        }
+        if (reply == PS2_REPLY_ACK) {
+            scancode_set = PS2USB_FALLBACK_KEYCODE_SET;
+            is_kbd_ready = true;
+            return true;
+        }
+        if (!ps2_is_ok()) {
             ps2_enable();
         }
     } while (attempts_remaining--);
@@ -254,8 +410,12 @@ kbd_init (const bool do_reset) {
 
         // Allow a longer timeout for reset
         ps2_send_byte(PS2_COMMAND_RESET);
+#if PS2USB_DEBUG_COMMANDS
+        if (is_debug_active) {
+            (void) fprintf_P(usb_kbd_type, PSTR(" !%02x!"), PS2_COMMAND_RESET);
+        }
+#endif
         byte = kbd_recv_byte();
-
         if (byte != PS2_REPLY_ACK) {
             if (byte == PS2_REPLY_TEST_PASSED) {
                 // Maybe the device actually reset just now, let's see
@@ -269,7 +429,6 @@ kbd_init (const bool do_reset) {
         }
 
         byte = kbd_recv_byte();
-
         if (byte != PS2_REPLY_TEST_PASSED) {
             return false;
         }
@@ -373,7 +532,6 @@ setup (const bool is_power_up) {
         led_set(0);
 
         if (byte == PS2_REPLY_TEST_PASSED) {
-            // Try to initialize directly from power-up
             (void) kbd_init(false);
         }
     }
@@ -481,6 +639,10 @@ main (void) {
         if (tick_is_due_at(byte)) {
             keys_tick(byte);
             previous_tick = byte;
+
+#if PS2USB_DEBUG_SCANCODES
+            fflush(usb_kbd_type);
+#endif
         }
 
         if (!ps2_is_ok()) {
@@ -527,9 +689,9 @@ main (void) {
             kbd_init(true);
         }
 
-        if (!usb_is_suspended() && kbd_idle_10ms_count > MAX_IDLE_10MS) {
+        if (!usb_is_suspended() && !is_debug_active && kbd_idle_10ms_count > MAX_IDLE_10MS) {
             // Ping the keyboard when idle to detect unplugging
-            if (ps2_command(PS2_COMMAND_ECHO) != PS2_COMMAND_ECHO) {
+            if (send_cmd(PS2_COMMAND_ECHO) != PS2_COMMAND_ECHO) {
                 kbd_error_count = MAX_ERROR_COUNT + 1;
             }
             kbd_idle_reset();

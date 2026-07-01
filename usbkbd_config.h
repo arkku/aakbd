@@ -138,7 +138,7 @@
 #endif
 #ifndef ENABLE_VIRTUAL_LEDS
 #if LED_COUNT <= 5
-/// Virtual LEDs are locally generated status indicators that can be displayed
+/// Virtual LEDs are locally-generated status indicators that can be displayed
 /// by custom hooks or used in macros.
 #define ENABLE_VIRTUAL_LEDS         1
 #else
@@ -150,42 +150,33 @@
 /// Version number in binary-coded decimal (i.e., 1.00 = 0x0100).
 #define DEVICE_VERSION 0x0100U
 #endif
-#ifndef SCROLL_LOCK_LED_ON_OVERFLOW
-/// Blink the scroll lock LED on key overflow?
-#define SCROLL_LOCK_LED_ON_OVERFLOW 1
-#endif
-#ifndef SCROLL_LOCK_LED_ON_SUSPEND
-/// Occasionally blink scroll lock LED on suspend (sleep)?
-/// The rationale is that since we can't actually power off the keyboard while
-/// sleeping (otherwise we couldn't get a wake press from it), it might be
-/// useful to know that it's actually powered.
-#define SCROLL_LOCK_LED_ON_SUSPEND 1
-#endif
 #ifndef ENABLE_BOOTLOADER_SHORTCUT
 /// Enable Left Shift + Scroll Lock + Right Shift (in that order) key combo to
 /// reset and jump to bootloader for firmware update? Note that this can be
 /// disabled here and instead mapped to a custom key in `layers.c`.
-#define ENABLE_BOOTLOADER_SHORTCUT  1
+#define ENABLE_BOOTLOADER_SHORTCUT 1
 #endif
 #ifndef ENABLE_RESET_SHORTCUT
 /// Enable Left Shift + Esc + Right Shift (in that order) key combo to
 /// reset the keyboard and release all keys. This can be used if the PS/2
 /// keyboard has somehow got into an invalid state. It is recommended to
 /// instead map this to a key in `layers.c`, that way it can be customised.
-#define ENABLE_RESET_SHORTCUT  0
+#define ENABLE_RESET_SHORTCUT 0
 #endif
 #ifndef ENABLE_DEBUG_SHORTCUT
 /// Enable Left Shift + F1 + Right Shift (in that order) key combo to "type"
 /// debug info with the keyboard. This has little value unless you are
-/// messing with the USB implementation.
+/// modifying the code or debugging an issue. The first number in the debug
+/// report is the free RAM, which is the most useful info there. You can also
+/// map this in your `layers.c`, which is recommended instead of this.
 #define ENABLE_DEBUG_SHORTCUT 0
 #endif
-
-/// Collect debounce statistics: histogram of actual debounce times needed.
-/// Prints a line at each debug report showing the distribution of observed
-/// debounce delays (in ms) and the highest debounce value that would have
-/// been sufficient. Only relevant when DEBOUNCE is non-zero.
 #ifndef DEBOUNCE_DEBUG
+/// Collect debounce statistics: histogram of actual debounce times needed.
+/// The debug printout will include a line showing the distribution of observed
+/// debounce delays (in ms) and the highest debounce value that would have
+/// been sufficient. Only relevant when DEBOUNCE is non-zero, and also only
+/// really works on the default sym_defer_g debounce type (QMK-based).
 #define DEBOUNCE_DEBUG 0
 #endif
 
@@ -280,14 +271,23 @@
 #endif
 
 #ifndef IS_SUSPEND_SUPPORTED
+/// Is suspend (sleep) supported? Makes fairly little difference on keyboards
+/// without RGB, solenoid, or other power-consuming bells and whistles, but
+/// also should be harmless. You can try disabling if the keyboard won't wake
+/// up from sleep.
 #define IS_SUSPEND_SUPPORTED        1
 #endif
 
 #ifndef USB_DEINIT_POWER_DOWN
+/// If enabled, USB deinit completely powers down the USB facilities. This
+/// saves a tiny amount of power, but probably has other downsides. Untested.
 #define USB_DEINIT_POWER_DOWN       0
 #endif
 
 #if ENABLE_APPLE_FN_KEY || ENABLE_MEDIA_KEYS
+/// Virtual keys are keys that do not directly correspond to USB keycodes.
+/// These are handled as special cases, and do not count towards the USB
+/// key rollover.
 #define ENABLE_VIRTUAL_KEYS         1
 #else
 #define ENABLE_VIRTUAL_KEYS         0
@@ -340,6 +340,76 @@
 
 #if VIRTUAL_KEY_BYTES_IN_REPORT > 1
 #warning "There are multiple bytes of virtual keys - not fully boot protocol compatible."
+#endif
+
+// MARK: - PS/2 Keyboard Output
+
+#ifndef ENABLE_PS2_DEVICE
+/// Should the PS/2device (i.e., PS/2 output) be enabled? This is currently
+/// only supported on AVR, and requires hardware wiring.
+#define ENABLE_PS2_DEVICE 0
+#endif
+
+#if ENABLE_PS2_DEVICE
+#ifndef ENABLE_PS2_NKRO
+/// Unlike USB, PS/2 sends individual "key pressed" and "key released" events.
+/// Thus, there is no upper limit to how many keys it can reporrt as being
+/// held down at once, since it is the PS/2 host (computer) that keeps track
+/// of it. Therefore (unlike USB where it lowers compatibility and efficiency),
+/// PS/2 can support n-key rollover (NKRO) with no extra effort. This controls
+/// that.
+///
+/// The only downside is if you enable this on a keyboard that does not
+/// _physically_ support NKRO, then holding down too many keys may cause
+/// situations where the release event never occurs and the key is stuck
+/// down "forever". But recovery is simple: press and release the stuck key.
+#define ENABLE_PS2_NKRO 1
+#endif
+
+#ifndef ENABLE_PS2_DEVICE_SET_3
+/// PS/2 has three different scancode sets. The default is set 2, and the only
+/// required one. The better, more consistent, set 3 is poorly supported among
+/// real keyboards, but this firmware DOES support it fully. Enabling set 3
+/// increases both code size and RAM (in the keyboard firmware, not the host
+/// computer), but it does give consistent key press and release events for
+/// every key (no special case like pause/break) _if the host enables it_.
+#define ENABLE_PS2_DEVICE_SET_3 1
+#endif
+#ifndef ENABLE_PS2_DEVICE_SET_1
+/// Out of PS/2's three different scancode sets, set 1 is basically formed
+/// from set 2 by a translation process. Enabling it probably makes no
+/// difference in practice since any host can either use the superior set 3
+/// or do the translation from the guaranteed-working set 2. But enabling it
+/// also costs nothing except ROM size. Disable if you run out of space.
+#define ENABLE_PS2_DEVICE_SET_1 1
+#endif
+
+#ifndef ENABLE_FALLBACK_TO_PS2_FROM_USB
+/// When PS/2 output is enabled, the firmware always checks for PS/2 first and
+/// decides whether to enable PS/2 or USB mode. But some PS/2 hosts are not
+/// easily detectable and may incorrectly go to USB mode (e.g., they may
+/// actively suppress the PS/2 bus on boot until they are ready). With this
+/// enabled, PS/2 detection will be attempted again if the USB fails to
+/// connect within a timeout.
+///
+/// Downside: when connected to PS/2 if the pins are shared with USB, the USB
+/// attempt will look like noise on the PS/2 bus, which might confuse some
+/// hosts. Also, if USB is really slow to enumerate, might cause incorrect
+/// PS/2 mode activation in some corner cases (have not had it happen, but it
+/// might). In that case need to restart the keyboard (bind a shortcut key or
+/// just plug it in again).
+#define ENABLE_FALLBACK_TO_PS2_FROM_USB 1
+#endif
+
+#ifndef PS2_DEVICE_ID
+/// The PS/2 host can query the keyboard for a device id. Not all do, but some
+/// have special cases for specific keyboards (e.g., media key support based
+/// on non-standard scancodes). The default value is what is reported by
+/// IBM Model M, which should trigger no special behaviour and is also the true
+/// OG PS/2 keyboard. (The original PS/2 systems also complain if they do not
+/// see an IBM keyboard, even though third-party keyboards work fine.)
+#define PS2_DEVICE_ID    0xAB83U
+#endif
 #endif
 
 #endif

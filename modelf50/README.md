@@ -75,6 +75,9 @@ DEVICE_FLAGS += -DCAPSENSE_CAL_AUTOSAVE=1
 
 # To enable solenoid support (config must be done via custom macros):
 HAPTIC_ENABLE ?= 1
+
+# If you have added LEDs, define which pins they are on:
+DEVICE_FLAGS += -DLED_NUM_LOCK_PIN=B5 -DLED_CAPS_LOCK_PIN=B4
 ```
 
 The `template_layers.c` goes together with `modelf77/template_macros.c`.

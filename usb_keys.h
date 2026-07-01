@@ -429,6 +429,10 @@ enum keycode_usb {
 #define LEFT_SHIFT_BIT              MODIFIER_BIT(USB_KEY_SHIFT)
 #define LEFT_ALT_BIT                MODIFIER_BIT(USB_KEY_ALT)
 #define LEFT_CTRL_BIT               MODIFIER_BIT(USB_KEY_CTRL)
+
+#define BOTH_SHIFT_BITS             (SHIFT_BIT | RIGHT_SHIFT_BIT)
+#define BOTH_ALT_BITS               (ALT_BIT | RIGHT_ALT_BIT)
+#define BOTH_CTRL_BITS              (CTRL_BIT | RIGHT_CTRL_BIT)
 #define LEFT_CMD_BIT                MODIFIER_BIT(USB_KEY_CMD)
 #define LEFT_WIN_BIT                MODIFIER_BIT(USB_KEY_WIN)
 #define LEFT_META_BIT               MODIFIER_BIT(USB_KEY_META)
