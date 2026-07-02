@@ -24,6 +24,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <stdint.h>
 #ifndef ENABLE_PS2_DEVICE
 #define ENABLE_PS2_DEVICE 1
 #endif
@@ -40,10 +41,11 @@
 #define KK_PS2_BUFFER_SIZE 16
 #endif
 
-#if KK_PS2_BUFFER_SIZE == 256
-#define modulo_buffer_size(x) ((uint8_t) (x))
-#else
-#define modulo_buffer_size(x) ((uint8_t) ((x) % (sizeof ps2_buffer)))
+#if KK_PS2_BUFFER_SIZE > 256
+#error "KK_PS2_BUFFER_SIZE must be <= 256"
+#endif
+#if (256 % KK_PS2_BUFFER_SIZE) != 0
+#error "KK_PS2_BUFFER_SIZE must be a power of 2"
 #endif
 
 /// Data setup time (microseconds) before the clock pulse on which it is read.
@@ -76,6 +78,21 @@ static uint8_t ps2_buffer_head = 0;
 
 /// Output ring buffer tail.
 static uint8_t ps2_buffer_tail = 0;
+
+/// The number of elements in `ps2_buffer`.
+#define ps2_buffer_count    ((uint8_t) (ps2_buffer_head - ps2_buffer_tail))
+
+/// Is the ps2_buffer empty?
+#define is_ps2_buffer_empty (ps2_buffer_count == 0)
+
+/// Is the ps2_buffer full?
+#define is_ps2_buffer_full  (ps2_buffer_count == KK_PS2_BUFFER_SIZE)
+
+#if KK_PS2_BUFFER_SIZE == 256
+#define modulo_buffer_size(x) ((uint8_t) (x))
+#else
+#define modulo_buffer_size(x) ((uint8_t) ((x) % (sizeof ps2_buffer)))
+#endif
 
 /// Global error flag for debug output. Note that this isn't cleared
 /// automatically.
@@ -379,22 +396,21 @@ ps2_device_recv (void) {
 
 bool
 ps2_device_send (const uint8_t data) {
-    uint8_t next_head = modulo_buffer_size(ps2_buffer_head + 1);
-    if (next_head == ps2_buffer_tail) {
+    if (is_ps2_buffer_full) {
         ps2_device_error = PS2_ERROR_BUFFER_OVERFLOW;
         return false;
     }
-    ps2_buffer[ps2_buffer_head] = data;
-    ps2_buffer_head = next_head;
+    ps2_buffer[modulo_buffer_size(ps2_buffer_head)] = data;
+    ++ps2_buffer_head;
     return true;
 }
 
 bool
 ps2_device_flush (void) {
-    while (ps2_buffer_head != ps2_buffer_tail) {
-        uint8_t data = ps2_buffer[ps2_buffer_tail];
+    while (!is_ps2_buffer_empty) {
+        const uint8_t data = ps2_buffer[modulo_buffer_size(ps2_buffer_tail)];
         if (ps2_device_tx_byte(data)) {
-            ps2_buffer_tail = modulo_buffer_size(ps2_buffer_tail + 1);
+            ++ps2_buffer_tail;
         } else {
             return false;
         }
@@ -409,7 +425,7 @@ ps2_device_clear_output (void) {
 
 bool
 ps2_device_has_pending_output (void) {
-    return ps2_buffer_head != ps2_buffer_tail;
+    return !is_ps2_buffer_empty;
 }
 
 // MARK: - External queries

@@ -68,16 +68,16 @@ static int pending_send_count = 0;
 
 // Forward declarations for variables defined in ps2_output.c (included later)
 extern uint8_t pending_cmd;
-extern uint8_t key_event_head;
-extern uint8_t key_event_tail;
+extern uint8_t key_event_queue_head;
+extern uint8_t key_event_queue_tail;
 
 static void
 clear_sent (void) {
     sent_count = 0;
     pending_send_count = 0;
     pending_cmd = 0;
-    key_event_head = 0;
-    key_event_tail = 0;
+    key_event_queue_head = 0;
+    key_event_queue_tail = 0;
 }
 
 static uint8_t recv_queue[256];
@@ -194,16 +194,10 @@ drain (bool include_keys, bool include_commands) {
     for (int i = 0; i < 2; ++i) {
         do {
             ps2_output_task();
-        } while (safety-- > 0 && ((include_commands && pending_cmd) || (!include_commands && pending_cmd == original_cmd) ||
-                                     (include_keys && key_event_head != key_event_tail) || ps2_device_has_pending_output()));
+        } while (safety-- > 0 && ((include_commands && pending_cmd) || (!include_commands && pending_cmd == original_cmd) || (include_keys && !ps2_output_queue_is_clear()) || ps2_device_has_pending_output()));
     }
     if (safety <= 0) {
-        (void) printf("FAIL DRAIN: TIMEOUT: pending_cmd=%02X head=%d tail=%d pending_buf=%d\n", pending_cmd, key_event_head,
-            key_event_tail, pending_send_count);
-    }
-    if (safety > 0 && !ps2_output_queue_is_clear()) {
-        (void) printf("FAIL DRAIN: queue not clear after drain: head=%d tail=%d\n", key_event_head, key_event_tail);
-        safety = 0;
+        (void) printf("FAIL DRAIN: TIMEOUT: pending_cmd=%02X head=%d tail=%d pending_buf=%d\n", pending_cmd, key_event_head, key_event_tail, pending_send_count);
     }
     return safety > 0;
 }

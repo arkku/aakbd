@@ -217,7 +217,6 @@ setup_recv_bits (uint8_t byte) {
 // uses #ifdef to conditionally compile status/enable pin code.
 // Keeping them undefined skips those code paths.
 
-#define KK_PS2_BUFFER_SIZE        16
 #define PS2_BUS_IDLE_TIME_US      ((uint8_t) 50U)
 #define PS2_BUS_READY_TIMEOUT_US  ((uint8_t) 200U)
 #define DATA_SETUP_US             15
@@ -294,7 +293,7 @@ test_send_with_host_inhibit_after_stop (void) {
 static void
 test_send_overflow (void) {
     reset();
-    for (int i = 0; i < 15; i++) {
+    for (int i = 0; i < KK_PS2_BUFFER_SIZE; i++) {
         check(ps2_device_send(0x55), "fill");
     }
     check(!ps2_device_send(0x55), "overflow");

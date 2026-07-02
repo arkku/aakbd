@@ -71,7 +71,7 @@
 /// at once, this would generate 4 events from a single press. On the other
 /// hand, even a couple of milliseconds between keypresses allows sending
 /// some queued events, making room for new ones.
-#define PS2_OUTPUT_MAX_KEY_EVENTS 10
+#define PS2_OUTPUT_MAX_KEY_EVENTS 16
 #endif
 
 #ifndef PS2_OUTPUT_MAX_EVENTS_PER_TASK
@@ -101,31 +101,64 @@ static uint8_t ps2_active_scancode_set = PS2_KEYBOARD_DEFAULT_SCANCODE_SET;
 /// Timer for the pending reset (`PS2_RESET_DURATION_MS`).
 static uint16_t reset_pending_since = 0;
 
-/// The state of the modifiers (shift, ctrl, alt, gui) flags currently at the
-/// PS/2 host (based on what we have sent there).
+/// The state of the modifiers (Shift, Ctrl, Alt, Cmd) flags. These use the
+/// same bit flags as the USB modifiers.
 static uint8_t ps2_modifiers = 0;
 
-/// Keypress event queue.
+// MARK: Keypress event queue
+
+#if (256 % PS2_OUTPUT_MAX_KEY_EVENTS) == 0
+// The event queue size is a power of two, we can optimize a bit.
+
+#define PS2_OUTPUT_KEY_EVENT_SENTINEL_COUNT 0
+
+#define key_event_queue_count           ((uint8_t) (key_event_queue_head - key_event_queue_tail))
+#define is_key_event_queue_empty        (key_event_queue_count == 0)
+#define is_key_event_queue_full         (key_event_queue_count == PS2_OUTPUT_MAX_KEY_EVENTS)
+#define key_event_head                  modulo_key_event_queue(key_event_queue_head)
+#define key_event_tail                  modulo_key_event_queue(key_event_queue_tail)
+#define increment_key_event_queue()     do { ++key_event_queue_head; } while (0)
+#define decrement_key_event_queue()     do { ++key_event_queue_tail; } while (0)
+
+#else
+
+#define PS2_OUTPUT_KEY_EVENT_SENTINEL_COUNT 1
+
+#define is_key_event_queue_empty        (key_event_queue_head == key_event_queue_tail)
+#define is_key_event_queue_full         (modulo_key_event_queue(key_event_queue_head + 1) == key_event_queue_tail)
+#define key_event_head                  (key_event_queue_head)
+#define key_event_tail                  (key_event_queue_tail)
+#define increment_key_event_queue()     do { key_event_queue_head = modulo_key_event_queue(key_event_queue_head + 1); } while (0)
+#define decrement_key_event_queue()     do { key_event_queue_tail = modulo_key_event_queue(key_event_queue_tail + 1); } while (0)
+
+#endif
+
 static struct {
     uint8_t key;
     bool is_release;
-} key_event_queue[PS2_OUTPUT_MAX_KEY_EVENTS];
+} key_event_queue[PS2_OUTPUT_MAX_KEY_EVENTS + PS2_OUTPUT_KEY_EVENT_SENTINEL_COUNT];
+
+#define modulo_key_event_queue(index)   ((index) % (PS2_OUTPUT_MAX_KEY_EVENTS + PS2_OUTPUT_KEY_EVENT_SENTINEL_COUNT))
 
 /// Sentinel value for the `key`, indicating the "release all keys" action has
 /// completed and the state can be reset.
 #define KEYS_ALL_RELEASED_MARKER ((uint8_t) 0U)
 
 /// Key event ring buffer head.
-uint8_t key_event_head = 0;
+uint8_t key_event_queue_head = 0;
 
 /// Key event ring buffer tail.
-uint8_t key_event_tail = 0;
+uint8_t key_event_queue_tail = 0;
+
+// MARK: Tenkey Tracking
 
 /// The count of tenkey cluster keys being held down currently.
 /// Why does it matter? Because in scancode sets 1 and 2, these keys have
 /// virtual modifiers added depending on shift and num lock states,
 /// and those need to be undone after the last tenkey cluster key release.
 static uint8_t tenkey_count = 0;
+
+// MARK: Repeat Tracking
 
 /// Key repeat state. At most one key can be repeating at once. This saves
 /// the scancode (in the current PS/2 scancode set), flags, and timestamp.
@@ -145,6 +178,8 @@ static uint8_t repeat_rate = PS2_KEYBOARD_DEFAULT_REPEAT_RATE;
 
 /// LED state set by the PS/2 host.
 static uint8_t host_led_state = 0;
+
+// MARK: Command State
 
 /// The command that is pending arguments, or 0 if none. Part of the command
 /// processing state machine, along with `pending_argc`.
@@ -773,21 +808,19 @@ process_repeat (void) {
 
 void
 ps2_press_key (const uint8_t key) {
-    const uint8_t next = (key_event_head + 1) % PS2_OUTPUT_MAX_KEY_EVENTS;
-    if (next != key_event_tail) {
+    if (!is_key_event_queue_full) {
         key_event_queue[key_event_head].key = key;
         key_event_queue[key_event_head].is_release = false;
-        key_event_head = next;
+        increment_key_event_queue();
     }
 }
 
 void
 ps2_release_key (const uint8_t key) {
-    const uint8_t next = (key_event_head + 1) % PS2_OUTPUT_MAX_KEY_EVENTS;
-    if (next != key_event_tail) {
+    if (!is_key_event_queue_full) {
         key_event_queue[key_event_head].key = key;
         key_event_queue[key_event_head].is_release = true;
-        key_event_head = next;
+        increment_key_event_queue();
     }
 }
 
@@ -1086,7 +1119,7 @@ ps2_output_task (void) {
     if (!pending_cmd && ps2_device_flush()) {
         // No unsent output or in-progress command
 
-        if (key_event_head == key_event_tail) {
+        if (is_key_event_queue_empty) {
             // No queued events, check for repeats
             process_repeat();
             (void) ps2_device_flush();
@@ -1102,7 +1135,7 @@ ps2_output_task (void) {
                     ps2_output_flags &= ~FLAG_TENKEY_RELEASED_SHIFT;
                     ps2_modifiers = 0;
                     tenkey_count = 0;
-                    goto advance_event_queue;
+                    goto remove_key_from_queue;
                 } else if (key_event_queue[key_event_tail].is_release) {
                     ps2_send_key_release(key);
                 } else {
@@ -1115,9 +1148,9 @@ ps2_output_task (void) {
                 }
 
                 ++sent_events;
-            advance_event_queue:
-                key_event_tail = (key_event_tail + 1) % PS2_OUTPUT_MAX_KEY_EVENTS;
-            } while (sent_events < PS2_OUTPUT_MAX_EVENTS_PER_TASK && key_event_head != key_event_tail);
+            remove_key_from_queue:
+                decrement_key_event_queue();
+            } while (sent_events < PS2_OUTPUT_MAX_EVENTS_PER_TASK && !is_key_event_queue_empty);
         }
     }
 }
@@ -1146,7 +1179,7 @@ ps2_output_is_initialized (void) {
 
 bool
 ps2_output_queue_is_clear (void) {
-    return key_event_head == key_event_tail;
+    return is_key_event_queue_empty;
 }
 
 void
@@ -1154,19 +1187,24 @@ ps2_output_clear_keys (const bool should_discard_unsent_keys) {
     clear_repeat();
     if (should_discard_unsent_keys) {
         tenkey_count = 0;
-        key_event_head = 0;
-        key_event_tail = 0;
+        key_event_queue_head = 0;
+        key_event_queue_tail = 0;
         ps2_modifiers = 0;
         ps2_output_flags &= ~(FLAG_TENKEY_VIRTUAL_SHIFT_ACTIVE | FLAG_TENKEY_RELEASED_SHIFT);
     } else {
         // Add sentinel after all existing events so cleanup runs
         // after they have all been processed naturally
-        uint8_t next = (key_event_head + 1) % PS2_OUTPUT_MAX_KEY_EVENTS;
-        if (next != key_event_tail) {
-            key_event_queue[key_event_head].key = KEYS_ALL_RELEASED_MARKER;
-            key_event_queue[key_event_head].is_release = false;
-            key_event_head = next;
+        if (is_key_event_queue_full) {
+            // Overflow, try to flush
+            ps2_output_task();
+            if (is_key_event_queue_full) {
+                // Still full, drop the oldest event
+                decrement_key_event_queue();
+            }
         }
+        key_event_queue[key_event_head].key = KEYS_ALL_RELEASED_MARKER;
+        key_event_queue[key_event_head].is_release = false;
+        increment_key_event_queue();
     }
 }
 
