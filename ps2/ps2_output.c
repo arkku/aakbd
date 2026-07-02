@@ -120,6 +120,7 @@ static uint8_t ps2_modifiers = 0;
 #define key_event_tail                  modulo_key_event_queue(key_event_queue_tail)
 #define increment_key_event_queue()     do { ++key_event_queue_head; } while (0)
 #define decrement_key_event_queue()     do { ++key_event_queue_tail; } while (0)
+#define unshift_key_event_queue()       do { --key_event_queue_tail; } while (0)
 
 #else
 
@@ -131,19 +132,23 @@ static uint8_t ps2_modifiers = 0;
 #define key_event_tail                  (key_event_queue_tail)
 #define increment_key_event_queue()     do { key_event_queue_head = modulo_key_event_queue(key_event_queue_head + 1); } while (0)
 #define decrement_key_event_queue()     do { key_event_queue_tail = modulo_key_event_queue(key_event_queue_tail + 1); } while (0)
+#define unshift_key_event_queue()       do { key_event_queue_tail = modulo_key_event_queue(key_event_queue_tail - 1); } while (0)
 
 #endif
 
 static struct {
     uint8_t key;
-    bool is_release;
+    uint8_t is_release;
 } key_event_queue[PS2_OUTPUT_MAX_KEY_EVENTS + PS2_OUTPUT_KEY_EVENT_SENTINEL_COUNT];
 
 #define modulo_key_event_queue(index)   ((index) % (PS2_OUTPUT_MAX_KEY_EVENTS + PS2_OUTPUT_KEY_EVENT_SENTINEL_COUNT))
 
-/// Sentinel value for the `key`, indicating the "release all keys" action has
-/// completed and the state can be reset.
-#define KEYS_ALL_RELEASED_MARKER ((uint8_t) 0U)
+/// A special marker in `key_event_queue`, which is not a keypress. The
+/// `is_release` field will then define which event it is.
+#define KEY_EVENT_SPECIAL ((uint8_t) 0U)
+
+#define SPECIAL_EVENT_ALL_KEYS_RELEASED ((uint8_t) 0U)
+#define SPECIAL_EVENT_NUM_LOCK_TOGGLED ((uint8_t) 1U)
 
 /// Key event ring buffer head.
 uint8_t key_event_queue_head = 0;
@@ -795,6 +800,35 @@ ps2_release_key (const uint8_t key) {
     }
 }
 
+// MARK: - Special Key Events
+
+static void
+handle_special_key_event (const uint8_t event) {
+    switch (event) {
+    case SPECIAL_EVENT_ALL_KEYS_RELEASED:
+        /// This is a marker that the `ps2_output_clear_keys()`
+        /// was done at this point in the queue. This means that
+        /// all keys are now released.
+        virtual_shift_off();
+        clear_key_state();
+        break;
+    case SPECIAL_EVENT_NUM_LOCK_TOGGLED:
+        if (tenkey_count && !is_scancode_set_3_active) {
+            // Tenkeys held across Num Lock change
+            if (host_led_state & LED_NUM_LOCK_BIT) {
+                shift_unsuppress();
+                virtual_shift_on();
+            } else {
+                virtual_shift_off();
+                shift_suppress();
+            }
+        }
+        break;
+    default:
+        break;
+    }
+}
+
 // MARK: - Command Processing
 
 /// Respond with ACK and set the `cmd` as pending further processing
@@ -864,10 +898,19 @@ ps2_process_cmd (const uint8_t cmd, const uint8_t argc) {
                 ps2_process_cmd(led_byte, 0);
                 return;
             }
+            const uint8_t old_leds = host_led_state;
             host_led_state = ps2_leds_to_usb(led_byte);
             usb_keyboard_leds = host_led_state;
             pending_argc = ALL_ARGS_READ;
             send_byte(PS2_REPLY_ACK);
+            if (tenkey_count
+                && (old_leds & LED_NUM_LOCK_BIT) != (host_led_state & LED_NUM_LOCK_BIT)
+                && !is_key_event_queue_full
+            ) {
+                unshift_key_event_queue();
+                key_event_queue[key_event_tail].key = KEY_EVENT_SPECIAL;
+                key_event_queue[key_event_tail].is_release = SPECIAL_EVENT_NUM_LOCK_TOGGLED;
+            }
         }
         return;
 
@@ -1098,12 +1141,8 @@ ps2_output_task (void) {
             int_fast8_t sent_events = 0;
             do {
                 const uint8_t key = key_event_queue[key_event_tail].key;
-                if (key == KEYS_ALL_RELEASED_MARKER) {
-                    /// This is a marker that the `ps2_output_clear_keys()`
-                    /// was done at this point in the queue. This means that
-                    /// all keys are now released.
-                    virtual_shift_off();
-                    clear_key_state();
+                if (key == KEY_EVENT_SPECIAL) {
+                    handle_special_key_event(key_event_queue[key_event_tail].is_release);
                     goto remove_key_from_queue;
                 } else if (key_event_queue[key_event_tail].is_release) {
                     ps2_send_key_release(key);
@@ -1169,8 +1208,8 @@ ps2_output_clear_keys (const bool should_discard_unsent_keys) {
                 decrement_key_event_queue();
             }
         }
-        key_event_queue[key_event_head].key = KEYS_ALL_RELEASED_MARKER;
-        key_event_queue[key_event_head].is_release = false;
+        key_event_queue[key_event_head].key = KEY_EVENT_SPECIAL;
+        key_event_queue[key_event_head].is_release = SPECIAL_EVENT_ALL_KEYS_RELEASED;
         increment_key_event_queue();
     }
 }

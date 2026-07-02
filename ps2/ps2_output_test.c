@@ -411,7 +411,7 @@ test_set2_extended_key (void) {
     release(USB_KEY_RIGHT_ARROW, brk, 3, "S2 right arrow break");
 }
 
-/// S2 KP NAV - nav key Num Lock OFF + both shifts
+/// S2 NAV - nav key Num Lock OFF + both shifts
 static void
 test_set2_keypad_nav_numlock_off_both_shifts (void) {
     api_set_leds(0x00);
@@ -708,11 +708,6 @@ test_set3_nav_end (void) {
     ps2_modifiers = 0;
     // Release
     release(USB_KEY_END, ((uint8_t[]){0xF0, 0x65}), 2, "S3 End break");
-}
-
-/// S3 non-numpad END — Num Lock ON + LShift (complements above)
-static void
-test_set3_nav_end_brief (void) {
 }
 
 /// S3 KP / - no shift interaction
@@ -1335,7 +1330,7 @@ test_set2_kp_divide_both_shifts (void) {
     release(USB_KEY_KP_DIVIDE, brk, 7, "S2 KP_Divide+both shifts break");
 }
 
-/// S1 KP NAV - Set 1 keypad nav with Num Lock ON
+/// S1 NAV - Set 1 navigation with Num Lock ON
 static void
 test_set1_keypad_nav_numlock_on (void) {
     api_set_scancode_set(1);
@@ -1347,7 +1342,7 @@ test_set1_keypad_nav_numlock_on (void) {
     release(USB_KEY_END, brk, 4, "S1 End numlock ON break");
 }
 
-/// S1 KP NAV - Set 1 break-before-remake with two held tenkeys
+/// S1 NAV - Set 1 tenkey break-before-remake with two held nav keys
 static void
 test_set1_tenkey_break_before_remake (void) {
     api_set_scancode_set(1);
@@ -1366,7 +1361,7 @@ test_set1_tenkey_break_before_remake (void) {
         "S1 End break (LShift released)");
 }
 
-/// S1 KP NAV - Set 1 keypad nav with Num Lock OFF and LShift held
+/// S1 NAV - Set 1 navigation with Num Lock OFF and LShift held
 static void
 test_set1_keypad_nav_numlock_off_shift (void) {
     api_set_scancode_set(1);
@@ -1380,7 +1375,7 @@ test_set1_keypad_nav_numlock_off_shift (void) {
     release(USB_KEY_END, brk, 4, "S1 End numlock OFF+LShift break");
 }
 
-/// S2 KP NAV - Set 2 keypad nav with Num Lock OFF, no modifiers
+/// S2 NAV - Set 2 navigation with Num Lock OFF, no modifiers
 static void
 test_set2_keypad_nav_numlock_off (void) {
     // Num Lock OFF: E0 prefix, then non-extended scancode
@@ -1390,7 +1385,7 @@ test_set2_keypad_nav_numlock_off (void) {
     release(USB_KEY_END, brk, 3, "S2 End numlock OFF break");
 }
 
-/// S1 KP NAV - Set 1 keypad nav with Num Lock OFF, no modifiers
+/// S1 NAV - Set 1 navigation with Num Lock OFF, no modifiers
 static void
 test_set1_keypad_nav_numlock_off (void) {
     api_set_scancode_set(1);
@@ -1438,7 +1433,7 @@ test_host_active (void) {
     }
 }
 
-/// S2 KP NAV - Set 2 keypad nav release suffix (Num Lock ON + LShift)
+/// S2 NAV - Set 2 navigation release suffix (Num Lock ON + LShift)
 static void
 test_set2_keypad_nav_suffix (void) {
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
@@ -1629,7 +1624,7 @@ test_set_scan_codes_set2 (void) {
     activate_scancode_set_and_verify(2, 0x07);
 }
 
-/// S2 KP NAV - Set 2 keypad nav with Num Lock ON and Right Shift held
+/// S2 NAV - Set 2 navigation with Num Lock ON and Right Shift held
 static void
 test_set2_keypad_nav_shift_numlock_right_shift (void) {
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
@@ -1640,7 +1635,7 @@ test_set2_keypad_nav_shift_numlock_right_shift (void) {
     release(USB_KEY_END, ((uint8_t[]){0xE0, 0xF0, 0x69}), 3, "S2 End numlock ON+RShift break");
 }
 
-/// S2 KP NAV - Set 2 keypad nav with Num Lock ON and both shifts held
+/// S2 NAV - Set 2 navigation with Num Lock ON and both shifts held
 static void
 test_set2_keypad_nav_shift_numlock_both (void) {
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
@@ -1651,7 +1646,7 @@ test_set2_keypad_nav_shift_numlock_both (void) {
     release(USB_KEY_END, ((uint8_t[]){0xE0, 0xF0, 0x69}), 3, "S2 End numlock ON+both shifts break");
 }
 
-/// S1 KP NAV - Set 1 keypad nav with Num Lock OFF and Right Shift held
+/// S1 NAV - Set 1 navigation with Num Lock OFF and Right Shift held
 static void
 test_set1_keypad_nav_numlock_right_shift (void) {
     api_set_scancode_set(1);
@@ -1663,28 +1658,6 @@ test_set1_keypad_nav_numlock_right_shift (void) {
     uint8_t brk[] = {0xE0, 0xCF, 0xE0, 0x36};
     press(USB_KEY_END, make, 4, "S1 End numlock OFF+RShift make");
     release(USB_KEY_END, brk, 4, "S1 End numlock OFF+RShift break");
-}
-
-/// S2 KP NAV - Set 2 keypad nav release suffix (Num Lock ON + LShift)
-static void
-test_set2_keypad_nav_shift_numlock_on_lshift_release (void) {
-    api_set_leds(PS2_LED_NUM_LOCK_BIT);
-    usb_keys_modifier_flags = SHIFT_BIT;
-    ps2_modifiers = SHIFT_BIT;
-    // ps2scancodes.md: Num Lock ON + any shift → bare key
-    press(USB_KEY_END, ((uint8_t[]){0xE0, 0x69}), 2, "S2 End LShift+NL make");
-    release(USB_KEY_END, ((uint8_t[]){0xE0, 0xF0, 0x69}), 3, "S2 End LShift+NL break");
-}
-
-/// S2 KP NAV - Set 2 keypad nav release suffix (Num Lock ON + RShift)
-static void
-test_set2_keypad_nav_shift_numlock_on_rshift_release (void) {
-    api_set_leds(PS2_LED_NUM_LOCK_BIT);
-    usb_keys_modifier_flags = RIGHT_SHIFT_BIT;
-    ps2_modifiers = RIGHT_SHIFT_BIT;
-    // ps2scancodes.md: Num Lock ON + any shift → bare key
-    press(USB_KEY_END, ((uint8_t[]){0xE0, 0x69}), 2, "S2 End RShift+NL make");
-    release(USB_KEY_END, ((uint8_t[]){0xE0, 0xF0, 0x69}), 3, "S2 End RShift+NL break");
 }
 
 // ----- Model M reference behavior tests -----
@@ -1981,7 +1954,8 @@ test_set2_tenkey_model_m_insert_numlock_toggle_release (void) {
 }
 
 /// Model M observed: Num Lock OFF, hold Insert, press Num Lock, Set Num Lock LED
-/// (host sends ED 02), then release Insert. Insert sees no LShift throughout.
+/// (host sends ED 02), then release Insert. Insert picks up virtual LShift
+/// when NL turns ON while held.
 static void
 test_set2_tenkey_model_m_insert_numlock_led_then_release (void) {
     api_set_leds(0);
@@ -1994,18 +1968,17 @@ test_set2_tenkey_model_m_insert_numlock_led_then_release (void) {
     release_key(USB_KEY_NUM_LOCK);
     check_result(((uint8_t[]){0xF0, 0x77}), 2,
         "Model M: NumLock break (F0 77)");
-    // Host sets Num Lock LED — keyboard updates host_led_state
+    // Host sets Num Lock LED — keyboard updates host_led_state and
+    // recalculates virtual shift state since nav keys are held
     clear_sent();
     queue_recv(PS2_COMMAND_SET_LEDS);
     queue_recv(PS2_LED_NUM_LOCK_BIT);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK}), 2,
-        "Model M: Set NL LED (FA FA)");
-    // Insert was pressed with NL OFF — release has no LShift even though
-    // NL is now ON, because LShift is evaluated at press time
+    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK, 0xE0, 0x12}), 4,
+        "Model M: Set NL LED + virtual LShift make (FA FA E0 12)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
-        "Model M: Insert break (E0 F0 70)");
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x70, 0xE0, 0xF0, 0x12}), 6,
+        "Model M: Insert break + virtual LShift break (E0 F0 70 E0 F0 12)");
 }
 
 /// Model M observed: Num Lock OFF, hold Left Shift, hold Insert, toggle H,
@@ -2179,14 +2152,14 @@ test_set2_tenkey_numlock_toggle_off_while_held (void) {
     queue_recv(PS2_COMMAND_SET_LEDS);
     queue_recv(0);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK}), 2,
-        "S2 NL toggle OFF");
+    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK, 0xE0, 0xF0, 0x12}), 5,
+        "S2 NL toggle OFF + virtual LShift break");
     release_key(USB_KEY_HOME);
     check_result(((uint8_t[]){0xE0, 0xF0, 0x6C}), 3,
         "S2 NL Home break (no LShift)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70, 0xE0, 0xF0, 0x12}), 6,
-        "S2 NL Insert break (LShift released)");
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
+        "S2 NL Insert break (LShift already released)");
 }
 
 /// Model M observed: Num Lock ON, hold Insert, press/release KP Divide,
@@ -2349,14 +2322,14 @@ test_set2_tenkey_numlock_toggle_on_while_held (void) {
     queue_recv(PS2_COMMAND_SET_LEDS);
     queue_recv(PS2_LED_NUM_LOCK_BIT);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK}), 2,
-        "S2 NL toggle ON");
+    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK, 0xE0, 0x12}), 4,
+        "S2 NL toggle ON + virtual LShift make");
     release_key(USB_KEY_HOME);
     check_result(((uint8_t[]){0xE0, 0xF0, 0x6C}), 3,
         "S2 NL Home break (no LShift)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
-        "S2 NL Insert break (no LShift)");
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x70, 0xE0, 0xF0, 0x12}), 6,
+        "S2 NL Insert break + virtual LShift break");
 }
 
 /// S2 TENKEY - toggle Num Lock ON via host LED command, then press a new
@@ -2372,12 +2345,13 @@ test_set2_tenkey_numlock_led_toggle_affects_future_keys (void) {
     queue_recv(PS2_COMMAND_SET_LEDS);
     queue_recv(PS2_LED_NUM_LOCK_BIT);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK}), 2,
-        "S2 NL LED toggle ON");
-    // New tenkey key pressed after the toggle — gets LShift
+    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK, 0xE0, 0x12}), 4,
+        "S2 NL LED toggle ON + virtual LShift make");
+    // New tenkey key pressed after the toggle — gets LShift, but previous
+    // forced state is cleared by line 533 first
     press_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x6C}), 4,
-        "S2 NL Home make after toggle (E0 12 E0 6C)");
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x6C}), 7,
+        "S2 NL Home make after toggle (E0 F0 12 E0 12 E0 6C)");
     release_key(USB_KEY_HOME);
     check_result(((uint8_t[]){0xE0, 0xF0, 0x6C}), 3,
         "S2 NL Home break (no LShift, count > 0)");
@@ -2399,11 +2373,12 @@ test_set2_tenkey_numlock_off_led_new_key (void) {
     queue_recv(PS2_COMMAND_SET_LEDS);
     queue_recv(0);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK}), 2,
-        "S2 NL LED toggle OFF");
+    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK, 0xE0, 0xF0, 0x12}), 5,
+        "S2 NL LED toggle OFF + virtual LShift break");
+    // Forced state was already cleared by the toggle, Home needs no cleanup
     press_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x6C}), 5,
-        "S2 NL Home make after toggle (E0 F0 12 E0 6C)");
+    check_result(((uint8_t[]){0xE0, 0x6C}), 2,
+        "S2 NL Home make after toggle (E0 6C, no LShift)");
     release_key(USB_KEY_HOME);
     check_result(((uint8_t[]){0xE0, 0xF0, 0x6C}), 3,
         "S2 NL Home break");
@@ -2467,7 +2442,7 @@ test_repeat_extended_key (void) {
     expect_none("S2 no ext repeat after release");
 }
 
-/// S1 KP NAV - Set 1 keypad nav with Num Lock ON and both shifts
+/// S1 NAV - Set 1 navigation with Num Lock ON and both shifts
 static void
 test_set1_keypad_nav_numlock_on_both_shifts (void) {
     api_set_scancode_set(1);
@@ -2546,7 +2521,7 @@ test_cmd_recursive_term (void) {
     }
 }
 
-/// S1 KP NAV - Set 1 keypad nav with Num Lock ON and Right Shift held
+/// S1 NAV - Set 1 navigation with Num Lock ON and Right Shift held
 static void
 test_set1_keypad_nav_numlock_on_right_shift (void) {
     api_set_scancode_set(1);
@@ -2558,7 +2533,7 @@ test_set1_keypad_nav_numlock_on_right_shift (void) {
     release(USB_KEY_END, ((uint8_t[]){0xE0, 0xCF}), 2, "S1 End numlock ON+RShift break");
 }
 
-/// S1 KP NAV - Set 1 keypad nav with Num Lock ON and LShift held
+/// S1 NAV - Set 1 navigation with Num Lock ON and LShift held
 static void
 test_set1_keypad_nav_numlock_on_left_shift (void) {
     api_set_scancode_set(1);
@@ -2849,7 +2824,7 @@ test_set2_prtsc_ctrl_only (void) {
     release(USB_KEY_PRINT_SCREEN, brk, 3, "S2 PrtSc+Ctrl break");
 }
 
-/// S1 KP NAV - Set 1 keypad nav press with Right Shift held
+/// S1 NAV - Set 1 navigation press with Right Shift held
 static void
 test_set1_keypad_nav_numlock_right_shift_press (void) {
     api_set_scancode_set(1);
@@ -2860,18 +2835,7 @@ test_set1_keypad_nav_numlock_right_shift_press (void) {
     press(USB_KEY_END, make, 4, "S1 End numlock OFF+RShift press");
 }
 
-/// S2 KP NAV - Set 2 keypad nav release suffix with Right Shift held
-static void
-test_set2_keypad_nav_suffix_rshift (void) {
-    api_set_leds(PS2_LED_NUM_LOCK_BIT);
-    usb_keys_modifier_flags = RIGHT_SHIFT_BIT;
-    ps2_modifiers = RIGHT_SHIFT_BIT;
-    // ps2scancodes.md: Num Lock ON + any shift → bare key
-    press(USB_KEY_END, ((uint8_t[]){0xE0, 0x69}), 2, "S2 End NL+RShift suffix make");
-    release(USB_KEY_END, ((uint8_t[]){0xE0, 0xF0, 0x69}), 3, "S2 End NL+RShift suffix break");
-}
-
-/// S1 KP NAV - Set 1 keypad nav release suffix with Right Shift held
+/// S1 NAV - Set 1 navigation release suffix with Right Shift held
 static void
 test_set1_keypad_nav_suffix_rshift (void) {
     api_set_scancode_set(1);
@@ -3648,6 +3612,70 @@ test_set2_kp_divide_model_m_shift_swap (void) {
     release_key(USB_KEY_RIGHT_SHIFT);
     check_result(((uint8_t[]){0xF0, 0x59}), 2,
         "Model M: RShift break (F0 59)");
+}
+
+/// Model M observed: NL ON, hold Home, hold End, press Num Lock (host then
+/// sends ED to update LED), release End, release Home.
+static void
+test_set2_tenkey_model_m_numlock_toggle_mid_hold (void) {
+    api_set_leds(PS2_LED_NUM_LOCK_BIT);
+
+    press_key(USB_KEY_HOME);
+    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x6C}), 4,
+        "Model M: Home make (E0 12 E0 6C)");
+
+    press_key(USB_KEY_END);
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x69}), 7,
+        "Model M: End make (E0 F0 12 E0 12 E0 69)");
+
+    press_key(USB_KEY_NUM_LOCK);
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0x77}), 4,
+        "Model M: Num Lock make (E0 F0 12 77)");
+
+    release_key(USB_KEY_NUM_LOCK);
+    check_result(((uint8_t[]){0xF0, 0x77}), 2,
+        "Model M: Num Lock break (F0 77)");
+
+    api_set_leds(0); // Host acknowledges NL OFF via ED
+
+    release_key(USB_KEY_END);
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x69}), 3,
+        "Model M: End break, no Shift");
+
+    release_key(USB_KEY_HOME);
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x6C}), 3,
+        "Model M: Home break, no Shift");
+}
+
+/// Host-driven Num Lock toggle while nav keys held (no physical Num Lock key
+/// press): ED changes LED state and should recalculate virtual shift.
+static void
+test_set2_tenkey_nl_led_toggle_mid_hold_ed_only (void) {
+    api_set_leds(PS2_LED_NUM_LOCK_BIT);
+
+    press_key(USB_KEY_HOME);
+    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x6C}), 4,
+        "ED-only: Home make (E0 12 E0 6C)");
+
+    press_key(USB_KEY_END);
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x69}), 7,
+        "ED-only: End make (E0 F0 12 E0 12 E0 69)");
+
+    // Host toggles NL OFF via ED while keys held
+    clear_sent();
+    queue_recv(PS2_COMMAND_SET_LEDS);
+    queue_recv(0);
+    drain_commands();
+    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK, 0xE0, 0xF0, 0x12}), 5,
+        "ED-only: ACK ACK + break forced LShift (E0 F0 12)");
+
+    release_key(USB_KEY_END);
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x69}), 3,
+        "ED-only: End break (no LShift)");
+
+    release_key(USB_KEY_HOME);
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x6C}), 3,
+        "ED-only: Home break (no LShift)");
 }
 
 /// Reset the state. Run automatically before each test, do not call manually.
