@@ -90,9 +90,10 @@ static uint8_t ps2_output_flags = 0;
 
 #define FLAG_OUTPUT_INITIALIZED         ((uint8_t) 0x01U)
 #define FLAG_SHIFT_SUPPRESSED_LEFT      ((uint8_t) 0x02U)
-#define FLAG_SHIFT_SUPPRESSED_RIGHT     ((uint8_t) 0x20U)
 #define FLAG_SHIFT_VIRTUAL_ON           ((uint8_t) 0x04U)
-#define FLAG_HOST_ACTIVE                ((uint8_t) 0x08U)
+#define FLAG_SHIFT_VIRTUAL_WAS_ACTIVE   ((uint8_t) 0x08U)
+#define FLAG_HOST_ACTIVE                ((uint8_t) 0x10U)
+#define FLAG_SHIFT_SUPPRESSED_RIGHT     ((uint8_t) 0x20U)
 #define FLAG_WAS_SCANNING_ENABLED       ((uint8_t) 0x40U)
 #define FLAG_SCANNING_ENABLED           ((uint8_t) 0x80U)
 
@@ -446,6 +447,7 @@ send_ext_key_set1_break (const uint8_t keycode) {
 static void
 virtual_shift_on (void) {
     if (!(ps2_modifiers & BOTH_SHIFT_BITS) && !(ps2_output_flags & FLAG_SHIFT_VIRTUAL_ON)) {
+        ps2_output_flags &= ~FLAG_SHIFT_VIRTUAL_WAS_ACTIVE;
         ps2_output_flags |= FLAG_SHIFT_VIRTUAL_ON;
         send_ext_key_make(is_scancode_set_1_active ? KEY_LEFT_SHIFT_SET1 : KEY_LEFT_SHIFT);
     }
@@ -455,6 +457,7 @@ static void
 virtual_shift_off (void) {
     if (ps2_output_flags & FLAG_SHIFT_VIRTUAL_ON) {
         ps2_output_flags &= ~FLAG_SHIFT_VIRTUAL_ON;
+        ps2_output_flags |= FLAG_SHIFT_VIRTUAL_WAS_ACTIVE;
         if (is_scancode_set_1_active) {
             send_ext_key_set1_break(KEY_LEFT_SHIFT_SET1);
         } else {
@@ -559,6 +562,7 @@ ps2_send_key_press (const uint8_t usb_keycode) {
         shift_unsuppress();
 
         if (is_tenkey_cluster_key(usb_keycode)) {
+            ps2_output_flags &= ~FLAG_SHIFT_VIRTUAL_WAS_ACTIVE;
             if (host_led_state & LED_NUM_LOCK_BIT) {
                 virtual_shift_on();
             } else {
@@ -621,7 +625,7 @@ ps2_send_key_press (const uint8_t usb_keycode) {
 
 static void
 clear_key_state (void) {
-    ps2_output_flags &= ~(FLAG_SHIFT_VIRTUAL_ON | FLAG_SHIFT_SUPPRESSED_LEFT | FLAG_SHIFT_SUPPRESSED_RIGHT);
+    ps2_output_flags &= ~(FLAG_SHIFT_VIRTUAL_ON | FLAG_SHIFT_SUPPRESSED_LEFT | FLAG_SHIFT_SUPPRESSED_RIGHT | FLAG_SHIFT_VIRTUAL_WAS_ACTIVE);
     ps2_modifiers = 0;
     tenkey_count = 0;
 }
@@ -731,11 +735,21 @@ ps2_send_key_release (const uint8_t usb_keycode) {
         if (!tenkey_count) {
             virtual_shift_off();
             shift_unsuppress();
+            ps2_output_flags &= ~FLAG_SHIFT_VIRTUAL_WAS_ACTIVE;
         }
     }
 
     if (IS_MODIFIER(usb_keycode)) {
-        ps2_modifiers &= ~MODIFIER_BIT(usb_keycode);
+        const uint8_t modifier_bit = MODIFIER_BIT(usb_keycode);
+        ps2_modifiers &= ~modifier_bit;
+        if (!is_scancode_set_3_active && (modifier_bit & BOTH_SHIFT_BITS)) {
+            ps2_output_flags &= ~modifier_bit;
+            if (tenkey_count && !(ps2_modifiers & BOTH_SHIFT_BITS)
+                && (host_led_state & LED_NUM_LOCK_BIT)
+                && !(ps2_output_flags & FLAG_SHIFT_VIRTUAL_WAS_ACTIVE)) {
+                virtual_shift_on();
+            }
+        }
     }
 }
 

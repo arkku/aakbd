@@ -3678,6 +3678,64 @@ test_set2_tenkey_nl_led_toggle_mid_hold_ed_only (void) {
         "ED-only: Home break (no LShift)");
 }
 
+/// Model M observed: NL ON, hold both shifts + Home, release shifts one by one
+static void
+test_set2_tenkey_nl_on_both_shifts_release_mid_hold (void) {
+    api_set_leds(PS2_LED_NUM_LOCK_BIT);
+    usb_keys_modifier_flags = SHIFT_BIT | RIGHT_SHIFT_BIT;
+    ps2_modifiers = SHIFT_BIT | RIGHT_SHIFT_BIT;
+    press_key(USB_KEY_LEFT_SHIFT);
+    press_key(USB_KEY_RIGHT_SHIFT);
+    clear_sent();
+    press_key(USB_KEY_HOME);
+    check_result(((uint8_t[]){0xE0, 0x6C}), 2,
+        "NL ON+both shifts: Home make (bare key)");
+    release_key(USB_KEY_LEFT_SHIFT);
+    check_result(((uint8_t[]){0xF0, 0x12}), 2,
+        "NL ON+both shifts: LShift break");
+    release_key(USB_KEY_RIGHT_SHIFT);
+    check_result(((uint8_t[]){0xF0, 0x59, 0xE0, 0x12}), 4,
+        "NL ON+both shifts: RShift break + forced LShift make");
+    release_key(USB_KEY_HOME);
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x6C, 0xE0, 0xF0, 0x12}), 6,
+        "NL ON+both shifts: Home break + forced LShift break");
+}
+
+/// Model M observed: PrtScr, then Num Lock ON, then both shifts + Home,
+/// release shifts. WAS_ACTIVE from PrtScr must not block forced LShift.
+static void
+test_set2_prtscr_then_nl_then_both_shifts_home (void) {
+    // PrtScr press+release (sets WAS_ACTIVE via virtual_shift_off)
+    press_key(USB_KEY_PRINT_SCREEN);
+    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x7C}), 4,
+        "PrtScr->NL->Home: PrtScr make (E0 12 E0 7C)");
+    release_key(USB_KEY_PRINT_SCREEN);
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x7C, 0xE0, 0xF0, 0x12}), 6,
+        "PrtScr->NL->Home: PrtScr break + forced LShift break");
+
+    // Num Lock ON via host command (NL ON)
+    api_set_leds(PS2_LED_NUM_LOCK_BIT);
+
+    // Both shifts + Home
+    usb_keys_modifier_flags = SHIFT_BIT | RIGHT_SHIFT_BIT;
+    ps2_modifiers = SHIFT_BIT | RIGHT_SHIFT_BIT;
+    press_key(USB_KEY_LEFT_SHIFT);
+    press_key(USB_KEY_RIGHT_SHIFT);
+    clear_sent();
+    press_key(USB_KEY_HOME);
+    check_result(((uint8_t[]){0xE0, 0x6C}), 2,
+        "PrtScr->NL->Home: Home make (bare key)");
+    release_key(USB_KEY_LEFT_SHIFT);
+    check_result(((uint8_t[]){0xF0, 0x12}), 2,
+        "PrtScr->NL->Home: LShift break");
+    release_key(USB_KEY_RIGHT_SHIFT);
+    check_result(((uint8_t[]){0xF0, 0x59, 0xE0, 0x12}), 4,
+        "PrtScr->NL->Home: RShift break + forced LShift make");
+    release_key(USB_KEY_HOME);
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x6C, 0xE0, 0xF0, 0x12}), 6,
+        "PrtScr->NL->Home: Home break + forced LShift break");
+}
+
 /// Reset the state. Run automatically before each test, do not call manually.
 /// This must set everything to a fresh state, blank slate for the next test.
 static void
