@@ -172,6 +172,9 @@ kbd_recv_byte (void) {
 }
 
 #if PS2USB_DEBUG_COMMANDS
+static uint16_t debug_led_toggle_countdown = 0;
+static uint8_t debug_last_led_tick = 0;
+
 static int
 send_cmd (const uint8_t cmd) {
     if (is_debug_active) {
@@ -278,7 +281,10 @@ kbd_input (void) {
 #if PS2USB_DEBUG_COMMANDS
                 case KEY_0: debug_cmd_arg(PS2_COMMAND_SET_SCAN_CODES, 0x00); break;
                 case KEY_2: debug_cmd(PS2_COMMAND_ID); break;
-                case KEY_3: debug_cmd_arg(PS2_COMMAND_SET_SCAN_CODES, 0x03); break;
+                case KEY_3:
+                    debug_cmd_arg(PS2_COMMAND_SET_SCAN_CODES, 0x03);
+                    scancode_set = 3;
+                    break;
                 case KEY_4: debug_cmd(PS2_COMMAND_ENABLE); break;
                 case KEY_5:
                     debug_cmd(PS2_COMMAND_DISABLE);
@@ -293,12 +299,21 @@ kbd_input (void) {
                 case KEY_C: debug_per_key(PS2_COMMAND_SET_KEY_MAKE_BREAK); break;
                 case KEY_D: debug_per_key(PS2_COMMAND_SET_KEY_MAKE); break;
                 case KEY_E: debug_cmd(PS2_COMMAND_RESEND); break;
-                case KEY_F: debug_cmd(PS2_COMMAND_RESET); break;
+                case KEY_F:
+                    debug_cmd(PS2_COMMAND_RESET);
+                    scancode_set = 2;
+                    break;
                 case KEY_G: debug_cmd(PS2_COMMAND_ECHO); break;
-                case KEY_N: debug_led_toggle(PS2_LED_NUM_LOCK_BIT); break;
+                case KEY_N:
+                    debug_led_toggle_countdown = 300; // ~3 seconds
+                    debug_last_led_tick = tick_10ms_count;
+                    break;
                 case KEY_M: debug_led_toggle(PS2_LED_CAPS_LOCK_BIT); break;
                 case KEY_COMMA: debug_led_toggle(PS2_LED_SCROLL_LOCK_BIT); break;
 #endif
+                case KEY_NUM_LOCK_SET2:
+                    debug_led_toggle(PS2_LED_NUM_LOCK_BIT);
+                    break;
                 case KEY_F11:
                 case KEY_F11_SET2:
                     (void) fprintf_P(usb_kbd_type, PSTR(" !!"));
@@ -681,6 +696,20 @@ main (void) {
         while (kbd_input()) {
             led_toggle();
         }
+
+#if PS2USB_DEBUG_SCANCODES
+        if (debug_led_toggle_countdown) {
+            const uint8_t current_tick = tick_10ms_count;
+            const uint8_t tick_diff = current_tick - debug_last_led_tick;
+            if (tick_diff >= debug_led_toggle_countdown) {
+                debug_led_toggle(PS2_LED_NUM_LOCK_BIT);
+                debug_led_toggle_countdown = 0;
+            } else {
+                debug_led_toggle_countdown -= tick_diff;
+            }
+            debug_last_led_tick = current_tick;
+        }
+#endif
 
         update_keyboard_leds(keys_led_state());
 
