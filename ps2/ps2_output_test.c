@@ -418,7 +418,7 @@ test_set2_keypad_nav_numlock_off_both_shifts (void) {
     usb_keys_modifier_flags = SHIFT_BIT | RIGHT_SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT | RIGHT_SHIFT_BIT;
     uint8_t make[] = {0xE0, 0xF0, 0x12, 0xE0, 0xF0, 0x59, 0xE0, 0x69};
-    uint8_t brk[] = {0xE0, 0xF0, 0x69, 0xE0, 0x12, 0xE0, 0x59};
+    uint8_t brk[] = {0xE0, 0xF0, 0x69, 0xE0, 0x59, 0xE0, 0x12};
     press(USB_KEY_END, make, 8, "S2 End numlock OFF+both shifts make");
     release(USB_KEY_END, brk, 7, "S2 End numlock OFF+both shifts break");
 }
@@ -609,19 +609,19 @@ test_output_task_after_shutdown (void) {
     tests_run++;
 }
 
-/// HW - sentinel cleanup clears lingering flags and tenkey_count
+/// HW - sentinel cleanup clears lingering shift state and tenkey_count
 static void
 test_sentinel_cleanup (void) {
     ps2_output_init();
     ps2_enable_scanning();
-    ps2_output_flags |= FLAG_TENKEY_VIRTUAL_SHIFT_ACTIVE | FLAG_TENKEY_RELEASED_SHIFT;
+    ps2_output_flags |= FLAG_SHIFT_VIRTUAL_ON | FLAG_SHIFT_SUPPRESSED_LEFT | FLAG_SHIFT_SUPPRESSED_RIGHT;
     tenkey_count = 3;
     ps2_output_clear_keys(false);
     drain_all();
-    if (ps2_output_flags & (FLAG_TENKEY_VIRTUAL_SHIFT_ACTIVE | FLAG_TENKEY_RELEASED_SHIFT)) {
+    if (ps2_output_flags & (FLAG_SHIFT_VIRTUAL_ON | FLAG_SHIFT_SUPPRESSED_LEFT | FLAG_SHIFT_SUPPRESSED_RIGHT)) {
         tests_failed++;
         tests_run++;
-        (void) printf("FAIL sentinel: flags not cleared\n");
+        (void) printf("FAIL sentinel: shift state not cleared, got 0x%02X\n", ps2_output_flags);
     } else if (tenkey_count != 0) {
         tests_failed++;
         tests_run++;
@@ -2936,8 +2936,8 @@ test_set1_media_keys (void) {
     press(USB_KEY_PREVIOUS_TRACK, ((uint8_t[]){0xE0, 0x10}), 2, "S1 PrevTrack make");
 }
 
-/// S1 INS - Set 1 Insert (KP_0) with Num Lock OFF, both shifts — exact
-/// Microsoft example
+/// S1 INS - Set 1 Insert with Num Lock OFF, both shifts — exact
+/// Microsoft example (MS doc erroneously called this "KP0/Insert")
 static void
 test_set1_insert_both_shifts_numlock_off (void) {
     api_set_scancode_set(1);
@@ -2951,11 +2951,11 @@ test_set1_insert_both_shifts_numlock_off (void) {
     clear_sent();
     press_key(USB_KEY_RIGHT_SHIFT);
     clear_sent();
-    // Now both shifts are held — press KP_0_INSERT
+    // Now both shifts are held — press Insert
     uint8_t make[] = {0xE0, 0xAA, 0xE0, 0xB6, 0xE0, 0x52};
     press(USB_KEY_INSERT, make, 6, "S1 Insert both shifts NumOFF make");
     // Release Insert — break + restore shifts
-    uint8_t brk[] = {0xE0, 0xD2, 0xE0, 0x2A, 0xE0, 0x36};
+    uint8_t brk[] = {0xE0, 0xD2, 0xE0, 0x36, 0xE0, 0x2A};
     release(USB_KEY_INSERT, brk, 6, "S1 Insert both shifts NumOFF break");
     // Release RShift
     release_key(USB_KEY_RIGHT_SHIFT);
@@ -3510,6 +3510,144 @@ test_set2_prtsc_rctrl_sysrq (void) {
     uint8_t brk[] = {0xE0, 0xF0, 0x7C};
     press(USB_KEY_PRINT_SCREEN, make, 2, "S2 RCtrl+PrtSc make");
     release(USB_KEY_PRINT_SCREEN, brk, 3, "S2 RCtrl+PrtSc break");
+}
+
+static void
+test_set2_printscreen_model_m_plain (void) {
+    press_key(USB_KEY_PRINT_SCREEN);
+    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x7C}), 4,
+        "Model M: PrintScreen make (E0 12 E0 7C, fake LShift + real key)");
+    release_key(USB_KEY_PRINT_SCREEN);
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x7C, 0xE0, 0xF0, 0x12}), 6,
+        "Model M: PrintScreen break (E0 F0 7C E0 F0 12, real key + fake LShift break)");
+}
+
+static void
+test_set2_printscreen_model_m_shift_held_first (void) {
+    usb_keys_modifier_flags = SHIFT_BIT;
+    ps2_modifiers = SHIFT_BIT;
+    press_key(USB_KEY_LEFT_SHIFT);
+    check_result(((uint8_t[]){0x12}), 1,
+        "Model M: LShift make (12)");
+    press_key(USB_KEY_PRINT_SCREEN);
+    check_result(((uint8_t[]){0xE0, 0x7C}), 2,
+        "Model M: PrintScreen make (E0 7C, no fake LShift since real Shift held)");
+    release_key(USB_KEY_PRINT_SCREEN);
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x7C}), 3,
+        "Model M: PrintScreen break (E0 F0 7C, no fake LShift break)");
+    release_key(USB_KEY_LEFT_SHIFT);
+    check_result(((uint8_t[]){0xF0, 0x12}), 2,
+        "Model M: LShift break (F0 12)");
+}
+
+static void
+test_set2_printscreen_model_m_shift_pressed_while_held (void) {
+    press_key(USB_KEY_PRINT_SCREEN);
+    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x7C}), 4,
+        "Model M: PrintScreen make (E0 12 E0 7C, fake LShift + real key)");
+
+    usb_keys_modifier_flags = SHIFT_BIT;
+    ps2_modifiers = SHIFT_BIT;
+    press_key(USB_KEY_LEFT_SHIFT);
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0x12}), 4,
+        "Model M: fake LShift EXTENDED break (E0 F0 12), then real LShift make (12)");
+
+    release_key(USB_KEY_PRINT_SCREEN);
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x7C}), 3,
+        "Model M: PrintScreen break (E0 F0 7C only, real Shift now covers it, no fake break)");
+
+    release_key(USB_KEY_LEFT_SHIFT);
+    check_result(((uint8_t[]){0xF0, 0x12}), 2,
+        "Model M: LShift break (F0 12)");
+}
+
+static void
+test_set2_printscreen_model_m_ctrl_held (void) {
+    usb_keys_modifier_flags = CTRL_BIT;
+    ps2_modifiers = CTRL_BIT;
+    press_key(USB_KEY_LEFT_CTRL);
+    check_result(((uint8_t[]){0x14}), 1,
+        "Model M: LCtrl make (14)");
+    press_key(USB_KEY_PRINT_SCREEN);
+    check_result(((uint8_t[]){0xE0, 0x7C}), 2,
+        "Model M: PrintScreen make (E0 7C, Ctrl suppresses fake LShift same as real Shift)");
+    release_key(USB_KEY_PRINT_SCREEN);
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x7C}), 3,
+        "Model M: PrintScreen break (E0 F0 7C, no fake LShift break)");
+    release_key(USB_KEY_LEFT_CTRL);
+    check_result(((uint8_t[]){0xF0, 0x14}), 2,
+        "Model M: LCtrl break (F0 14)");
+}
+
+static void
+test_set2_printscreen_model_m_alt_held (void) {
+    usb_keys_modifier_flags = ALT_BIT;
+    ps2_modifiers = ALT_BIT;
+    press_key(USB_KEY_LEFT_ALT);
+    check_result(((uint8_t[]){0x11}), 1,
+        "Model M: LAlt make (11)");
+    press_key(USB_KEY_PRINT_SCREEN);
+    check_result(((uint8_t[]){0x84}), 1,
+        "Model M: SysRq make (84, dedicated non-extended byte, no fake LShift)");
+    release_key(USB_KEY_PRINT_SCREEN);
+    check_result(((uint8_t[]){0xF0, 0x84}), 2,
+        "Model M: SysRq break (F0 84)");
+    release_key(USB_KEY_LEFT_ALT);
+    check_result(((uint8_t[]){0xF0, 0x11}), 2,
+        "Model M: LAlt break (F0 11)");
+}
+
+static void
+test_set2_pause_model_m_ctrl_held (void) {
+    usb_keys_modifier_flags = CTRL_BIT;
+    ps2_modifiers = CTRL_BIT;
+    press_key(USB_KEY_LEFT_CTRL);
+    check_result(((uint8_t[]){0x14}), 1,
+        "Model M: LCtrl make (14)");
+    press_key(USB_KEY_PAUSE_BREAK);
+    check_result(((uint8_t[]){0xE0, 0x7E}), 2,
+        "Model M: Ctrl+Pause make (E0 7E, dedicated code, not the normal 6-byte Pause sequence)");
+    release_key(USB_KEY_PAUSE_BREAK);
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x7E}), 3,
+        "Model M: Ctrl+Pause break (E0 F0 7E, unlike plain Pause which has no break at all)");
+    release_key(USB_KEY_LEFT_CTRL);
+    check_result(((uint8_t[]){0xF0, 0x14}), 2,
+        "Model M: LCtrl break (F0 14)");
+}
+
+static void
+test_set2_kp_divide_model_m_shift_swap (void) {
+    usb_keys_modifier_flags = SHIFT_BIT;
+    ps2_modifiers = SHIFT_BIT;
+    press_key(USB_KEY_LEFT_SHIFT);
+    check_result(((uint8_t[]){0x12}), 1,
+        "Model M: LShift make (12)");
+
+    press_key(USB_KEY_KP_DIVIDE);
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x4A}), 5,
+        "Model M: masked LShift EXTENDED break (E0 F0 12), then KP_Divide make (E0 4A)");
+
+    usb_keys_modifier_flags = 0;
+    ps2_modifiers = 0;
+    release_key(USB_KEY_LEFT_SHIFT);
+    check_result(((uint8_t[]){0xF0, 0x12}), 2,
+        "Model M: real LShift break (F0 12, plain, distinct from the earlier fake extended break)");
+
+    usb_keys_modifier_flags = RIGHT_SHIFT_BIT;
+    ps2_modifiers = RIGHT_SHIFT_BIT;
+    press_key(USB_KEY_RIGHT_SHIFT);
+    check_result(((uint8_t[]){0x59}), 1,
+        "Model M: RShift make (59, pressed fresh while Divide held, NOT masked)");
+
+    release_key(USB_KEY_KP_DIVIDE);
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x4A}), 3,
+        "Model M: KP_Divide break (E0 F0 4A, NO restore bytes for either Shift)");
+
+    usb_keys_modifier_flags = 0;
+    ps2_modifiers = 0;
+    release_key(USB_KEY_RIGHT_SHIFT);
+    check_result(((uint8_t[]){0xF0, 0x59}), 2,
+        "Model M: RShift break (F0 59)");
 }
 
 /// Reset the state. Run automatically before each test, do not call manually.

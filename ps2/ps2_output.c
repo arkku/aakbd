@@ -88,12 +88,13 @@
 /// PS/2 output state flags.
 static uint8_t ps2_output_flags = 0;
 
-#define FLAG_SCANNING_ENABLED            ((uint8_t) (0x01U))
-#define FLAG_WAS_SCANNING_ENABLED        ((uint8_t) (0x02U))
-#define FLAG_TENKEY_VIRTUAL_SHIFT_ACTIVE ((uint8_t) (0x04U))
-#define FLAG_TENKEY_RELEASED_SHIFT       ((uint8_t) (0x08U))
-#define FLAG_HOST_ACTIVE                 ((uint8_t) (0x10U))
-#define FLAG_OUTPUT_INITIALIZED          ((uint8_t) (0x80U))
+#define FLAG_OUTPUT_INITIALIZED         ((uint8_t) 0x01U)
+#define FLAG_SHIFT_SUPPRESSED_LEFT      ((uint8_t) 0x02U)
+#define FLAG_SHIFT_SUPPRESSED_RIGHT     ((uint8_t) 0x20U)
+#define FLAG_SHIFT_VIRTUAL_ON           ((uint8_t) 0x04U)
+#define FLAG_HOST_ACTIVE                ((uint8_t) 0x08U)
+#define FLAG_WAS_SCANNING_ENABLED       ((uint8_t) 0x40U)
+#define FLAG_SCANNING_ENABLED           ((uint8_t) 0x80U)
 
 /// The active scancode set (1, 2 or 3).
 static uint8_t ps2_active_scancode_set = PS2_KEYBOARD_DEFAULT_SCANCODE_SET;
@@ -438,38 +439,57 @@ send_ext_key_set1_break (const uint8_t keycode) {
 }
 
 static void
-release_tenkey_virtual_shift (void) {
-    if (ps2_output_flags & FLAG_TENKEY_VIRTUAL_SHIFT_ACTIVE) {
+virtual_shift_on (void) {
+    if (!(ps2_modifiers & BOTH_SHIFT_BITS) && !(ps2_output_flags & FLAG_SHIFT_VIRTUAL_ON)) {
+        ps2_output_flags |= FLAG_SHIFT_VIRTUAL_ON;
+        send_ext_key_make(is_scancode_set_1_active ? KEY_LEFT_SHIFT_SET1 : KEY_LEFT_SHIFT);
+    }
+}
+
+static void
+virtual_shift_off (void) {
+    if (ps2_output_flags & FLAG_SHIFT_VIRTUAL_ON) {
+        ps2_output_flags &= ~FLAG_SHIFT_VIRTUAL_ON;
         if (is_scancode_set_1_active) {
             send_ext_key_set1_break(KEY_LEFT_SHIFT_SET1);
         } else {
             send_ext_key_set2_break(KEY_LEFT_SHIFT);
         }
-        ps2_output_flags &= ~FLAG_TENKEY_VIRTUAL_SHIFT_ACTIVE;
     }
 }
 
 static void
-restore_tenkey_released_shift (void) {
-    if (ps2_output_flags & FLAG_TENKEY_RELEASED_SHIFT) {
-        if (!(host_led_state & LED_NUM_LOCK_BIT)) {
-            const bool left_shift = (ps2_modifiers & SHIFT_BIT) != 0;
-            const bool right_shift = (ps2_modifiers & RIGHT_SHIFT_BIT) != 0;
-            if (left_shift) {
-                send_ext_key_make(is_scancode_set_1_active ? KEY_LEFT_SHIFT_SET1 : KEY_LEFT_SHIFT);
-            }
-            if (right_shift) {
-                send_ext_key_make(is_scancode_set_1_active ? KEY_RIGHT_SHIFT_SET1 : KEY_RIGHT_SHIFT);
-            }
+shift_suppress (void) {
+    _Static_assert(FLAG_SHIFT_SUPPRESSED_LEFT == SHIFT_BIT);
+    _Static_assert(FLAG_SHIFT_SUPPRESSED_RIGHT == RIGHT_SHIFT_BIT);
+
+    if (ps2_modifiers & SHIFT_BIT) {
+        if (is_scancode_set_1_active) {
+            send_ext_key_set1_break(KEY_LEFT_SHIFT_SET1);
+        } else {
+            send_ext_key_set2_break(KEY_LEFT_SHIFT);
         }
-        ps2_output_flags &= ~FLAG_TENKEY_RELEASED_SHIFT;
     }
+    if (ps2_modifiers & RIGHT_SHIFT_BIT) {
+        if (is_scancode_set_1_active) {
+            send_ext_key_set1_break(KEY_RIGHT_SHIFT_SET1);
+        } else {
+            send_ext_key_set2_break(KEY_RIGHT_SHIFT);
+        }
+    }
+    ps2_output_flags |= (ps2_modifiers & BOTH_SHIFT_BITS);
 }
 
-static inline void
-release_tenkey_modifiers (void) {
-    release_tenkey_virtual_shift();
-    restore_tenkey_released_shift();
+static void
+shift_unsuppress (void) {
+    const uint8_t to_restore = (ps2_output_flags & BOTH_SHIFT_BITS) & ps2_modifiers;
+    if (to_restore & RIGHT_SHIFT_BIT) {
+        send_ext_key_make(is_scancode_set_1_active ? KEY_RIGHT_SHIFT_SET1 : KEY_RIGHT_SHIFT);
+    }
+    if (to_restore & SHIFT_BIT) {
+        send_ext_key_make(is_scancode_set_1_active ? KEY_LEFT_SHIFT_SET1 : KEY_LEFT_SHIFT);
+    }
+    ps2_output_flags &= ~to_restore;
 }
 
 static inline bool
@@ -530,36 +550,14 @@ ps2_send_key_press (const uint8_t usb_keycode) {
     }
 
     if (!is_scancode_set_3_active) {
-        release_tenkey_modifiers();
+        virtual_shift_off();
+        shift_unsuppress();
 
         if (is_tenkey_cluster_key(usb_keycode)) {
-            const bool num_lock = (host_led_state & LED_NUM_LOCK_BIT) != 0;
-            const bool left_shift = (ps2_modifiers & SHIFT_BIT) != 0;
-            const bool right_shift = (ps2_modifiers & RIGHT_SHIFT_BIT) != 0;
-
-            if (num_lock) {
-                if (!left_shift && !right_shift) {
-                    send_ext_key_make(is_scancode_set_1_active ? KEY_LEFT_SHIFT_SET1 : KEY_LEFT_SHIFT);
-                    ps2_output_flags |= FLAG_TENKEY_VIRTUAL_SHIFT_ACTIVE;
-                }
+            if (host_led_state & LED_NUM_LOCK_BIT) {
+                virtual_shift_on();
             } else {
-                if (left_shift) {
-                    if (is_scancode_set_1_active) {
-                        send_ext_key_set1_break(KEY_LEFT_SHIFT_SET1);
-                    } else {
-                        send_ext_key_set2_break(KEY_LEFT_SHIFT);
-                    }
-                }
-                if (right_shift) {
-                    if (is_scancode_set_1_active) {
-                        send_ext_key_set1_break(KEY_RIGHT_SHIFT_SET1);
-                    } else {
-                        send_ext_key_set2_break(KEY_RIGHT_SHIFT);
-                    }
-                }
-                if (left_shift || right_shift) {
-                    ps2_output_flags |= FLAG_TENKEY_RELEASED_SHIFT;
-                }
+                shift_suppress();
             }
             ++tenkey_count;
         }
@@ -574,13 +572,15 @@ ps2_send_key_press (const uint8_t usb_keycode) {
                 return;
             }
             if (!(ps2_modifiers & (CTRL_BIT | RIGHT_CTRL_BIT | SHIFT_BIT | RIGHT_SHIFT_BIT))) {
-                send_ext_key_make(is_scancode_set_1_active ? KEY_LEFT_SHIFT_SET1 : KEY_LEFT_SHIFT);
+                virtual_shift_on();
             }
             break;
 
         case USB_KEY_PAUSE_BREAK:
             if (ps2_modifiers & BOTH_CTRL_BITS) {
-                // Pause is a weird special case, so it happens that:
+                // Pause is a weird special case, so it happens that the
+                // scancode resolves to the one with Ctrl active (other parts
+                // of the scancode are not unique)
                 send_ext_key_make(scancode);
             } else if (is_scancode_set_1_active) {
                 send_2_bytes(PS2_PAUSE_PREFIX, KEY_LEFT_CTRL_SET1);
@@ -595,20 +595,7 @@ ps2_send_key_press (const uint8_t usb_keycode) {
             return;
 
         case USB_KEY_KP_DIVIDE:
-            if (ps2_modifiers & SHIFT_BIT) {
-                if (is_scancode_set_1_active) {
-                    send_ext_key_set1_break(KEY_LEFT_SHIFT_SET1);
-                } else {
-                    send_ext_key_set2_break(KEY_LEFT_SHIFT);
-                }
-            }
-            if (ps2_modifiers & RIGHT_SHIFT_BIT) {
-                if (is_scancode_set_1_active) {
-                    send_ext_key_set1_break(KEY_RIGHT_SHIFT_SET1);
-                } else {
-                    send_ext_key_set2_break(KEY_RIGHT_SHIFT);
-                }
-            }
+            shift_suppress();
             break;
 
         default:
@@ -625,6 +612,13 @@ ps2_send_key_press (const uint8_t usb_keycode) {
     if (IS_MODIFIER(usb_keycode)) {
         ps2_modifiers |= MODIFIER_BIT(usb_keycode);
     }
+}
+
+static void
+clear_key_state (void) {
+    ps2_output_flags &= ~(FLAG_SHIFT_VIRTUAL_ON | FLAG_SHIFT_SUPPRESSED_LEFT | FLAG_SHIFT_SUPPRESSED_RIGHT);
+    ps2_modifiers = 0;
+    tenkey_count = 0;
 }
 
 void
@@ -653,10 +647,6 @@ ps2_send_key_release (const uint8_t usb_keycode) {
     clear_repeat_for_key(scancode, is_extended);
 
     if (!is_scancode_set_3_active) {
-        if (!is_tenkey_cluster_key(usb_keycode) && !IS_MODIFIER(usb_keycode)) {
-            release_tenkey_modifiers();
-        }
-
         switch (usb_keycode) {
         case USB_KEY_PRINT_SCREEN:
             if (ps2_modifiers & BOTH_ALT_BITS) {
@@ -673,14 +663,7 @@ ps2_send_key_release (const uint8_t usb_keycode) {
             } else {
                 send_ext_key_set2_break(EXTENDED_KEY_PRINT_SCREEN_SET2);
             }
-            if (!(ps2_modifiers & (CTRL_BIT | RIGHT_CTRL_BIT
-                                   | SHIFT_BIT | RIGHT_SHIFT_BIT))) {
-                if (is_scancode_set_1_active) {
-                    send_ext_key_set1_break(KEY_LEFT_SHIFT_SET1);
-                } else {
-                    send_ext_key_set2_break(KEY_LEFT_SHIFT);
-                }
-            }
+            virtual_shift_off();
             clear_repeat();
             return;
 
@@ -700,20 +683,7 @@ ps2_send_key_release (const uint8_t usb_keycode) {
             } else {
                 send_ext_key_set2_break(EXTENDED_KEY_KP_DIVIDE_SET2);
             }
-            if (ps2_modifiers & RIGHT_SHIFT_BIT) {
-                if (is_scancode_set_1_active) {
-                    send_ext_key_make(KEY_RIGHT_SHIFT_SET1);
-                } else {
-                    send_ext_key_make(KEY_RIGHT_SHIFT);
-                }
-            }
-            if (ps2_modifiers & SHIFT_BIT) {
-                if (is_scancode_set_1_active) {
-                    send_ext_key_make(KEY_LEFT_SHIFT_SET1);
-                } else {
-                    send_ext_key_make(KEY_LEFT_SHIFT);
-                }
-            }
+            shift_unsuppress();
             return;
 
         default:
@@ -754,7 +724,8 @@ ps2_send_key_release (const uint8_t usb_keycode) {
             --tenkey_count;
         }
         if (!tenkey_count) {
-            release_tenkey_modifiers();
+            virtual_shift_off();
+            shift_unsuppress();
         }
     }
 
@@ -1131,10 +1102,8 @@ ps2_output_task (void) {
                     /// This is a marker that the `ps2_output_clear_keys()`
                     /// was done at this point in the queue. This means that
                     /// all keys are now released.
-                    release_tenkey_virtual_shift();
-                    ps2_output_flags &= ~FLAG_TENKEY_RELEASED_SHIFT;
-                    ps2_modifiers = 0;
-                    tenkey_count = 0;
+                    virtual_shift_off();
+                    clear_key_state();
                     goto remove_key_from_queue;
                 } else if (key_event_queue[key_event_tail].is_release) {
                     ps2_send_key_release(key);
@@ -1186,11 +1155,9 @@ void
 ps2_output_clear_keys (const bool should_discard_unsent_keys) {
     clear_repeat();
     if (should_discard_unsent_keys) {
-        tenkey_count = 0;
         key_event_queue_head = 0;
         key_event_queue_tail = 0;
-        ps2_modifiers = 0;
-        ps2_output_flags &= ~(FLAG_TENKEY_VIRTUAL_SHIFT_ACTIVE | FLAG_TENKEY_RELEASED_SHIFT);
+        clear_key_state();
     } else {
         // Add sentinel after all existing events so cleanup runs
         // after they have all been processed naturally
