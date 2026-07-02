@@ -81,7 +81,6 @@ bool debounce(matrix_row_t raw[], matrix_row_t cooked[], bool changed) {
                 if (presses) {
                     cooked[changed_row] |= presses;
                     cooked_changed = true;
-#endif
                 }
             }
         }
