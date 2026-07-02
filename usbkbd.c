@@ -243,6 +243,7 @@ usb_keyboard_release_all_keys (void) {
 #if ENABLE_PS2_DEVICE
         if (keys_buffer[i]) {
             ps2_release_key(keys_buffer[i]);
+            ps2_output_task();
         }
 #endif
         keys_buffer[i] = 0;
@@ -261,6 +262,7 @@ usb_keyboard_release_all_keys (void) {
             if (mods & bit) {
                 ps2_release_key(key);
                 mods &= ~bit;
+                ps2_output_task();
             }
             ++key;
             bit <<= 1;
@@ -555,6 +557,10 @@ usb_keyboard_set_modifiers (const uint8_t modifier_flags) {
                     ps2_press_key(key);
                 } else {
                     ps2_release_key(key);
+                }
+                if (unsent_mods) {
+                    // Try to avoid filling the output buffer for multiple mods
+                    ps2_output_task();
                 }
             }
             ++key;
