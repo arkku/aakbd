@@ -504,9 +504,9 @@ static void
 test_set1_print_screen (void) {
     api_set_scancode_set(1);
     uint8_t make[] = {0xE0, 0x2A, 0xE0, 0x37};
-    uint8_t brk[] = {0xE0, 0xB7};
+    uint8_t brk[] = {0xE0, 0xB7, 0xE0, 0xAA};
     press(USB_KEY_PRINT_SCREEN, make, 4, "S1 PrtSc make");
-    release(USB_KEY_PRINT_SCREEN, brk, 2, "S1 PrtSc break");
+    release(USB_KEY_PRINT_SCREEN, brk, 4, "S1 PrtSc break");
 }
 
 /// S1 PAUSE - pause key
@@ -1923,6 +1923,32 @@ test_set2_prtscr_repeat (void) {
     release_key(USB_KEY_PRINT_SCREEN);
     check_result(((uint8_t[]){0xE0, 0xF0, 0x7C, 0xE0, 0xF0, 0x12}), 6,
         "Model M: PrtScr break (E0 F0 7C E0 F0 12)");
+}
+
+/// Model M observed: hold Alt, hold Print Screen until it repeats, release.
+/// Repeats are 84 (single byte SysRq), not E0 7C.
+static void
+test_set2_prtscr_alt_repeat (void) {
+    api_set_repeat_rate(0x00);
+    usb_keys_modifier_flags = ALT_BIT;
+    ps2_modifiers = ALT_BIT;
+    mock_timer = 0;
+    press_key(USB_KEY_LEFT_ALT);
+    check_result(((uint8_t[]){0x11}), 1,
+        "Model M: Alt make (11)");
+    press_key(USB_KEY_PRINT_SCREEN);
+    check_result(((uint8_t[]){0x84}), 1,
+        "Model M: Alt+PrtScr make (84)");
+    mock_timer += decode_repeat_delay_ms(repeat_rate) + 1;
+    drain_commands();
+    check_result(((uint8_t[]){0x84}), 1,
+        "Model M: Alt+PrtScr repeat (84)");
+    release_key(USB_KEY_PRINT_SCREEN);
+    check_result(((uint8_t[]){0xF0, 0x84}), 2,
+        "Model M: Alt+PrtScr break (F0 84)");
+    release_key(USB_KEY_LEFT_ALT);
+    check_result(((uint8_t[]){0xF0, 0x11}), 2,
+        "Model M: Alt break (F0 11)");
 }
 
 /// Model M observed: Num Lock ON, hold Insert, press Num Lock key, release Insert.
@@ -3509,8 +3535,8 @@ reset (void) {
     reset_pending_since = 0;
     repeat_rate = PS2_KEYBOARD_DEFAULT_REPEAT_RATE;
     ps2_repeat_key.scancode = 0;
-    ps2_repeat_key.flags = 0;
-    ps2_repeat_key.timestamp = 0;
+    ps2_repeat_key.flags = 0xFF;
+    ps2_repeat_key.timestamp = 0x5555;
     usb_keys_modifier_flags = 0;
     ps2_modifiers = 0;
     mock_timer = 0;

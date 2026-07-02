@@ -378,12 +378,6 @@ set3_init_defaults (void) {
 #endif // !ENABLE_PS2_DEVICE_SET_3
 
 #define SET1_MAKE_TO_BREAK(sc) ((sc) ^ 0x80)
-#define LEFT_SHIFT_SET1_BREAK  SET1_MAKE_TO_BREAK(KEY_LEFT_SHIFT_SET1)
-#define RIGHT_SHIFT_SET1_BREAK SET1_MAKE_TO_BREAK(KEY_RIGHT_SHIFT_SET1)
-#define CTRL_PAUSE_SET1_BREAK  SET1_MAKE_TO_BREAK(EXTENDED_KEY_CTRL_PAUSE_SET1)
-#define PAUSE_SET1_SCANCODE    0x1D
-#define PAUSE_SET1_NUM_LOCK    0x45
-#define PAUSE_SET2_SCANCODE    0x14
 
 #if ENABLE_PS2_DEVICE_SET_1
 #define is_scancode_set_1_active (ps2_active_scancode_set == 1)
@@ -538,66 +532,52 @@ ps2_send_key_press (const uint8_t usb_keycode) {
         switch (usb_keycode) {
         case USB_KEY_PRINT_SCREEN:
             if (ps2_modifiers & BOTH_ALT_BITS) {
-                send_byte(is_scancode_set_1_active ? KEY_ALT_PRINT_SCREEN_SET1 : KEY_ALT_SYSRQ_SET2);
-            } else if (ps2_modifiers & (CTRL_BIT | RIGHT_CTRL_BIT | SHIFT_BIT | RIGHT_SHIFT_BIT)) {
-                if (is_scancode_set_1_active) {
-                    send_ext_key_make(EXTENDED_KEY_PRINT_SCREEN_SET1);
-                } else {
-                    send_ext_key_make(EXTENDED_KEY_PRINT_SCREEN_SET2);
-                }
-            } else if (is_scancode_set_1_active) {
-                send_ext_key_make(KEY_LEFT_SHIFT_SET1);
-                send_ext_key_make(EXTENDED_KEY_PRINT_SCREEN_SET1);
-            } else {
-                send_ext_key_make(KEY_LEFT_SHIFT);
-                send_ext_key_make(EXTENDED_KEY_PRINT_SCREEN_SET2);
+                const uint8_t sysrq = is_scancode_set_1_active ? KEY_ALT_SYSRQ_SET1 : KEY_ALT_SYSRQ_SET2;
+                send_byte(sysrq);
+                ps2_repeat_key.scancode = sysrq;
+                ps2_repeat_key.flags = 0;
+                return;
             }
-
-            ps2_repeat_key.scancode = EXTENDED_KEY_PRINT_SCREEN_SET2;
-            ps2_repeat_key.flags = REPEAT_FLAG_KEY_IS_EXTENDED;
-            return;
+            if (!(ps2_modifiers & (CTRL_BIT | RIGHT_CTRL_BIT | SHIFT_BIT | RIGHT_SHIFT_BIT))) {
+                send_ext_key_make(is_scancode_set_1_active ? KEY_LEFT_SHIFT_SET1 : KEY_LEFT_SHIFT);
+            }
+            break;
 
         case USB_KEY_PAUSE_BREAK:
             if (ps2_modifiers & BOTH_CTRL_BITS) {
-                if (is_scancode_set_1_active) {
-                    send_ext_key_make(EXTENDED_KEY_CTRL_PAUSE_SET1);
-                } else {
-                    send_ext_key_make(EXTENDED_KEY_CTRL_PAUSE_SET2);
-                }
+                // Pause is a weird special case, so it happens that:
+                send_ext_key_make(scancode);
             } else if (is_scancode_set_1_active) {
-                send_2_bytes(PS2_PAUSE_PREFIX, PAUSE_SET1_SCANCODE);
-                send_2_bytes(PAUSE_SET1_NUM_LOCK, PS2_PAUSE_PREFIX);
-                send_2_bytes(SET1_MAKE_TO_BREAK(PAUSE_SET1_SCANCODE), SET1_MAKE_TO_BREAK(PAUSE_SET1_NUM_LOCK));
+                send_2_bytes(PS2_PAUSE_PREFIX, KEY_LEFT_CTRL_SET1);
+                send_2_bytes(KEY_NUM_LOCK_SET1, PS2_PAUSE_PREFIX);
+                send_2_bytes(SET1_MAKE_TO_BREAK(KEY_LEFT_CTRL_SET1), SET1_MAKE_TO_BREAK(KEY_NUM_LOCK_SET1));
             } else {
-                send_2_bytes(PS2_PAUSE_PREFIX, PAUSE_SET2_SCANCODE);
+                send_2_bytes(PS2_PAUSE_PREFIX, EXTENDED_KEY_PAUSE_SET2);
                 send_2_bytes(KEY_NUM_LOCK_SET2, PS2_PAUSE_PREFIX);
-                send_2_bytes(PS2_BREAK_PREFIX, PAUSE_SET2_SCANCODE);
+                send_2_bytes(PS2_BREAK_PREFIX, EXTENDED_KEY_PAUSE_SET2);
                 send_2_bytes(PS2_BREAK_PREFIX, KEY_NUM_LOCK_SET2);
             }
             return;
 
-        case USB_KEY_KP_DIVIDE: {
-            const bool left_shift = (ps2_modifiers & SHIFT_BIT) != 0;
-            const bool right_shift = (ps2_modifiers & RIGHT_SHIFT_BIT) != 0;
-            if (is_scancode_set_1_active) {
-                if (left_shift) {
+        case USB_KEY_KP_DIVIDE:
+            if (ps2_modifiers & SHIFT_BIT) {
+                if (is_scancode_set_1_active) {
                     send_ext_key_set1_break(KEY_LEFT_SHIFT_SET1);
-                }
-                if (right_shift) {
-                    send_ext_key_set1_break(KEY_RIGHT_SHIFT_SET1);
-                }
-                send_ext_key_make(EXTENDED_KEY_KP_DIVIDE_SET1);
-            } else {
-                if (left_shift) {
+                } else {
                     send_ext_key_set2_break(KEY_LEFT_SHIFT);
                 }
-                if (right_shift) {
+            }
+            if (ps2_modifiers & RIGHT_SHIFT_BIT) {
+                if (is_scancode_set_1_active) {
+                    send_ext_key_set1_break(KEY_RIGHT_SHIFT_SET1);
+                } else {
                     send_ext_key_set2_break(KEY_RIGHT_SHIFT);
                 }
-                send_ext_key_make(EXTENDED_KEY_KP_DIVIDE_SET2);
             }
-            return;
-        }
+            break;
+
+        default:
+            break;
         }
     }
 
@@ -646,21 +626,25 @@ ps2_send_key_release (const uint8_t usb_keycode) {
         case USB_KEY_PRINT_SCREEN:
             if (ps2_modifiers & BOTH_ALT_BITS) {
                 if (is_scancode_set_1_active) {
-                    send_byte(SET1_MAKE_TO_BREAK(KEY_ALT_PRINT_SCREEN_SET1));
+                    send_byte(SET1_MAKE_TO_BREAK(KEY_ALT_SYSRQ_SET1));
                 } else {
                     send_2_bytes(PS2_BREAK_PREFIX, KEY_ALT_SYSRQ_SET2);
                 }
-            } else if (ps2_modifiers & (CTRL_BIT | RIGHT_CTRL_BIT | SHIFT_BIT | RIGHT_SHIFT_BIT)) {
-                if (is_scancode_set_1_active) {
-                    send_ext_key_set1_break(EXTENDED_KEY_PRINT_SCREEN_SET1);
-                } else {
-                    send_ext_key_set2_break(EXTENDED_KEY_PRINT_SCREEN_SET2);
-                }
-            } else if (is_scancode_set_1_active) {
+                clear_repeat();
+                return;
+            }
+            if (is_scancode_set_1_active) {
                 send_ext_key_set1_break(EXTENDED_KEY_PRINT_SCREEN_SET1);
             } else {
                 send_ext_key_set2_break(EXTENDED_KEY_PRINT_SCREEN_SET2);
-                send_ext_key_set2_break(KEY_LEFT_SHIFT);
+            }
+            if (!(ps2_modifiers & (CTRL_BIT | RIGHT_CTRL_BIT
+                                   | SHIFT_BIT | RIGHT_SHIFT_BIT))) {
+                if (is_scancode_set_1_active) {
+                    send_ext_key_set1_break(KEY_LEFT_SHIFT_SET1);
+                } else {
+                    send_ext_key_set2_break(KEY_LEFT_SHIFT);
+                }
             }
             clear_repeat();
             return;
@@ -675,28 +659,30 @@ ps2_send_key_release (const uint8_t usb_keycode) {
             }
             return;
 
-        case USB_KEY_KP_DIVIDE: {
-            bool left_shift = (ps2_modifiers & SHIFT_BIT) != 0;
-            bool right_shift = (ps2_modifiers & RIGHT_SHIFT_BIT) != 0;
+        case USB_KEY_KP_DIVIDE:
             if (is_scancode_set_1_active) {
                 send_ext_key_set1_break(EXTENDED_KEY_KP_DIVIDE_SET1);
-                if (right_shift) {
-                    send_ext_key_make(KEY_RIGHT_SHIFT_SET1);
-                }
-                if (left_shift) {
-                    send_ext_key_make(KEY_LEFT_SHIFT_SET1);
-                }
             } else {
                 send_ext_key_set2_break(EXTENDED_KEY_KP_DIVIDE_SET2);
-                if (right_shift) {
+            }
+            if (ps2_modifiers & RIGHT_SHIFT_BIT) {
+                if (is_scancode_set_1_active) {
+                    send_ext_key_make(KEY_RIGHT_SHIFT_SET1);
+                } else {
                     send_ext_key_make(KEY_RIGHT_SHIFT);
                 }
-                if (left_shift) {
+            }
+            if (ps2_modifiers & SHIFT_BIT) {
+                if (is_scancode_set_1_active) {
+                    send_ext_key_make(KEY_LEFT_SHIFT_SET1);
+                } else {
                     send_ext_key_make(KEY_LEFT_SHIFT);
                 }
             }
             return;
-        }
+
+        default:
+            break;
         }
     }
 
