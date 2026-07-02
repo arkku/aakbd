@@ -1693,6 +1693,8 @@ test_set2_keypad_nav_shift_numlock_on_rshift_release (void) {
     release(USB_KEY_END, ((uint8_t[]){0xE0, 0xF0, 0x69}), 3, "S2 End RShift+NL break");
 }
 
+// ----- Model M reference behavior tests -----
+
 /// S2 TENKEY - virtual LShift reference counting with overlapping nav keys
 /// Model M behavior: E0 12 virtual LShift wraps each tenkey press,
 /// released when count returns to zero
@@ -1715,12 +1717,6 @@ test_set2_tenkey_virtual_shift_refcount (void) {
     check_result(((uint8_t[]){0xE0, 0xF0, 0x75, 0xE0, 0xF0, 0x12}), 6,
         "S2 NL Up break (LShift released)");
 }
-
-// ----- Model M reference behavior tests -----
-// These tests encode the exact byte sequences observed from a real IBM
-// Model M keyboard. Our implementation currently differs (refcount keeps
-// LShift active across events; Model M wraps each event individually).
-// These tests are expected to FAIL until the code is updated to match.
 
 /// Model M observed: Num Lock ON, press and release Insert
 static void
