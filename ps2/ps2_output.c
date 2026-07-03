@@ -832,7 +832,7 @@ handle_special_key_event (const uint8_t event) {
         if (tenkey_count && !is_scancode_set_3_active) {
             // Tenkeys held across Num Lock change
             if (host_led_state & LED_NUM_LOCK_BIT) {
-                shift_unsuppress();
+                //shift_unsuppress(); // <- this does not match Model M
                 virtual_shift_on();
             } else {
                 virtual_shift_off();
