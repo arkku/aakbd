@@ -83,6 +83,16 @@
 #define PS2_OUTPUT_MAX_EVENTS_PER_TASK 2
 #endif
 
+#ifndef PS2_OUTPUT_NUM_LOCK_LED_EVENT
+/// Enabling this treats a Num Lock LED toggle from the host as kind of
+/// equivalent to having pressed the Num Lock key locally if keys are held
+/// down that are affected by this. This makes sense on computers that may
+/// toggle Num Lock from another (e.g., USB) keyboard or just from software.
+/// However, this does not match what the original IBM Model M PS/2 keyboard
+/// does, so it is optional.
+#define PS2_OUTPUT_NUM_LOCK_LED_EVENT 1
+#endif
+
 // MARK: - Stored State
 
 /// PS/2 output state flags.
@@ -149,7 +159,9 @@ static struct {
 #define KEY_EVENT_SPECIAL ((uint8_t) 0U)
 
 #define SPECIAL_EVENT_ALL_KEYS_RELEASED ((uint8_t) 0U)
+#if PS2_OUTPUT_NUM_LOCK_LED_EVENT
 #define SPECIAL_EVENT_NUM_LOCK_TOGGLED ((uint8_t) 1U)
+#endif
 
 /// Key event ring buffer head.
 uint8_t key_event_queue_head = 0;
@@ -828,6 +840,7 @@ handle_special_key_event (const uint8_t event) {
         virtual_shift_off();
         clear_key_state();
         break;
+#ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
     case SPECIAL_EVENT_NUM_LOCK_TOGGLED:
         if (tenkey_count && !is_scancode_set_3_active) {
             // Tenkeys held across Num Lock change
@@ -847,6 +860,7 @@ handle_special_key_event (const uint8_t event) {
             }
         }
         break;
+#endif
     default:
         break;
     }
@@ -921,11 +935,14 @@ ps2_process_cmd (const uint8_t cmd, const uint8_t argc) {
                 ps2_process_cmd(led_byte, 0);
                 return;
             }
+#ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
             const uint8_t old_leds = host_led_state;
+#endif
             host_led_state = ps2_leds_to_usb(led_byte);
             usb_keyboard_leds = host_led_state;
             pending_argc = ALL_ARGS_READ;
             send_byte(PS2_REPLY_ACK);
+#ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
             if (tenkey_count
                 && (old_leds & LED_NUM_LOCK_BIT) != (host_led_state & LED_NUM_LOCK_BIT)
                 && !is_key_event_queue_full
@@ -934,6 +951,7 @@ ps2_process_cmd (const uint8_t cmd, const uint8_t argc) {
                 key_event_queue[key_event_tail].key = KEY_EVENT_SPECIAL;
                 key_event_queue[key_event_tail].is_release = SPECIAL_EVENT_NUM_LOCK_TOGGLED;
             }
+#endif
         }
         return;
 

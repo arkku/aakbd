@@ -115,6 +115,7 @@ current_10ms_tick_count (void) {
 #if PS2USB_DEBUG_SCANCODES
 bool is_debug_active = true;
 static bool debug_f0_seen = false;
+static bool debug_e1_active = false;
 #endif
 
 volatile uint16_t * const boot_key_pointer = (volatile uint16_t *) 0x0800U;
@@ -276,7 +277,11 @@ kbd_input (void) {
 
             if (key == 0xF0) {
                 debug_f0_seen = true;
+            } else if (key == 0xE1) {
+                debug_e1_active = true;
+                debug_f0_seen = false;
             } else if (!debug_f0_seen && key < 0xF0) {
+                debug_e1_active = false;
                 switch (key) {
 #if PS2USB_DEBUG_COMMANDS
                 case KEY_0: debug_cmd_arg(PS2_COMMAND_SET_SCAN_CODES, 0x00); break;
@@ -311,9 +316,6 @@ kbd_input (void) {
                 case KEY_M: debug_led_toggle(PS2_LED_CAPS_LOCK_BIT); break;
                 case KEY_COMMA: debug_led_toggle(PS2_LED_SCROLL_LOCK_BIT); break;
 #endif
-                case KEY_NUM_LOCK_SET2:
-                    debug_led_toggle(PS2_LED_NUM_LOCK_BIT);
-                    break;
                 case KEY_F11:
                 case KEY_F11_SET2:
                     (void) fprintf_P(usb_kbd_type, PSTR(" !!"));
@@ -323,6 +325,12 @@ kbd_input (void) {
                     break;
                 }
             } else {
+                if (key == KEY_NUM_LOCK_SET2 && !debug_e1_active) {
+                    debug_led_toggle(PS2_LED_NUM_LOCK_BIT);
+                }
+                if (key >= 0xF0) {
+                    debug_e1_active = false;
+                }
                 debug_f0_seen = false;
             }
             continue;

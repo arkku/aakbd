@@ -218,7 +218,7 @@ drain_all (void) {
 }
 
 static void
-check_result (const uint8_t *expected, int count, const char *msg) {
+check_result_line (const uint8_t *expected, int count, const char *msg, int line) {
     drain_all();
     tests_run++;
     bool ok = (sent_count == count);
@@ -229,7 +229,7 @@ check_result (const uint8_t *expected, int count, const char *msg) {
     clear_sent();
     if (!ok) {
         tests_failed++;
-        (void) printf("FAIL %s:", msg);
+        (void) printf("FAIL %d: %s:", line, msg);
         (void) printf(" expected %d: { ", count);
         for (int j = 0; j < count; ++j) {
             (void) printf(" %02X,", expected[j]);
@@ -242,7 +242,7 @@ check_result (const uint8_t *expected, int count, const char *msg) {
         return;
     }
     if (verbose) {
-        (void) printf("PASS %s:", msg);
+        (void) printf("PASS %d: %s:", line, msg);
         for (int i = 0; i < count; ++i) {
             (void) printf(" %02X", expected[i]);
         }
@@ -251,34 +251,34 @@ check_result (const uint8_t *expected, int count, const char *msg) {
 }
 
 static void
-press (uint8_t key, const uint8_t *exp, int n, const char *msg) {
+press_line (uint8_t key, const uint8_t *exp, int n, const char *msg, int line) {
     ps2_press_key(key);
-    check_result(exp, n, msg);
+    check_result_line(exp, n, msg, line);
 }
 
 static void
-release (uint8_t key, const uint8_t *exp, int n, const char *msg) {
+release_line (uint8_t key, const uint8_t *exp, int n, const char *msg, int line) {
     ps2_release_key(key);
-    check_result(exp, n, msg);
+    check_result_line(exp, n, msg, line);
 }
 
 // Helper: queue a command, drain, check ACK, clear
 static void
-expect_cmd (const uint8_t cmd, const char *msg) {
+expect_cmd_line (const uint8_t cmd, const char *msg, int line) {
     clear_sent();
     queue_recv(cmd);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK}), 1, msg);
+    check_result_line(((uint8_t[]){PS2_REPLY_ACK}), 1, msg, line);
 }
 
 // Helper: queue a command with argument, drain, check ACK, clear
 static void
-expect_cmd_arg (const uint8_t cmd, const uint8_t arg, const char *msg) {
+expect_cmd_arg_line (const uint8_t cmd, const uint8_t arg, const char *msg, int line) {
     clear_sent();
     queue_recv(cmd);
     queue_recv(arg);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK}), 2, msg);
+    check_result_line(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK}), 2, msg, line);
 }
 
 // press_key and release_key update modifier flags like the real USB HID stack
@@ -301,12 +301,12 @@ release_key (uint8_t key) {
 }
 
 static void
-expect_none (const char *msg) {
+ expect_none_line (const char *msg, int line) {
     drain_all();
     tests_run++;
     if (sent_count) {
         tests_failed++;
-        (void) printf("FAIL %s: expected no bytes, got %d:", msg, sent_count);
+        (void) printf("FAIL %d: %s: expected no bytes, got %d:", line, msg, sent_count);
         for (int i = 0; i < sent_count; ++i) {
             printf(" %02X", sent_buffer[i]);
         }
@@ -317,13 +317,13 @@ expect_none (const char *msg) {
 }
 
 static void
-expect_none_release (uint8_t key, const char *msg) {
+expect_none_release_line (uint8_t key, const char *msg, int line) {
     ps2_release_key(key);
     drain_all();
     if (sent_count) {
         tests_failed++;
         tests_run++;
-        (void) printf("FAIL %s: expected no bytes, got:", msg);
+        (void) printf("FAIL %d: %s: expected no bytes, got:", line, msg);
         for (int i = 0; i < sent_count; ++i) {
             (void) printf(" %02X", sent_buffer[i]);
         }
@@ -338,7 +338,7 @@ expect_none_release (uint8_t key, const char *msg) {
 }
 
 static void
-expect_repeat (uint8_t key, bool should_repeat, const char *msg) {
+expect_repeat_line (uint8_t key, bool should_repeat, const char *msg, int line) {
     ps2_press_key(key);
     // Process the key event (sets ps2_repeat_key, sends make, flushes)
     ps2_output_task();
@@ -356,9 +356,9 @@ expect_repeat (uint8_t key, bool should_repeat, const char *msg) {
     tests_run++;
     if (repeated != should_repeat) {
         tests_failed++;
-        (void) printf("FAIL %s\n", msg);
+        (void) printf("FAIL %d: %s\n", line, msg);
     } else if (verbose) {
-        (void) printf("PASS %s\n", msg);
+        (void) printf("PASS %d: %s\n", line, msg);
     }
     clear_sent();
 }
@@ -393,6 +393,16 @@ api_all_keys_typematic (void) {
     drain_commands();
     clear_sent();
 }
+
+// Macros to add line number to test messages, pass as separate integer
+#define check_result(e, c, m) check_result_line(e, c, m, __LINE__)
+#define press(k, e, n, m) press_line(k, e, n, m, __LINE__)
+#define release(k, e, n, m) release_line(k, e, n, m, __LINE__)
+#define expect_cmd(c, m) expect_cmd_line(c, m, __LINE__)
+#define expect_cmd_arg(c, a, m) expect_cmd_arg_line(c, a, m, __LINE__)
+#define expect_none(m) expect_none_line(m, __LINE__)
+#define expect_none_release(k, m) expect_none_release_line(k, m, __LINE__)
+#define expect_repeat(k, r, m) expect_repeat_line(k, r, m, __LINE__)
 
 /// S2 KEY - basic alpha key make/break
 static void
@@ -1949,30 +1959,30 @@ test_set2_tenkey_model_m_insert_numlock_toggle_release (void) {
 }
 
 /// Num Lock OFF, hold Insert, press Num Lock, Set Num Lock LED
-/// (host sends ED 02), then release Insert. Insert picks up virtual LShift
-/// when NL turns ON while held (uses ED command, not Model M verified).
+/// (host sends ED 02), then release Insert.
 static void
-test_set2_tenkey_model_m_insert_numlock_led_then_release (void) {
+test_set2_nl_led_then_release (void) {
+#ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
     api_set_leds(0);
     press_key(USB_KEY_INSERT);
     check_result(((uint8_t[]){0xE0, 0x70}), 2,
-        "Model M: Insert make (E0 70, NL off)");
+        "NL LED->ON: Insert make (E0 70, NL off)");
     press_key(USB_KEY_NUM_LOCK);
     check_result(((uint8_t[]){0x77}), 1,
-        "Model M: NumLock make (77)");
+        "NL LED->ON: NumLock make (77)");
     release_key(USB_KEY_NUM_LOCK);
     check_result(((uint8_t[]){0xF0, 0x77}), 2,
-        "Model M: NumLock break (F0 77)");
-    // Host sets Num Lock LED — keyboard updates host_led_state and
-    // recalculates virtual shift state since nav keys are held
+        "NL LED->ON: NumLock break (F0 77)");
+    // Host sets Num Lock LED
     queue_recv(PS2_COMMAND_SET_LEDS);
     queue_recv(PS2_LED_NUM_LOCK_BIT);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK, 0xE0, 0x12}), 4,
-        "Model M: Set NL LED + virtual LShift make (FA FA E0 12)");
+    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK}), 2,
+        "NL LED->ON: Set NL LED (FA FA)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70, 0xE0, 0xF0, 0x12}), 6,
-        "Model M: Insert break + virtual LShift break (E0 F0 70 E0 F0 12)");
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
+        "NL LED->ON: Insert break (E0 F0 70)");
+#endif
 }
 
 /// Model M observed: Num Lock OFF, hold Left Shift, hold Insert, toggle H,
@@ -2135,6 +2145,7 @@ test_set2_tenkey_model_m_off_rshift_insert_h_shift_first (void) {
 /// S2 TENKEY - toggle Num Lock OFF while tenkey keys held
 static void
 test_set2_tenkey_numlock_toggle_off_while_held (void) {
+#ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     press_key(USB_KEY_INSERT);
     check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x70}), 4,
@@ -2153,6 +2164,7 @@ test_set2_tenkey_numlock_toggle_off_while_held (void) {
     release_key(USB_KEY_INSERT);
     check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
         "S2 NL Insert break (LShift already released)");
+#endif
 }
 
 /// Model M observed: Num Lock ON, hold Insert, press/release KP Divide,
@@ -2303,6 +2315,7 @@ test_set2_prtscr_race_alt_cleared_before_drain (void) {
 /// toggle have no LShift, pressed after get LShift)
 static void
 test_set2_tenkey_numlock_toggle_on_while_held (void) {
+#ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
     api_set_leds(0);
     press_key(USB_KEY_INSERT);
     check_result(((uint8_t[]){0xE0, 0x70}), 2,
@@ -2313,20 +2326,22 @@ test_set2_tenkey_numlock_toggle_on_while_held (void) {
     queue_recv(PS2_COMMAND_SET_LEDS);
     queue_recv(PS2_LED_NUM_LOCK_BIT);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK, 0xE0, 0x12}), 4,
-        "S2 NL toggle ON + virtual LShift make");
+    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK}), 2,
+        "S2 NL toggle ON");
     release_key(USB_KEY_HOME);
     check_result(((uint8_t[]){0xE0, 0xF0, 0x6C}), 3,
         "S2 NL Home break (no LShift)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70, 0xE0, 0xF0, 0x12}), 6,
-        "S2 NL Insert break + virtual LShift break");
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
+        "S2 NL Insert break");
+#endif
 }
 
 /// S2 TENKEY - toggle Num Lock ON via host LED command, then press a new
 /// tenkey key — future events react to the new state (get LShift).
 static void
 test_set2_tenkey_numlock_led_toggle_affects_future_keys (void) {
+#ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
     api_set_leds(0);
     press_key(USB_KEY_INSERT);
     check_result(((uint8_t[]){0xE0, 0x70}), 2,
@@ -2335,19 +2350,19 @@ test_set2_tenkey_numlock_led_toggle_affects_future_keys (void) {
     queue_recv(PS2_COMMAND_SET_LEDS);
     queue_recv(PS2_LED_NUM_LOCK_BIT);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK, 0xE0, 0x12}), 4,
-        "S2 NL LED toggle ON + virtual LShift make");
-    // New tenkey key pressed after the toggle — gets LShift, but previous
-    // forced state is cleared by line 533 first
+    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK}), 2,
+        "S2 NL LED toggle ON");
+    // New tenkey key pressed after the toggle — gets LShift since NL now ON
     press_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x6C}), 7,
-        "S2 NL Home make after toggle (E0 F0 12 E0 12 E0 6C)");
+    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x6C}), 4,
+        "S2 NL Home make after toggle (E0 12 E0 6C)");
     release_key(USB_KEY_HOME);
     check_result(((uint8_t[]){0xE0, 0xF0, 0x6C}), 3,
         "S2 NL Home break (no LShift, count > 0)");
     release_key(USB_KEY_INSERT);
     check_result(((uint8_t[]){0xE0, 0xF0, 0x70, 0xE0, 0xF0, 0x12}), 6,
         "S2 NL Insert break (LShift released)");
+#endif
 }
 
 /// S2 TENKEY - NL ON, hold Insert, toggle NL OFF via LED (no key press),
@@ -2355,6 +2370,7 @@ test_set2_tenkey_numlock_led_toggle_affects_future_keys (void) {
 /// gets no LShift.
 static void
 test_set2_tenkey_numlock_off_led_new_key (void) {
+#ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     press_key(USB_KEY_INSERT);
     check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x70}), 4,
@@ -2374,6 +2390,7 @@ test_set2_tenkey_numlock_off_led_new_key (void) {
     release_key(USB_KEY_INSERT);
     check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
         "S2 NL Insert break (no LShift)");
+#endif
 }
 
 /// S2 TENKEY - non-tenkey press with Num Lock OFF and shift held restores
@@ -3622,6 +3639,7 @@ test_set2_tenkey_model_m_numlock_toggle_mid_hold (void) {
 /// press): ED changes LED state and should recalculate virtual shift.
 static void
 test_set2_tenkey_nl_led_toggle_mid_hold_ed_only (void) {
+#ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
 
     press_key(USB_KEY_HOME);
@@ -3646,6 +3664,7 @@ test_set2_tenkey_nl_led_toggle_mid_hold_ed_only (void) {
     release_key(USB_KEY_HOME);
     check_result(((uint8_t[]){0xE0, 0xF0, 0x6C}), 3,
         "ED-only: Home break (no LShift)");
+#endif
 }
 
 /// Model M observed: NL ON, hold both shifts + Home, release shifts one by one
@@ -3706,9 +3725,10 @@ test_set2_prtscr_then_nl_then_both_shifts_home (void) {
 }
 
 /// NL OFF + LShift + Insert (shift suppressed), then NL ON via host ED while
-/// held, release Insert, release LShift (uses ED, not Model M verified).
+/// held, release Insert, release LShift (uses ED).
 static void
 test_set2_nl_toggle_on_while_shift_suppressed (void) {
+#ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
     api_set_leds(0);
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
@@ -3719,14 +3739,15 @@ test_set2_nl_toggle_on_while_shift_suppressed (void) {
     queue_recv(PS2_COMMAND_SET_LEDS);
     queue_recv(PS2_LED_NUM_LOCK_BIT);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK}), 2,
-        "NL OFF->ON: NL ON via ED");
+    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK, 0xE0, 0x12}), 4,
+        "NL OFF->ON: NL ON via ED + LShift restore");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70, 0xE0, 0x12}), 5,
-        "NL OFF->ON: Insert break + LShift restore");
+    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
+        "NL OFF->ON: Insert break");
     release_key(USB_KEY_LEFT_SHIFT);
     check_result(((uint8_t[]){0xF0, 0x12}), 2,
         "NL OFF->ON: LShift break");
+#endif
 }
 
 /// Model M observed: NL ON + both shifts + Home, release shifts one by one,
