@@ -672,7 +672,9 @@ ps2_send_key_release (const uint8_t usb_keycode) {
             } else {
                 send_ext_key_set2_break(EXTENDED_KEY_PRINT_SCREEN_SET2);
             }
-            virtual_shift_off();
+            if (!tenkey_count) {
+                virtual_shift_off();
+            }
             clear_repeat();
             return;
 
