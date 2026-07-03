@@ -831,12 +831,19 @@ handle_special_key_event (const uint8_t event) {
     case SPECIAL_EVENT_NUM_LOCK_TOGGLED:
         if (tenkey_count && !is_scancode_set_3_active) {
             // Tenkeys held across Num Lock change
+            // Note: Real IBM Model M keyboard does not trigger these changes
+            // on Num Lock LED change, instead it assumes that the Num Lock
+            // key is the only way to toggle the state (and assumes the Num
+            // Lock key always does so, even if the OS decides otherwise). So
+            // anything done here does not exactly match Model M, but at the
+            // same time I think it _might_ be more correct technically in a
+            // post-DOS world.
             if (host_led_state & LED_NUM_LOCK_BIT) {
-                //shift_unsuppress(); // <- this does not match Model M
-                virtual_shift_on();
+                shift_unsuppress();
+                //virtual_shift_on();
             } else {
                 virtual_shift_off();
-                shift_suppress();
+                //shift_suppress();
             }
         }
         break;
