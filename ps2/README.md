@@ -225,6 +225,142 @@ static inline void handle_reset(void) {
 
 It would actually be quite possible to implement host operating system
 detection for PS/2 because they will give different commands in different
-order, but I am not sure of the usefulness because I suspect that most PS/2
-users specifically intend to use it on vintage computers. On modern computers
-USB is the better choice (trust me, I have implemented both in this firmware).
+order, but I am not sure of the usefulness of that (see below).
+
+### Why PS/2?
+
+The main intent of providing PS/2 output is for retrocomputing, i.e., for use
+with computers that do not support USB. During development I tested this on an
+actual IBM Personal System 2 computer, after which the PS/2 protocol is named,
+and spent quite a lot of time and effort implementing the corner cases to match
+IBM Model M PS/2 keyboard exactly. For modern use those corner cases probably
+wouldn't matter (e.g., I don't think modern operating systems care about
+whether a virtual shift is held and released when using tenkey cluster keys
+in different Num Lock states), but the intent here is specifically to do the
+retrocomputing aspect as accurately as possible.
+
+Now, I've come to understand that some people are looking to use PS/2 output on
+modern computers (where some gaming-oriented motherboards still carry PS/2
+input ports). While obviously nothing would stop you from doing that, let me
+tell you that it is almost certainly folly. USB keyboards can use 1000 Hz
+polling rate, which means once per every millisecond, and a single USB report
+contains the entire state of the keyboard (i.e., multiple keys pressed
+simultaneously, such as from a key binding that activates multiple modifiers
+on one press, will register just as fast as a single key). Meanwhile PS/2
+takes about 1 millisecond to transmit one byte. In some cases one byte is
+enough for a key press, but more are needed for key releases and the
+so-called "extended keys" (which are used in the legacy-heavy scancode set 2,
+which is also the only one widely supported and the only one used by Windows).
+And these bytes need to be sent sequentially, each taking about that
+1 millisecond (during which USB would have reported the entire state).
+
+So, as someone who has implemented both the USB and PS/2 keyboard output, let
+me tell you that if both your keyboard and computer support USB, use should
+use USB. But if you have a computer that does not support USB, then the PS/2
+output is just for you! Or, if you have a keyboard that only has PS/2 output
+and your computer does not support it, please see the [ps2usb](../ps2usb)
+device for a converter that will turn the keyboard into USB (with full support
+for layers and key remapping).
+
+N-key rollover, or NKRO, support is another thing that may be mentioned as an
+advantage to PS/2: it inherently sends events like "key pressed" (make)
+and "key released" (break), it is up to the host computer to track which keys 
+are currently down, whereas USB sends a fixed-size report telling the entire
+state of the keys currently down. So, with PS/2 the computer can remember all
+keys currently being pressed, but with USB either the report size restricts how
+many simultaneous keys can be reported, or the report size has to be quite
+large and incompatible with simpler implementations (like some BIOSes).
+
+So, inherent NKRO is a true advantage to PS/2 in some sense, but I would argue
+that for anything other than showmanship you do not need more than 10-key
+rollover at most (one key per finger seems more than enough, especially if the
+other hand is on a mouse) – see the [main AAKBD README.md](../README.md) for
+more on this. And, the event-based reporting of PS/2 can also be seen as
+a downside: if it goes out of sync and a key release event is missed, the only
+way to re-sync the state is to find out which key is stuck down and press it
+again. And for retrocomputing use, all software is designed to work with the
+traditional 2KRO keyboards (which include the famous IBM Model M, where several
+combinations of more than 2 keys are simply not possible)…
+
+### Porting the PS/2 Output to Other Firmwares
+
+After publishing this PS/2 output support, I received some inquiries about
+porting it to other firmwares (e.g., vial-qmk), which would make it more
+accessible to others. Personally, I specifically made my keyboard firmware to
+create something better for my own use than QMK, which simply doesn't support
+some of the configurability that I want (and in some cases probably never will,
+e.g., when it comes to things like the Apple Fn key handling) and at the same
+time has a lot of bloat that I do not want. I genuinely feel that I have
+succeeded in making a better keyboard implementation in many ways, but I do
+recognize that there is a fairly high threshold for setting it up, especially
+for non-technical users – the firmware is, after all, optimized for arbitrary
+configurability and aimed at DIY users (who would also be ok with doing the
+hardware modifications necessary to add the physical PS/2 output support).
+
+So, I am not really interested in porting the PS/2 output to another firmware
+myself, but this is open source (GPLv3+) and I am always open to helping
+others in their open source efforts, as it is the open source efforts of others
+that enable the existence of my firmware in the first place (despite my
+critique of QMK, my firmware probably wouldn't exist without it, even though it
+is not a fork of QMK).
+
+Here are the porting instructions for those interested in doing so:
+
+* `ps2_output.c` is the actual PS/2 keyboard implementation, independent of
+  hardware, you should be able to use this as is (and I highly recommend not
+  modifying it so you can stay up to date if there are fixes: simply copy over
+  the new version – just provide your own stub headers where needed to make it
+  compile without my full keyboard implementation)
+* `usb2ps_keys.c` contains the PS/2 scancode definitions, and it uses the USB
+  keycodes as the common ground (for plain keys, the USB keycodes are also used
+  as-is by QMK, so this should also work as is (and any replacement would by
+  necessity end up being the same because this is based on PS/2 keyboard
+  specs), but you may need either my `usb_keys.h` for the key name definitions
+  or replace them with the more cryptic QMK `KC_*` names, or raw numbers)
+* `kk_ps2_device.c` is the low-level PS/2 protocol implementation (the order of
+  bits on the bus, etc.), which you also should be able to use as is, but that
+  can also be replaced by your own implementation if you want to do things
+  differently
+* `kk_ps2_avr.h` contains the AVR-specific hardware access helper macros used
+  by `kk_ps2_device.c` – this you should be able to use as is for AVR-based
+  keyboards, but for ARM you would need to provide a similar header (it's less
+  than 100 lines of code and fairly trivial at that)
+
+Then, probably the best way to hook this up to the firmware is to find all
+instances of `#if ENABLE_PS2_DEVICE` outside the `ps2` directory. The basic
+setup (found in `qmk_main.c`, which closely resembles the QMK equivalent) is:
+
+* `ps2_device_init()` – needed to set up the PS/2 pins
+* `if (ps2_device_host_detected())` – if you want to do the PS/2 autodetection,
+  this call does it
+* `ps2_output_init()` – enables the PS/2 output
+* _do not_ call `usb_init()` or anything like that if you use PS/2 output
+* `ps2_output_task()` needs to be called on every main loop iteration, e.g., in
+  QMK's `keyboard_task()` (it can be called unconditionally, it does nothing if
+  PS/2 output is not initialized)
+
+Now you just need to send the key events to PS/2, the calls are found in
+`usbkbd.c` and they should be hooked _after_ all processing (layers, key
+remapping, debouncing, etc.) has been done:
+
+* `if (ps2_output_is_scanning())` should be used to guard the calls to sending
+  keypress events (the PS/2 host can disable the key matrix scanning, but
+  I think it's better to always keep the actual matrix scanning enabled and
+  just disable sending the keypresses to PS/2)
+* `ps2_press_key(usb_keycode)` sends a key press (make) to PS/2, using plain
+  USB keycodes
+* `ps2_release_key(usb_keycode)` sends a key release (break) to PS/2, using
+  plain USB keycodes
+* if modifier keys are handled separately, remember to sync their state to
+  PS/2, e.g., in `usbkbd.c` I track them in a local `ps2_modifier_flags` and
+  when the modifier flags change I send all the `ps2_press_key(…)` and
+  `ps2_release_key(…)` events based on that
+* for keyboard LED state updates, you need to define `volatile uint8_t
+  usb_keyboard_leds`, which will be updated by `ps2_output.c` to contain the
+  LED state as set by the PS/2 host computer (it's up to you if and how you
+  wish to sync this to actual keyboard LEDs, but it must exist)
+
+That's all. I would estimate this at about 100 lines of code in total, and
+might even be doable by an AI coding agent with these specs. Feel free to
+message me if you need help, or indeed even if you don't it would be nice to
+know if someone is actually using my implementation. Good luck!
