@@ -36,8 +36,8 @@ connector's clock and data pins, then set the appropriate configuration in
 ENABLE_PS2_DEVICE = 1
 
 ifeq (1,$(ENABLE_PS2_DEVICE))
-# B6 = PS/2 CLK, B7 = PS/2 DATA
-DEVICE_FLAGS += -DPS2_PORT=B -DPS2_DATA_PIN=7 -DPS2_CLK_PIN=6
+# B6 = PS/2 DATA, B7 = PS/2 CLK
+DEVICE_FLAGS += -DPS2_PORT=B -DPS2_DATA_PIN=6 -DPS2_CLK_PIN=7
 endif
 ```
 
