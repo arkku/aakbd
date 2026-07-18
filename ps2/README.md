@@ -140,6 +140,32 @@ no warranty, express or implied! Just because I'm happy to plug this into my
 MacBook Pro, doesn't mean you should risk yours. It's better to use a dedicated
 PS/2 connector.
 
+### PS/2 Wiring for Model F Keyboards
+
+![PS/2 wiring for Model F Keyboards](ps2_connector.jpg)
+
+With the USB connector facing towards you and the component side of the
+controller facing _down_ (the normal installed position!), on the right side
+there will be a 6-pin header. The pins on the side facing away from you
+will be, from farthest towards the USB connector:
+
+* Ground
+* B6 (PS/2 Data)
+* B7 (PS/2 Clock)
+
+Directly under B7 will be +5V. (Under B6 is B4 and under Ground is B5, these
+are Num Lock and Caps Lock LED by default in AAKBD builds so you can also check
+for correct orientation by toggling those LEDs.)
+
+On the component side of the PCB with the USB connector facing _away_ from
+you, R1 is connected to USB D- (PS/2 Data) and R2 is connected to D+ (PS/2
+Clock). Both resistors are 22Ω – if you wish to share the USB connector with
+PS/2 wire B6 to R1 and B7 to R2 on the side nearest to the USB connector
+(leaving the 22Ω resistance between the USB pins and the B6/B7 pins). As
+discussed above, I recommend adding a resistor in series with both connections
+(i.e., between R1/R2 and B6/B7) – this is only for safety and the exact value
+is not important, anything between 22Ω and 220Ω should be fine.
+
 ### Scancode Sets
 
 Three scancode keysets are defined for PS/2 keyboards. The default is 2, and
