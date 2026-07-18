@@ -93,6 +93,24 @@ Or directly with dfu-util (once in bootloader mode):
 dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D gmmkpro1.bin
 ```
 
+## Vial
+
+You can build with `VIAL_ENABLE=1` to support configuration through Vial.
+I recommend then also `ENABLE_MEDIA_KEYS=1` ani `MEDIA_KEYS_ENDPOINT=1` to
+support all Vial media keys.
+
+The whole keyboard works, including encoder and RGB, but the RGB is *not*
+configurable from Vial. In general I don't like that kind of bloat. The default
+[template_macros_vial.c](template_macros_vial.c) does set up some RGB effects
+(reactive lighting on press, using some keys as Num/Caps/Scroll Lock LEDs, and
+a gradient on the sides), but you need to copy it to `macros_vial.c`, edit it
+and recompile the firmware if you wish to change that.
+
+The **RGBM** On/Off/Toggle keys (not "RGB", but "RGBM") are recognized to turn
+the RGB on/off. That setting is not persisted, though. If someone is actually
+using this and wants more or persistent control over RGB, let me know, for my
+personal use this is enough as it is.
+
 ## Note
 
 This firmware is an experimental proof of concept. It may contain bugs, and

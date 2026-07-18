@@ -1,17 +1,17 @@
 # Makefile for PS/2 device mode keyboard logic tests
 
 #CC = gcc
-CFLAGS = -DTESTING -I. -I.. -I$(BUILD_DIR) -std=gnu11 -Wall
+CFLAGS = -DTESTING -I. -I.. -I../arch/arm -I$(BUILD_DIR) -std=gnu11 -Wall
 LDFLAGS = -lm
 TEST_BIN = ps2_output_test.bin
 BUILD_DIR = build
 RUNNER = $(BUILD_DIR)/test_runner.c
-GEN_RUNNER = ./gen_test_runner.sh
+GEN_RUNNER = ./generate_test_runner.sh
 
 TEST_SRC = ps2_output_test.c
 TEST_DEPS = ps2_output.c usb2ps2_keys.c
 TEST_HDRS = ps2_output.h usb2ps2_keys.h ps2_keys.h kk_ps2.h \
-            ../usb_keys.h ../usbkbd_config.h ../progmem.h
+             ../usb_keys.h ../usbkbd_config.h ../arch/arm/progmem.h
 
 DEVICE_TEST_BIN = kk_ps2_device_test.bin
 DEVICE_TEST_SRC = kk_ps2_device_test.c

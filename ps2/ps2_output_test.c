@@ -30,6 +30,10 @@
 #define ENABLE_MEDIA_KEYS       1
 #define MEDIA_KEYS_COUNT        7
 
+#ifndef ENABLE_PS2_LEGACY_COMPATIBILITY
+#define ENABLE_PS2_LEGACY_COMPATIBILITY 1
+#endif
+
 #define PS2_PORT        D
 #define PS2_DATA_PIN    1
 #define PS2_CLK_PIN     0
@@ -58,7 +62,7 @@ timer_read (void) {
 #include "usb_keys.h"
 
 uint8_t usb_keys_modifier_flags = 0;
-uint8_t keys_buffer[32] = {0};
+uint8_t keys_buffer[32] = { 0 };
 volatile uint8_t usb_keyboard_leds = 0;
 bool usb_keyboard_is_in_boot_protocol = false;
 static uint8_t sent_buffer[8192];
@@ -194,10 +198,13 @@ drain (bool include_keys, bool include_commands) {
     for (int i = 0; i < 2; ++i) {
         do {
             ps2_output_task();
-        } while (safety-- > 0 && ((include_commands && pending_cmd) || (!include_commands && pending_cmd == original_cmd) || (include_keys && !ps2_output_queue_is_clear()) || ps2_device_has_pending_output()));
+        } while (safety-- > 0
+            && ((include_commands && pending_cmd) || (!include_commands && pending_cmd == original_cmd)
+                || (include_keys && !ps2_output_queue_is_clear()) || ps2_device_has_pending_output()));
     }
     if (safety <= 0) {
-        (void) printf("FAIL DRAIN: TIMEOUT: pending_cmd=%02X head=%d tail=%d pending_buf=%d\n", pending_cmd, key_event_head, key_event_tail, pending_send_count);
+        (void) printf("FAIL DRAIN: TIMEOUT: pending_cmd=%02X head=%d tail=%d pending_buf=%d\n",
+            pending_cmd, key_event_head, key_event_tail, pending_send_count);
     }
     return safety > 0;
 }
@@ -268,7 +275,7 @@ expect_cmd_line (const uint8_t cmd, const char *msg, int line) {
     clear_sent();
     queue_recv(cmd);
     drain_commands();
-    check_result_line(((uint8_t[]){PS2_REPLY_ACK}), 1, msg, line);
+    check_result_line(((uint8_t[]){ PS2_REPLY_ACK }), 1, msg, line);
 }
 
 // Helper: queue a command with argument, drain, check ACK, clear
@@ -278,7 +285,7 @@ expect_cmd_arg_line (const uint8_t cmd, const uint8_t arg, const char *msg, int 
     queue_recv(cmd);
     queue_recv(arg);
     drain_commands();
-    check_result_line(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK}), 2, msg, line);
+    check_result_line(((uint8_t[]){ PS2_REPLY_ACK, PS2_REPLY_ACK }), 2, msg, line);
 }
 
 // press_key and release_key update modifier flags like the real USB HID stack
@@ -301,7 +308,7 @@ release_key (uint8_t key) {
 }
 
 static void
- expect_none_line (const char *msg, int line) {
+expect_none_line (const char *msg, int line) {
     drain_all();
     tests_run++;
     if (sent_count) {
@@ -395,20 +402,20 @@ api_all_keys_typematic (void) {
 }
 
 // Macros to add line number to test messages, pass as separate integer
-#define check_result(e, c, m) check_result_line(e, c, m, __LINE__)
-#define press(k, e, n, m) press_line(k, e, n, m, __LINE__)
-#define release(k, e, n, m) release_line(k, e, n, m, __LINE__)
-#define expect_cmd(c, m) expect_cmd_line(c, m, __LINE__)
-#define expect_cmd_arg(c, a, m) expect_cmd_arg_line(c, a, m, __LINE__)
-#define expect_none(m) expect_none_line(m, __LINE__)
+#define check_result(e, c, m)     check_result_line(e, c, m, __LINE__)
+#define press(k, e, n, m)         press_line(k, e, n, m, __LINE__)
+#define release(k, e, n, m)       release_line(k, e, n, m, __LINE__)
+#define expect_cmd(c, m)          expect_cmd_line(c, m, __LINE__)
+#define expect_cmd_arg(c, a, m)   expect_cmd_arg_line(c, a, m, __LINE__)
+#define expect_none(m)            expect_none_line(m, __LINE__)
 #define expect_none_release(k, m) expect_none_release_line(k, m, __LINE__)
-#define expect_repeat(k, r, m) expect_repeat_line(k, r, m, __LINE__)
+#define expect_repeat(k, r, m)    expect_repeat_line(k, r, m, __LINE__)
 
 /// S2 KEY - basic alpha key make/break
 static void
 test_set2_alpha_key (void) {
-    uint8_t make[] = {0x1C};
-    uint8_t brk[] = {0xF0, 0x1C};
+    uint8_t make[] = { 0x1C };
+    uint8_t brk[] = { 0xF0, 0x1C };
     press(USB_KEY_A, make, 1, "S2 A make");
     release(USB_KEY_A, brk, 2, "S2 A break");
 }
@@ -416,8 +423,8 @@ test_set2_alpha_key (void) {
 /// S2 EXT - extended key make/break
 static void
 test_set2_extended_key (void) {
-    uint8_t make[] = {0xE0, 0x74};
-    uint8_t brk[] = {0xE0, 0xF0, 0x74};
+    uint8_t make[] = { 0xE0, 0x74 };
+    uint8_t brk[] = { 0xE0, 0xF0, 0x74 };
     press(USB_KEY_RIGHT_ARROW, make, 2, "S2 right arrow make");
     release(USB_KEY_RIGHT_ARROW, brk, 3, "S2 right arrow break");
 }
@@ -425,31 +432,71 @@ test_set2_extended_key (void) {
 /// S2 NAV - nav key Num Lock OFF + both shifts
 static void
 test_set2_keypad_nav_numlock_off_both_shifts (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(0x00);
     usb_keys_modifier_flags = SHIFT_BIT | RIGHT_SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT | RIGHT_SHIFT_BIT;
-    uint8_t make[] = {0xE0, 0xF0, 0x12, 0xE0, 0xF0, 0x59, 0xE0, 0x69};
-    uint8_t brk[] = {0xE0, 0xF0, 0x69, 0xE0, 0x59, 0xE0, 0x12};
+    uint8_t make[] = { 0xE0, 0xF0, 0x12, 0xE0, 0xF0, 0x59, 0xE0, 0x69 };
+    uint8_t brk[] = { 0xE0, 0xF0, 0x69, 0xE0, 0x59, 0xE0, 0x12 };
     press(USB_KEY_END, make, 8, "S2 End numlock OFF+both shifts make");
     release(USB_KEY_END, brk, 7, "S2 End numlock OFF+both shifts break");
+#endif
 }
 
 /// S2 KP / - KP_Divide with Left Shift held
 static void
 test_set2_kp_divide (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
-    uint8_t make[] = {0xE0, 0xF0, 0x12, 0xE0, 0x4A};
-    uint8_t brk[] = {0xE0, 0xF0, 0x4A, 0xE0, 0x12};
+    uint8_t make[] = { 0xE0, 0xF0, 0x12, 0xE0, 0x4A };
+    uint8_t brk[] = { 0xE0, 0xF0, 0x4A, 0xE0, 0x12 };
     press(USB_KEY_KP_DIVIDE, make, 5, "S2 KP_Divide+LShift make");
     release(USB_KEY_KP_DIVIDE, brk, 5, "S2 KP_Divide+LShift break");
+#endif
+}
+
+/// Verify tenkey keys produce raw scancode without legacy wrapping
+static void
+test_no_legacy_keypad (void) {
+#if !ENABLE_PS2_LEGACY_COMPATIBILITY
+    // S2 KP_Divide with LShift → no shift suppress
+    usb_keys_modifier_flags = SHIFT_BIT;
+    ps2_modifiers = SHIFT_BIT;
+    uint8_t make[] = { 0xE0, 0x4A };
+    uint8_t brk[] = { 0xE0, 0xF0, 0x4A };
+    press(USB_KEY_KP_DIVIDE, make, 2, "S2 KP_Divide+LShift make (no legacy)");
+    release(USB_KEY_KP_DIVIDE, brk, 3, "S2 KP_Divide+LShift break (no legacy)");
+
+    // S2 End with both shifts → no shift suppress
+    ps2_output_clear_keys(true);
+    usb_keys_modifier_flags = SHIFT_BIT | RIGHT_SHIFT_BIT;
+    ps2_modifiers = SHIFT_BIT | RIGHT_SHIFT_BIT;
+    api_set_leds(0x00);
+    drain_all();
+    uint8_t end_make[] = { 0xE0, 0x69 };
+    uint8_t end_brk[] = { 0xE0, 0xF0, 0x69 };
+    press(USB_KEY_END, end_make, 2, "S2 End numlock OFF+both shifts make (no legacy)");
+    release(USB_KEY_END, end_brk, 3, "S2 End numlock OFF+both shifts break (no legacy)");
+
+    // S1 KP_Divide with LShift → no shift suppress
+    ps2_output_clear_keys(true);
+    usb_keys_modifier_flags = SHIFT_BIT;
+    ps2_modifiers = SHIFT_BIT;
+    api_set_scancode_set(1);
+    drain_all();
+    uint8_t s1_make[] = { 0xE0, 0x35 };
+    uint8_t s1_brk[] = { 0xE0, 0xB5 };
+    press(USB_KEY_KP_DIVIDE, s1_make, 2, "S1 KP_Divide+LShift make (no legacy)");
+    release(USB_KEY_KP_DIVIDE, s1_brk, 2, "S1 KP_Divide+LShift break (no legacy)");
+#endif
 }
 
 /// S2 PRTSCR - print screen no modifiers
 static void
 test_set2_print_screen (void) {
-    uint8_t make[] = {0xE0, 0x12, 0xE0, 0x7C};
-    uint8_t brk[] = {0xE0, 0xF0, 0x7C, 0xE0, 0xF0, 0x12};
+    uint8_t make[] = { 0xE0, 0x12, 0xE0, 0x7C };
+    uint8_t brk[] = { 0xE0, 0xF0, 0x7C, 0xE0, 0xF0, 0x12 };
     press(USB_KEY_PRINT_SCREEN, make, 4, "S2 PrtSc make");
     release(USB_KEY_PRINT_SCREEN, brk, 6, "S2 PrtSc break");
 }
@@ -459,8 +506,8 @@ static void
 test_set2_print_screen_alt (void) {
     usb_keys_modifier_flags = ALT_BIT;
     ps2_modifiers = ALT_BIT;
-    uint8_t make[] = {0x84};
-    uint8_t brk[] = {0xF0, 0x84};
+    uint8_t make[] = { 0x84 };
+    uint8_t brk[] = { 0xF0, 0x84 };
     press(USB_KEY_PRINT_SCREEN, make, 1, "S2 PrtSc+Alt make");
     release(USB_KEY_PRINT_SCREEN, brk, 2, "S2 PrtSc+Alt break");
 }
@@ -470,8 +517,8 @@ static void
 test_set2_print_screen_ctrl_shift (void) {
     usb_keys_modifier_flags = CTRL_BIT | SHIFT_BIT;
     ps2_modifiers = CTRL_BIT | SHIFT_BIT;
-    uint8_t make[] = {0xE0, 0x7C};
-    uint8_t brk[] = {0xE0, 0xF0, 0x7C};
+    uint8_t make[] = { 0xE0, 0x7C };
+    uint8_t brk[] = { 0xE0, 0xF0, 0x7C };
     press(USB_KEY_PRINT_SCREEN, make, 2, "S2 PrtSc+Ctrl+Shift make");
     release(USB_KEY_PRINT_SCREEN, brk, 3, "S2 PrtSc+Ctrl+Shift break");
 }
@@ -479,7 +526,7 @@ test_set2_print_screen_ctrl_shift (void) {
 /// S2 PAUSE - pause key
 static void
 test_set2_pause (void) {
-    uint8_t make[] = {0xE1, 0x14, 0x77, 0xE1, 0xF0, 0x14, 0xF0, 0x77};
+    uint8_t make[] = { 0xE1, 0x14, 0x77, 0xE1, 0xF0, 0x14, 0xF0, 0x77 };
     press(USB_KEY_PAUSE_BREAK, make, 8, "S2 Pause make (8-byte)");
     expect_none_release(USB_KEY_PAUSE_BREAK, "S2 Pause has no break code");
 }
@@ -488,8 +535,8 @@ test_set2_pause (void) {
 static void
 test_set1_alpha_key (void) {
     api_set_scancode_set(1);
-    uint8_t make[] = {0x1E};
-    uint8_t brk[] = {0x9E};
+    uint8_t make[] = { 0x1E };
+    uint8_t brk[] = { 0x9E };
     press(USB_KEY_A, make, 1, "S1 A make");
     release(USB_KEY_A, brk, 1, "S1 A break");
 }
@@ -498,8 +545,8 @@ test_set1_alpha_key (void) {
 static void
 test_set1_extended_key (void) {
     api_set_scancode_set(1);
-    uint8_t make[] = {0xE0, 0x4D};
-    uint8_t brk[] = {0xE0, 0xCD};
+    uint8_t make[] = { 0xE0, 0x4D };
+    uint8_t brk[] = { 0xE0, 0xCD };
     press(USB_KEY_RIGHT_ARROW, make, 2, "S1 right arrow make");
     release(USB_KEY_RIGHT_ARROW, brk, 2, "S1 right arrow break");
 }
@@ -508,8 +555,8 @@ test_set1_extended_key (void) {
 static void
 test_set1_print_screen (void) {
     api_set_scancode_set(1);
-    uint8_t make[] = {0xE0, 0x2A, 0xE0, 0x37};
-    uint8_t brk[] = {0xE0, 0xB7, 0xE0, 0xAA};
+    uint8_t make[] = { 0xE0, 0x2A, 0xE0, 0x37 };
+    uint8_t brk[] = { 0xE0, 0xB7, 0xE0, 0xAA };
     press(USB_KEY_PRINT_SCREEN, make, 4, "S1 PrtSc make");
     release(USB_KEY_PRINT_SCREEN, brk, 4, "S1 PrtSc break");
 }
@@ -518,7 +565,7 @@ test_set1_print_screen (void) {
 static void
 test_set1_pause (void) {
     api_set_scancode_set(1);
-    uint8_t make[] = {0xE1, 0x1D, 0x45, 0xE1, 0x9D, 0xC5};
+    uint8_t make[] = { 0xE1, 0x1D, 0x45, 0xE1, 0x9D, 0xC5 };
     press(USB_KEY_PAUSE_BREAK, make, 6, "S1 Pause make (6-byte)");
     expect_none_release(USB_KEY_PAUSE_BREAK, "S1 Pause has no break code");
 }
@@ -536,8 +583,8 @@ api_init_set3_all_make_break (void) {
 static void
 test_set3_alpha_key (void) {
     api_init_set3_all_make_break();
-    uint8_t make[] = {0x1C};
-    uint8_t brk[] = {0xF0, 0x1C};
+    uint8_t make[] = { 0x1C };
+    uint8_t brk[] = { 0xF0, 0x1C };
     press(USB_KEY_A, make, 1, "S3 A make");
     release(USB_KEY_A, brk, 2, "S3 A break");
 }
@@ -549,20 +596,21 @@ test_output_init (void) {
     usb_keyboard_leds = 0;
     ps2_output_init();
     // BAT started: LEDs on, scanning disabled, no bytes sent yet
-    if (usb_keyboard_leds != (LED_SCROLL_LOCK_BIT | LED_NUM_LOCK_BIT | LED_CAPS_LOCK_BIT) ||
-        ps2_output_is_scanning()) {
+    if (usb_keyboard_leds != (LED_SCROLL_LOCK_BIT | LED_NUM_LOCK_BIT | LED_CAPS_LOCK_BIT)
+        || ps2_output_is_scanning()) {
         tests_failed++;
         tests_run++;
         (void) printf("FAIL init: expected LEDs=0x%02X scanning=0, got "
                       "LEDs=0x%02X scanning=%d\n",
-            LED_SCROLL_LOCK_BIT | LED_NUM_LOCK_BIT | LED_CAPS_LOCK_BIT, usb_keyboard_leds, ps2_output_is_scanning());
+            LED_SCROLL_LOCK_BIT | LED_NUM_LOCK_BIT | LED_CAPS_LOCK_BIT, usb_keyboard_leds,
+            ps2_output_is_scanning());
     } else {
         tests_run++;
     }
     // Complete BAT: advance timer past PS2_RESET_DURATION_MS
     mock_timer += 1001;
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_TEST_PASSED}), 1, "init: AA after BAT");
+    check_result(((uint8_t[]){ PS2_REPLY_TEST_PASSED }), 1, "init: AA after BAT");
     if (usb_keyboard_leds != 0) {
         tests_failed++;
         tests_run++;
@@ -625,18 +673,24 @@ static void
 test_sentinel_cleanup (void) {
     ps2_output_init();
     ps2_enable_scanning();
-    ps2_output_flags |= FLAG_SHIFT_VIRTUAL_ON | FLAG_SHIFT_SUPPRESSED_LEFT | FLAG_SHIFT_SUPPRESSED_RIGHT;
+    ps2_output_flags |=
+        FLAG_SHIFT_VIRTUAL_ON | FLAG_SHIFT_SUPPRESSED_LEFT | FLAG_SHIFT_SUPPRESSED_RIGHT;
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     tenkey_count = 3;
+#endif
     ps2_output_clear_keys(false);
     drain_all();
-    if (ps2_output_flags & (FLAG_SHIFT_VIRTUAL_ON | FLAG_SHIFT_SUPPRESSED_LEFT | FLAG_SHIFT_SUPPRESSED_RIGHT)) {
+    if (ps2_output_flags
+        & (FLAG_SHIFT_VIRTUAL_ON | FLAG_SHIFT_SUPPRESSED_LEFT | FLAG_SHIFT_SUPPRESSED_RIGHT)) {
         tests_failed++;
         tests_run++;
         (void) printf("FAIL sentinel: shift state not cleared, got 0x%02X\n", ps2_output_flags);
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     } else if (tenkey_count != 0) {
         tests_failed++;
         tests_run++;
         (void) printf("FAIL sentinel: tenkey_count=%d\n", tenkey_count);
+#endif
     } else {
         tests_run++;
     }
@@ -648,8 +702,8 @@ static void
 test_repeat_timing (void) {
     api_set_repeat_rate(0x20);
 
-    uint8_t make[] = {0x1C};
-    uint8_t brk[] = {0xF0, 0x1C};
+    uint8_t make[] = { 0x1C };
+    uint8_t brk[] = { 0xF0, 0x1C };
 
     mock_timer = 0;
     ps2_press_key(USB_KEY_A);
@@ -692,7 +746,7 @@ test_repeat_timing (void) {
 static void
 test_set3_nav_end (void) {
     api_init_set3_all_make_break();
-    uint8_t expected[] = {0x65}; // KEY_END in Set 3
+    uint8_t expected[] = { 0x65 }; // KEY_END in Set 3
     // Num Lock ON (should be ignored in Set 3)
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     press(USB_KEY_END, expected, 1, "S3 End Num ON make");
@@ -718,14 +772,14 @@ test_set3_nav_end (void) {
     usb_keys_modifier_flags = 0;
     ps2_modifiers = 0;
     // Release
-    release(USB_KEY_END, ((uint8_t[]){0xF0, 0x65}), 2, "S3 End break");
+    release(USB_KEY_END, ((uint8_t[]){ 0xF0, 0x65 }), 2, "S3 End break");
 }
 
 /// S3 KP / - no shift interaction
 static void
 test_set3_kp_divide (void) {
     api_init_set3_all_make_break();
-    uint8_t expected[] = {0x77}; // KP_Divide in Set 3 (ps2scancodes.md line 517)
+    uint8_t expected[] = { 0x77 }; // KP_Divide in Set 3 (ps2scancodes.md line 517)
     press(USB_KEY_KP_DIVIDE, expected, 1, "S3 KP_Divide make");
     // With LShift — same scancode
     usb_keys_modifier_flags = SHIFT_BIT;
@@ -740,7 +794,7 @@ test_set3_kp_divide (void) {
     usb_keys_modifier_flags = 0;
     ps2_modifiers = 0;
     // Release
-    release(USB_KEY_KP_DIVIDE, ((uint8_t[]){0xF0, 0x77}), 2, "S3 KP_Divide break");
+    release(USB_KEY_KP_DIVIDE, ((uint8_t[]){ 0xF0, 0x77 }), 2, "S3 KP_Divide break");
 }
 
 /// S3 PAUSE - Set 3 Ctrl+Pause = same as Pause (no Break special case)
@@ -748,8 +802,8 @@ static void
 test_set3_ctrl_pause (void) {
     api_init_set3_all_make_break();
     // Pause in Set 3 = 0x62 regardless of Ctrl (ps2scancodes.md line 505)
-    uint8_t make[] = {0x62};
-    uint8_t brk[] = {0xF0, 0x62};
+    uint8_t make[] = { 0x62 };
+    uint8_t brk[] = { 0xF0, 0x62 };
     press(USB_KEY_PAUSE_BREAK, make, 1, "S3 Pause make");
     release(USB_KEY_PAUSE_BREAK, brk, 2, "S3 Pause break");
     // With Ctrl — same result (no Break special case in Set 3)
@@ -766,8 +820,8 @@ test_set3_ctrl_pause (void) {
 static void
 test_set3_print_screen (void) {
     api_init_set3_all_make_break();
-    uint8_t make[] = {0x57};
-    uint8_t brk[] = {0xF0, 0x57};
+    uint8_t make[] = { 0x57 };
+    uint8_t brk[] = { 0xF0, 0x57 };
     press(USB_KEY_PRINT_SCREEN, make, 1, "S3 PrtSc make");
     release(USB_KEY_PRINT_SCREEN, brk, 2, "S3 PrtSc break");
 }
@@ -776,8 +830,8 @@ test_set3_print_screen (void) {
 static void
 test_set3_pause (void) {
     api_init_set3_all_make_break();
-    uint8_t make[] = {0x62};
-    uint8_t brk[] = {0xF0, 0x62};
+    uint8_t make[] = { 0x62 };
+    uint8_t brk[] = { 0xF0, 0x62 };
     press(USB_KEY_PAUSE_BREAK, make, 1, "S3 Pause make");
     release(USB_KEY_PAUSE_BREAK, brk, 2, "S3 Pause break");
 }
@@ -787,8 +841,8 @@ static void
 test_set3_extended_media_key (void) {
     api_init_set3_all_make_break();
     // Volume Up = E0 95 / E0 F0 95 (set 3 scancode, E0-prefixed as extended)
-    uint8_t make[] = {0xE0, 0x95};
-    uint8_t brk[] = {0xE0, 0xF0, 0x95};
+    uint8_t make[] = { 0xE0, 0x95 };
+    uint8_t brk[] = { 0xE0, 0xF0, 0x95 };
     press(USB_KEY_VOLUME_UP, make, 2, "S3 Volume Up make");
     release(USB_KEY_VOLUME_UP, brk, 3, "S3 Volume Up break");
 }
@@ -798,29 +852,29 @@ static void
 test_set3_defaults (void) {
     api_set_scancode_set(3);
     queue_recv(PS2_COMMAND_SET_DEFAULTS);
-    check_result(((uint8_t[]){PS2_REPLY_ACK}), 1, "S3 F6: ACK after defaults");
+    check_result(((uint8_t[]){ PS2_REPLY_ACK }), 1, "S3 F6: ACK after defaults");
     // Key H: no break, repeats by default
-    press(USB_KEY_H, ((uint8_t[]){0x33}), 1, "S3 default H make (no break)");
+    press(USB_KEY_H, ((uint8_t[]){ 0x33 }), 1, "S3 default H make (no break)");
     expect_none_release(USB_KEY_H, "S3 default H no break");
     // H should repeat (default typematic enabled)
     expect_repeat(USB_KEY_H, true, "S3 default: H repeats");
     // CapsLock: break enabled, no repeat by default
-    uint8_t caps_brk[] = {0xF0, 0x14};
-    press(USB_KEY_CAPS_LOCK, ((uint8_t[]){0x14}), 1, "S3 default CapsLock make");
+    uint8_t caps_brk[] = { 0xF0, 0x14 };
+    press(USB_KEY_CAPS_LOCK, ((uint8_t[]){ 0x14 }), 1, "S3 default CapsLock make");
     release(USB_KEY_CAPS_LOCK, caps_brk, 2, "S3 default CapsLock break");
     // CapsLock should NOT repeat
     expect_repeat(USB_KEY_CAPS_LOCK, false, "S3 default: CapsLock no repeat");
     // Left Shift: break
-    uint8_t lshift_brk[] = {0xF0, 0x12};
-    press(USB_KEY_LEFT_SHIFT, ((uint8_t[]){0x12}), 1, "S3 default LShift make");
+    uint8_t lshift_brk[] = { 0xF0, 0x12 };
+    press(USB_KEY_LEFT_SHIFT, ((uint8_t[]){ 0x12 }), 1, "S3 default LShift make");
     release(USB_KEY_LEFT_SHIFT, lshift_brk, 2, "S3 default LShift break");
     // Left Win: break
-    uint8_t lwin_brk[] = {0xF0, 0x8B};
-    press(USB_KEY_LEFT_WIN, ((uint8_t[]){0x8B}), 1, "S3 default LWin make");
+    uint8_t lwin_brk[] = { 0xF0, 0x8B };
+    press(USB_KEY_LEFT_WIN, ((uint8_t[]){ 0x8B }), 1, "S3 default LWin make");
     release(USB_KEY_LEFT_WIN, lwin_brk, 2, "S3 default LWin break");
     // Menu: break
-    uint8_t menu_brk[] = {0xF0, 0x8D};
-    press(USB_KEY_MENU, ((uint8_t[]){0x8D}), 1, "S3 default Menu make");
+    uint8_t menu_brk[] = { 0xF0, 0x8D };
+    press(USB_KEY_MENU, ((uint8_t[]){ 0x8D }), 1, "S3 default Menu make");
     release(USB_KEY_MENU, menu_brk, 2, "S3 default Menu break");
 }
 
@@ -832,11 +886,11 @@ test_set3_set_keyset_resets_defaults (void) {
     // Re-set scancode set — should NOT change per-key state
     api_set_scancode_set(3);
     // F7 state should be preserved: no break, repeat for all
-    press(USB_KEY_H, ((uint8_t[]){0x33}), 1, "S3 set3 preserves H make (no break)");
+    press(USB_KEY_H, ((uint8_t[]){ 0x33 }), 1, "S3 set3 preserves H make (no break)");
     expect_none_release(USB_KEY_H, "S3 set3 preserves H no break");
     expect_repeat(USB_KEY_H, true, "S3 set3 preserves H repeats");
     // CapsLock also still has F7 state (no break, repeats)
-    press(USB_KEY_CAPS_LOCK, ((uint8_t[]){0x14}), 1, "S3 set3 preserves CapsLock make (no break)");
+    press(USB_KEY_CAPS_LOCK, ((uint8_t[]){ 0x14 }), 1, "S3 set3 preserves CapsLock make (no break)");
     expect_none_release(USB_KEY_CAPS_LOCK, "S3 set3 preserves CapsLock no break");
     expect_repeat(USB_KEY_CAPS_LOCK, true, "S3 set3 preserves CapsLock repeats");
 }
@@ -854,17 +908,18 @@ test_set3_per_key_fc (void) {
     queue_recv(0x62);
     queue_recv(PS2_COMMAND_ENABLE);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK}), 6,
-        "per-key FC: ACKs");
+    check_result(((uint8_t[]){ PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK,
+                     PS2_REPLY_ACK, PS2_REPLY_ACK }),
+        6, "per-key FC: ACKs");
     // Listed keys: H and CapsLock should now have break
-    uint8_t brk_h[] = {0xF0, 0x33};
-    press(USB_KEY_H, ((uint8_t[]){0x33}), 1, "S3 per-key FC H make");
+    uint8_t brk_h[] = { 0xF0, 0x33 };
+    press(USB_KEY_H, ((uint8_t[]){ 0x33 }), 1, "S3 per-key FC H make");
     release(USB_KEY_H, brk_h, 2, "S3 per-key FC H break");
-    uint8_t brk_caps[] = {0xF0, 0x14};
-    press(USB_KEY_CAPS_LOCK, ((uint8_t[]){0x14}), 1, "S3 per-key FC CapsLock make");
+    uint8_t brk_caps[] = { 0xF0, 0x14 };
+    press(USB_KEY_CAPS_LOCK, ((uint8_t[]){ 0x14 }), 1, "S3 per-key FC CapsLock make");
     release(USB_KEY_CAPS_LOCK, brk_caps, 2, "S3 per-key FC CapsLock break");
     // Unlisted key G: should have no break, still repeat (unaffected)
-    press(USB_KEY_G, ((uint8_t[]){0x34}), 1, "S3 per-key FC G make (no break)");
+    press(USB_KEY_G, ((uint8_t[]){ 0x34 }), 1, "S3 per-key FC G make (no break)");
     expect_none_release(USB_KEY_G, "S3 per-key FC G no break");
     expect_repeat(USB_KEY_G, true, "S3 per-key FC G repeats");
 }
@@ -882,17 +937,18 @@ test_set3_per_key_fd (void) {
     queue_recv(0x62);
     queue_recv(PS2_COMMAND_ENABLE);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK}), 6,
-        "per-key FD: ACKs");
+    check_result(((uint8_t[]){ PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK,
+                     PS2_REPLY_ACK, PS2_REPLY_ACK }),
+        6, "per-key FD: ACKs");
     // Listed keys: H and CapsLock should have no break, no repeat
-    press(USB_KEY_H, ((uint8_t[]){0x33}), 1, "S3 per-key FD H make (no break)");
+    press(USB_KEY_H, ((uint8_t[]){ 0x33 }), 1, "S3 per-key FD H make (no break)");
     expect_none_release(USB_KEY_H, "S3 per-key FD H no break");
     expect_repeat(USB_KEY_H, false, "S3 per-key FD H no repeat");
-    press(USB_KEY_CAPS_LOCK, ((uint8_t[]){0x14}), 1, "S3 per-key FD CapsLock make (no break)");
+    press(USB_KEY_CAPS_LOCK, ((uint8_t[]){ 0x14 }), 1, "S3 per-key FD CapsLock make (no break)");
     expect_none_release(USB_KEY_CAPS_LOCK, "S3 per-key FD CapsLock no break");
     expect_repeat(USB_KEY_CAPS_LOCK, false, "S3 per-key FD CapsLock no repeat");
     // Unlisted key G: unaffected — still no break, still repeats
-    press(USB_KEY_G, ((uint8_t[]){0x34}), 1, "S3 per-key FD G make (no break)");
+    press(USB_KEY_G, ((uint8_t[]){ 0x34 }), 1, "S3 per-key FD G make (no break)");
     expect_none_release(USB_KEY_G, "S3 per-key FD G no break");
     expect_repeat(USB_KEY_G, true, "S3 per-key FD G repeats");
 }
@@ -908,16 +964,18 @@ test_set3_per_key_fd_after_f8 (void) {
     queue_recv(0x62);
     queue_recv(PS2_COMMAND_ENABLE);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK}), 6,
-        "per-key FD after F8: ACKs");
+    check_result(((uint8_t[]){ PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK,
+                     PS2_REPLY_ACK, PS2_REPLY_ACK }),
+        6, "per-key FD after F8: ACKs");
     // Listed keys: H and CapsLock should lose break (repeat already 0 from F8)
-    press(USB_KEY_H, ((uint8_t[]){0x33}), 1, "S3 per-key FD after F8 H make (no break)");
+    press(USB_KEY_H, ((uint8_t[]){ 0x33 }), 1, "S3 per-key FD after F8 H make (no break)");
     expect_none_release(USB_KEY_H, "S3 per-key FD after F8 H no break");
-    press(USB_KEY_CAPS_LOCK, ((uint8_t[]){0x14}), 1, "S3 per-key FD after F8 CapsLock make (no break)");
+    press(
+        USB_KEY_CAPS_LOCK, ((uint8_t[]){ 0x14 }), 1, "S3 per-key FD after F8 CapsLock make (no break)");
     expect_none_release(USB_KEY_CAPS_LOCK, "S3 per-key FD after F8 CapsLock no break");
     // Unlisted key G: still has break, no repeat (F8 baseline)
-    uint8_t brk_g[] = {0xF0, 0x34};
-    press(USB_KEY_G, ((uint8_t[]){0x34}), 1, "S3 per-key FD after F8 G make");
+    uint8_t brk_g[] = { 0xF0, 0x34 };
+    press(USB_KEY_G, ((uint8_t[]){ 0x34 }), 1, "S3 per-key FD after F8 G make");
     release(USB_KEY_G, brk_g, 2, "S3 per-key FD after F8 G break");
     expect_repeat(USB_KEY_G, false, "S3 per-key FD after F8 G no repeat");
 }
@@ -933,18 +991,19 @@ test_set3_per_key_fb (void) {
     queue_recv(0x62);
     queue_recv(PS2_COMMAND_ENABLE);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK}), 6,
-        "S3 per-key FB: ACKs");
+    check_result(((uint8_t[]){ PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK,
+                     PS2_REPLY_ACK, PS2_REPLY_ACK }),
+        6, "S3 per-key FB: ACKs");
     // Listed keys: H and CapsLock repeat, no break
-    press(USB_KEY_H, ((uint8_t[]){0x33}), 1, "S3 per-key FB H make (no break)");
+    press(USB_KEY_H, ((uint8_t[]){ 0x33 }), 1, "S3 per-key FB H make (no break)");
     expect_none_release(USB_KEY_H, "S3 per-key FB H no break");
     expect_repeat(USB_KEY_H, true, "S3 per-key FB H repeats");
-    press(USB_KEY_CAPS_LOCK, ((uint8_t[]){0x14}), 1, "S3 per-key FB CapsLock make (no break)");
+    press(USB_KEY_CAPS_LOCK, ((uint8_t[]){ 0x14 }), 1, "S3 per-key FB CapsLock make (no break)");
     expect_none_release(USB_KEY_CAPS_LOCK, "S3 per-key FB CapsLock no break");
     expect_repeat(USB_KEY_CAPS_LOCK, true, "S3 per-key FB CapsLock repeats");
     // Unlisted key G: still break=1, repeat=0 (F8 baseline)
-    uint8_t brk_g[] = {0xF0, 0x34};
-    press(USB_KEY_G, ((uint8_t[]){0x34}), 1, "S3 per-key FB G make");
+    uint8_t brk_g[] = { 0xF0, 0x34 };
+    press(USB_KEY_G, ((uint8_t[]){ 0x34 }), 1, "S3 per-key FB G make");
     release(USB_KEY_G, brk_g, 2, "S3 per-key FB G break");
     expect_repeat(USB_KEY_G, false, "S3 per-key FB G no repeat");
 }
@@ -955,12 +1014,12 @@ test_set3_set_all_typematic (void) {
     api_init_set3_all_make_break();
     api_all_keys_typematic();
     // After F7: break=0 for all keys
-    press(USB_KEY_A, ((uint8_t[]){0x1C}), 1, "S3 F7 typematic A make");
+    press(USB_KEY_A, ((uint8_t[]){ 0x1C }), 1, "S3 F7 typematic A make");
     expect_none_release(USB_KEY_A, "S3 F7 typematic A no break");
-    press(USB_KEY_H, ((uint8_t[]){0x33}), 1, "S3 F7 typematic H make");
+    press(USB_KEY_H, ((uint8_t[]){ 0x33 }), 1, "S3 F7 typematic H make");
     expect_none_release(USB_KEY_H, "S3 F7 typematic H no break");
     // CapsLock previously had break=1, but F7 should clear it
-    press(USB_KEY_CAPS_LOCK, ((uint8_t[]){0x14}), 1, "S3 F7 typematic CapsLock make");
+    press(USB_KEY_CAPS_LOCK, ((uint8_t[]){ 0x14 }), 1, "S3 F7 typematic CapsLock make");
     expect_none_release(USB_KEY_CAPS_LOCK, "S3 F7 typematic CapsLock no break");
     // After F7: repeat=1 for all keys
     expect_repeat(USB_KEY_A, true, "S3 F7 typematic A repeats");
@@ -974,9 +1033,9 @@ test_set3_fa_all_break_repeat (void) {
     api_set_scancode_set(3);
     expect_cmd(PS2_COMMAND_SET_ALL_KEYS_NORMAL, "S3 FA: ACK");
     // After FA, even non-modifier A should send break (break=1)
-    release(USB_KEY_A, ((uint8_t[]){0xF0, 0x1C}), 2, "S3 FA A break");
+    release(USB_KEY_A, ((uint8_t[]){ 0xF0, 0x1C }), 2, "S3 FA A break");
     // CapsLock should also send break
-    release(USB_KEY_CAPS_LOCK, ((uint8_t[]){0xF0, 0x14}), 2, "S3 FA CapsLock break");
+    release(USB_KEY_CAPS_LOCK, ((uint8_t[]){ 0xF0, 0x14 }), 2, "S3 FA CapsLock break");
 }
 
 /// S3 F9+F8 - Set 3 F7+F9+F8: verify bit interactions
@@ -1017,10 +1076,10 @@ test_set3_set_all_make (void) {
     api_set_scancode_set(3);
     expect_cmd(PS2_COMMAND_SET_ALL_KEYS_MAKE, "S3 F9: ACK");
     // A and CapsLock should both have no break
-    press(USB_KEY_A, ((uint8_t[]){0x1C}), 1, "S3 F9 make-only A make");
+    press(USB_KEY_A, ((uint8_t[]){ 0x1C }), 1, "S3 F9 make-only A make");
     expect_none_release(USB_KEY_A, "S3 F9 make-only A no break");
     // CapsLock should also have no break after F9
-    press(USB_KEY_CAPS_LOCK, ((uint8_t[]){0x14}), 1, "S3 F9 make-only CapsLock make");
+    press(USB_KEY_CAPS_LOCK, ((uint8_t[]){ 0x14 }), 1, "S3 F9 make-only CapsLock make");
     expect_none_release(USB_KEY_CAPS_LOCK, "S3 F9 make-only CapsLock no break");
     // F9 also clears repeat for all keys
     expect_repeat(USB_KEY_A, false, "S3 F9 make-only A no repeat");
@@ -1034,7 +1093,7 @@ test_cmd_enable_disable (void) {
     ps2_press_key(USB_KEY_A);
     expect_none("disabled: A no make");
     expect_cmd(PS2_COMMAND_ENABLE, "enable: FA");
-    press(USB_KEY_A, ((uint8_t[]){0x1C}), 1, "enabled: A make");
+    press(USB_KEY_A, ((uint8_t[]){ 0x1C }), 1, "enabled: A make");
 }
 
 /// CMD F5 - F5 restores defaults (same as F6) without changing scancode set or
@@ -1049,11 +1108,11 @@ test_cmd_disable_restores_defaults (void) {
     // F4: re-enable
     expect_cmd(PS2_COMMAND_ENABLE, "S3 F5: FA after re-enable");
     // Defaults restored: H no break, repeats; CapsLock has break, no repeat
-    press(USB_KEY_H, ((uint8_t[]){0x33}), 1, "S3 F5 default H make (no break)");
+    press(USB_KEY_H, ((uint8_t[]){ 0x33 }), 1, "S3 F5 default H make (no break)");
     expect_none_release(USB_KEY_H, "S3 F5 default H no break");
     expect_repeat(USB_KEY_H, true, "S3 F5 default H repeats");
-    uint8_t caps_brk[] = {0xF0, 0x14};
-    press(USB_KEY_CAPS_LOCK, ((uint8_t[]){0x14}), 1, "S3 F5 default CapsLock make");
+    uint8_t caps_brk[] = { 0xF0, 0x14 };
+    press(USB_KEY_CAPS_LOCK, ((uint8_t[]){ 0x14 }), 1, "S3 F5 default CapsLock make");
     release(USB_KEY_CAPS_LOCK, caps_brk, 2, "S3 F5 default CapsLock break");
     expect_repeat(USB_KEY_CAPS_LOCK, false, "S3 F5 default CapsLock no break");
 }
@@ -1066,8 +1125,8 @@ test_cmd_reset (void) {
     ps2_output_reset(true);
     // After RESET command: ACK sent, BAT in progress — all LEDs on, scanning
     // off Verify LEDs on and scanning disabled
-    if (usb_keyboard_leds != (LED_SCROLL_LOCK_BIT | LED_NUM_LOCK_BIT | LED_CAPS_LOCK_BIT) ||
-        ps2_output_is_scanning()) {
+    if (usb_keyboard_leds != (LED_SCROLL_LOCK_BIT | LED_NUM_LOCK_BIT | LED_CAPS_LOCK_BIT)
+        || ps2_output_is_scanning()) {
         tests_failed++;
         tests_run++;
         (void) printf("FAIL reset: expected all LEDs on scanning=0, got "
@@ -1082,7 +1141,8 @@ test_cmd_reset (void) {
     // Advance timer past 500ms BAT duration and process — AA sent, LEDs off
     mock_timer = reset_pending_since + 2000;
     drain_commands();
-    if (sent_count != 1 || sent_buffer[0] != PS2_REPLY_TEST_PASSED || usb_keyboard_leds != 0 || !ps2_output_is_scanning()) {
+    if (sent_count != 1 || sent_buffer[0] != PS2_REPLY_TEST_PASSED || usb_keyboard_leds != 0
+        || !ps2_output_is_scanning()) {
         tests_failed++;
         tests_run++;
         (void) printf("FAIL reset BAT complete: expected AA, LEDs=0, scanning=1\n");
@@ -1092,7 +1152,7 @@ test_cmd_reset (void) {
             (void) printf("PASS reset BAT complete\n");
         }
     }
-    press(USB_KEY_A, ((uint8_t[]){PS2_REPLY_TEST_PASSED, 0x1C}), 2, "after reset: A make");
+    press(USB_KEY_A, ((uint8_t[]){ PS2_REPLY_TEST_PASSED, 0x1C }), 2, "after reset: A make");
 }
 
 /// CMD FF - FF resets scancode set, per-key state, and defaults
@@ -1111,8 +1171,9 @@ test_cmd_reset_restores_everything (void) {
     mock_timer = reset_pending_since + 2000;
     // After reset: scancode set is 2, H has Set 2 scancode 0x33 with break
     // (Set 2 defaults: H has break code)
-    uint8_t make_h[] = {PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_TEST_PASSED, 0x33};
-    uint8_t brk_h[] = {0xF0, 0x33};
+    uint8_t make_h[] = { PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK,
+        PS2_REPLY_TEST_PASSED, 0x33 };
+    uint8_t brk_h[] = { 0xF0, 0x33 };
     press(USB_KEY_H, make_h, 6, "after FF reset: H make (Set 2)");
     release(USB_KEY_H, brk_h, 2, "after FF reset: H break (Set 2)");
 }
@@ -1122,7 +1183,7 @@ static void
 test_cmd_set_defaults (void) {
     // ps2keyboard.md line 209: F6 = load defaults, scanning remains enabled
     expect_cmd(PS2_COMMAND_SET_DEFAULTS, "F6: ACK");
-    press(USB_KEY_A, ((uint8_t[]){0x1C}), 1, "after set defaults: A make");
+    press(USB_KEY_A, ((uint8_t[]){ 0x1C }), 1, "after set defaults: A make");
 }
 
 /// CMD ED - PS/2 command: Set LEDs (ED)
@@ -1147,7 +1208,8 @@ test_cmd_set_leds (void) {
     if (host_led_state != LED_NUM_LOCK_BIT) {
         tests_failed++;
         tests_run++;
-        (void) printf("FAIL S2 SET_LEDS Num: expected 0x%02X, got 0x%02X\n", LED_NUM_LOCK_BIT, host_led_state);
+        (void) printf(
+            "FAIL S2 SET_LEDS Num: expected 0x%02X, got 0x%02X\n", LED_NUM_LOCK_BIT, host_led_state);
     } else {
         tests_run++;
         if (verbose) {
@@ -1159,7 +1221,8 @@ test_cmd_set_leds (void) {
     if (host_led_state != LED_CAPS_LOCK_BIT) {
         tests_failed++;
         tests_run++;
-        (void) printf("FAIL S2 SET_LEDS Caps: expected 0x%02X, got 0x%02X\n", LED_CAPS_LOCK_BIT, host_led_state);
+        (void) printf(
+            "FAIL S2 SET_LEDS Caps: expected 0x%02X, got 0x%02X\n", LED_CAPS_LOCK_BIT, host_led_state);
     } else {
         tests_run++;
         if (verbose) {
@@ -1171,7 +1234,8 @@ test_cmd_set_leds (void) {
     if (host_led_state != LED_SCROLL_LOCK_BIT) {
         tests_failed++;
         tests_run++;
-        (void) printf("FAIL S2 SET_LEDS Scroll: expected 0x%02X, got 0x%02X\n", LED_SCROLL_LOCK_BIT, host_led_state);
+        (void) printf("FAIL S2 SET_LEDS Scroll: expected 0x%02X, got 0x%02X\n", LED_SCROLL_LOCK_BIT,
+            host_led_state);
     } else {
         tests_run++;
         if (verbose) {
@@ -1205,7 +1269,7 @@ activate_scancode_set_and_verify (uint8_t set, uint8_t expected_scancode) {
     queue_recv(set);
     drain_commands();
     clear_sent();
-    uint8_t expected_make[] = {expected_scancode};
+    uint8_t expected_make[] = { expected_scancode };
     char label[40];
     snprintf(label, sizeof(label), "SET_SCAN_CODES %u -> S%u F12 make", set, set);
     ps2_press_key(USB_KEY_F12);
@@ -1221,11 +1285,11 @@ test_cmd_set_scan_codes (void) {
     // F0 0 = read current set, should return FA + current set
     queue_recv(PS2_COMMAND_SET_SCAN_CODES);
     queue_recv(0);
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK, 0x03}), 3, "F0 0 read set 3");
+    check_result(((uint8_t[]){ PS2_REPLY_ACK, PS2_REPLY_ACK, 0x03 }), 3, "F0 0 read set 3");
     // F0 99 = invalid set, should get FE (RESEND)
     queue_recv(PS2_COMMAND_SET_SCAN_CODES);
     queue_recv(99);
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_RESEND}), 2, "F0 99 invalid set");
+    check_result(((uint8_t[]){ PS2_REPLY_ACK, PS2_REPLY_RESEND }), 2, "F0 99 invalid set");
 }
 
 /// CMD F3 - default rate and delay
@@ -1236,8 +1300,7 @@ test_default_repeat_rate (void) {
     if (delay_ms == 500 && period_ms >= 90 && period_ms <= 94) {
         tests_run++;
         if (verbose) {
-            (void) printf("PASS default rate: delay=%u ms period=%u ms\n",
-                delay_ms, period_ms);
+            (void) printf("PASS default rate: delay=%u ms period=%u ms\n", delay_ms, period_ms);
         }
     } else {
         tests_failed++;
@@ -1319,8 +1382,8 @@ test_scanning_disabled (void) {
 static void
 test_set2_kp_divide_no_shift (void) {
     // ps2scancodes.md line 132: KP_Divide = E0 4A / E0 F0 4A
-    uint8_t make[] = {0xE0, 0x4A};
-    uint8_t brk[] = {0xE0, 0xF0, 0x4A};
+    uint8_t make[] = { 0xE0, 0x4A };
+    uint8_t brk[] = { 0xE0, 0xF0, 0x4A };
     press(USB_KEY_KP_DIVIDE, make, 2, "S2 KP_Divide make");
     release(USB_KEY_KP_DIVIDE, brk, 3, "S2 KP_Divide break");
 }
@@ -1328,78 +1391,87 @@ test_set2_kp_divide_no_shift (void) {
 /// S2 KP / - Set 2 KP_Divide with both shifts held
 static void
 test_set2_kp_divide_both_shifts (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     usb_keys_modifier_flags = SHIFT_BIT | RIGHT_SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT | RIGHT_SHIFT_BIT;
     // ps2scancodes.md "Keypad / with Shift (Note 3)" lines 588-594
-    uint8_t make[] = {0xE0, 0xF0, 0x12, 0xE0, 0xF0, 0x59, 0xE0, 0x4A};
-    uint8_t brk[] = {0xE0, 0xF0, 0x4A, 0xE0, 0x59, 0xE0, 0x12};
+    uint8_t make[] = { 0xE0, 0xF0, 0x12, 0xE0, 0xF0, 0x59, 0xE0, 0x4A };
+    uint8_t brk[] = { 0xE0, 0xF0, 0x4A, 0xE0, 0x59, 0xE0, 0x12 };
     press(USB_KEY_KP_DIVIDE, make, 8, "S2 KP_Divide+both shifts make");
     release(USB_KEY_KP_DIVIDE, brk, 7, "S2 KP_Divide+both shifts break");
+#endif
 }
 
 /// S1 NAV - Set 1 navigation with Num Lock ON
 static void
 test_set1_keypad_nav_numlock_on (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_scancode_set(1);
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     // ps2scancodes.md "Keypad interaction" lines 383-390 (Set 1)
-    uint8_t make[] = {0xE0, 0x2A, 0xE0, 0x4F};
-    uint8_t brk[] = {0xE0, 0xCF, 0xE0, 0xAA};
+    uint8_t make[] = { 0xE0, 0x2A, 0xE0, 0x4F };
+    uint8_t brk[] = { 0xE0, 0xCF, 0xE0, 0xAA };
     press(USB_KEY_END, make, 4, "S1 End numlock ON make");
     release(USB_KEY_END, brk, 4, "S1 End numlock ON break");
+#endif
 }
 
 /// S1 NAV - Set 1 tenkey break-before-remake with two held nav keys
 static void
 test_set1_tenkey_break_before_remake (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_scancode_set(1);
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     press_key(USB_KEY_END);
-    check_result(((uint8_t[]){0xE0, 0x2A, 0xE0, 0x4F}), 4,
-        "S1 End NL ON make");
+    check_result(((uint8_t[]){ 0xE0, 0x2A, 0xE0, 0x4F }), 4, "S1 End NL ON make");
     press_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0xAA, 0xE0, 0x2A, 0xE0, 0x47}), 6,
+    check_result(((uint8_t[]){ 0xE0, 0xAA, 0xE0, 0x2A, 0xE0, 0x47 }), 6,
         "S1 Home NL ON make (brk, remake, scan)");
     release_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0xC7}), 2,
-        "S1 Home break");
+    check_result(((uint8_t[]){ 0xE0, 0xC7 }), 2, "S1 Home break");
     release_key(USB_KEY_END);
-    check_result(((uint8_t[]){0xE0, 0xCF, 0xE0, 0xAA}), 4,
-        "S1 End break (LShift released)");
+    check_result(((uint8_t[]){ 0xE0, 0xCF, 0xE0, 0xAA }), 4, "S1 End break (LShift released)");
+#endif
 }
 
 /// S1 NAV - Set 1 navigation with Num Lock OFF and LShift held
 static void
 test_set1_keypad_nav_numlock_off_shift (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_scancode_set(1);
     api_set_leds(0x00);
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
     // ps2scancodes.md line 388: LShift + key → E0 AA / E0 2A (Set 1 Num OFF)
-    uint8_t make[] = {0xE0, 0xAA, 0xE0, 0x4F};
-    uint8_t brk[] = {0xE0, 0xCF, 0xE0, 0x2A};
+    uint8_t make[] = { 0xE0, 0xAA, 0xE0, 0x4F };
+    uint8_t brk[] = { 0xE0, 0xCF, 0xE0, 0x2A };
     press(USB_KEY_END, make, 4, "S1 End numlock OFF+LShift make");
     release(USB_KEY_END, brk, 4, "S1 End numlock OFF+LShift break");
+#endif
 }
 
 /// S2 NAV - Set 2 navigation with Num Lock OFF, no modifiers
 static void
 test_set2_keypad_nav_numlock_off (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     // Num Lock OFF: E0 prefix, then non-extended scancode
-    uint8_t make[] = {0xE0, 0x69};
-    uint8_t brk[] = {0xE0, 0xF0, 0x69};
+    uint8_t make[] = { 0xE0, 0x69 };
+    uint8_t brk[] = { 0xE0, 0xF0, 0x69 };
     press(USB_KEY_END, make, 2, "S2 End numlock OFF make");
     release(USB_KEY_END, brk, 3, "S2 End numlock OFF break");
+#endif
 }
 
 /// S1 NAV - Set 1 navigation with Num Lock OFF, no modifiers
 static void
 test_set1_keypad_nav_numlock_off (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_scancode_set(1);
-    uint8_t make[] = {0xE0, 0x4F};
-    uint8_t brk[] = {0xE0, 0xCF};
+    uint8_t make[] = { 0xE0, 0x4F };
+    uint8_t brk[] = { 0xE0, 0xCF };
     press(USB_KEY_END, make, 2, "S1 End numlock OFF make");
     release(USB_KEY_END, brk, 2, "S1 End numlock OFF break");
+#endif
 }
 
 /// S2 PRTSCR - Set 2 PrtSc with both shifts held (any modifier except Alt)
@@ -1407,8 +1479,8 @@ static void
 test_set2_prtsc_both_shifts (void) {
     usb_keys_modifier_flags = SHIFT_BIT | RIGHT_SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT | RIGHT_SHIFT_BIT;
-    uint8_t make[] = {0xE0, 0x7C};
-    uint8_t brk[] = {0xE0, 0xF0, 0x7C};
+    uint8_t make[] = { 0xE0, 0x7C };
+    uint8_t brk[] = { 0xE0, 0xF0, 0x7C };
     press(USB_KEY_PRINT_SCREEN, make, 2, "S2 PrtSc+both shifts make");
     release(USB_KEY_PRINT_SCREEN, brk, 3, "S2 PrtSc+both shifts break");
 }
@@ -1443,85 +1515,87 @@ test_host_active (void) {
 /// S2 NAV - Set 2 navigation release suffix (Num Lock ON + LShift)
 static void
 test_set2_keypad_nav_suffix (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
     // ps2scancodes.md: Num Lock ON + any shift → bare key
-    press(USB_KEY_END, ((uint8_t[]){0xE0, 0x69}), 2, "S2 End suffix make");
-    release(USB_KEY_END, ((uint8_t[]){0xE0, 0xF0, 0x69}), 3, "S2 End suffix break");
+    press(USB_KEY_END, ((uint8_t[]){ 0xE0, 0x69 }), 2, "S2 End suffix make");
+    release(USB_KEY_END, ((uint8_t[]){ 0xE0, 0xF0, 0x69 }), 3, "S2 End suffix break");
+#endif
 }
 
 /// S1 F13 - Set 1 F13: 0x64 make / 0xE4 break
 static void
 test_set1_f13 (void) {
     api_set_scancode_set(1);
-    press(USB_KEY_F13, ((uint8_t[]){0x64}), 1, "S1 F13 make");
-    release(USB_KEY_F13, ((uint8_t[]){0xE4}), 1, "S1 F13 break");
+    press(USB_KEY_F13, ((uint8_t[]){ 0x64 }), 1, "S1 F13 make");
+    release(USB_KEY_F13, ((uint8_t[]){ 0xE4 }), 1, "S1 F13 break");
 }
 
 /// S1 F24 - Set 1 F24: 0x76 make / 0xF6 break
 static void
 test_set1_f24 (void) {
     api_set_scancode_set(1);
-    press(USB_KEY_F24, ((uint8_t[]){0x76}), 1, "S1 F24 make");
-    release(USB_KEY_F24, ((uint8_t[]){0xF6}), 1, "S1 F24 break");
+    press(USB_KEY_F24, ((uint8_t[]){ 0x76 }), 1, "S1 F24 make");
+    release(USB_KEY_F24, ((uint8_t[]){ 0xF6 }), 1, "S1 F24 break");
 }
 
 /// S2 F13 - Set 2 F13: 0x08 make / 0xF0 0x08 break
 static void
 test_set2_f13 (void) {
-    press(USB_KEY_F13, ((uint8_t[]){0x08}), 1, "S2 F13 make");
-    release(USB_KEY_F13, ((uint8_t[]){0xF0, 0x08}), 2, "S2 F13 break");
+    press(USB_KEY_F13, ((uint8_t[]){ 0x08 }), 1, "S2 F13 make");
+    release(USB_KEY_F13, ((uint8_t[]){ 0xF0, 0x08 }), 2, "S2 F13 break");
 }
 
 /// S2 F24 - Set 2 F24: 0x5F make / 0xF0 0x5F break
 static void
 test_set2_f24 (void) {
-    press(USB_KEY_F24, ((uint8_t[]){0x5F}), 1, "S2 F24 make");
-    release(USB_KEY_F24, ((uint8_t[]){0xF0, 0x5F}), 2, "S2 F24 break");
+    press(USB_KEY_F24, ((uint8_t[]){ 0x5F }), 1, "S2 F24 make");
+    release(USB_KEY_F24, ((uint8_t[]){ 0xF0, 0x5F }), 2, "S2 F24 break");
 }
 
 /// S3 F13 - Set 3 F13: native scancode 0x7F
 static void
 test_set3_f13 (void) {
     api_set_scancode_set(3);
-    press(USB_KEY_F13, ((uint8_t[]){0x7F}), 1, "S3 F13 make");
+    press(USB_KEY_F13, ((uint8_t[]){ 0x7F }), 1, "S3 F13 make");
 }
 
 /// S3 F14 - Set 3 F14: native scancode 0x80
 static void
 test_set3_f14 (void) {
     api_set_scancode_set(3);
-    press(USB_KEY_F14, ((uint8_t[]){0x80}), 1, "S3 F14 make");
+    press(USB_KEY_F14, ((uint8_t[]){ 0x80 }), 1, "S3 F14 make");
 }
 
 /// S3 F15 - Set 3 F15: native scancode 0x81
 static void
 test_set3_f15 (void) {
     api_set_scancode_set(3);
-    press(USB_KEY_F15, ((uint8_t[]){0x81}), 1, "S3 F15 make");
+    press(USB_KEY_F15, ((uint8_t[]){ 0x81 }), 1, "S3 F15 make");
 }
 
 /// S3 F16 - Set 3 F16: native scancode 0x82
 static void
 test_set3_f16 (void) {
     api_set_scancode_set(3);
-    press(USB_KEY_F16, ((uint8_t[]){0x82}), 1, "S3 F16 make");
+    press(USB_KEY_F16, ((uint8_t[]){ 0x82 }), 1, "S3 F16 make");
 }
 
 /// S3 F17 - Set 3 F17: native scancode 0x83
 static void
 test_set3_f17 (void) {
     api_set_scancode_set(3);
-    press(USB_KEY_F17, ((uint8_t[]){0x83}), 1, "S3 F17 make");
+    press(USB_KEY_F17, ((uint8_t[]){ 0x83 }), 1, "S3 F17 make");
 }
 
 /// S3 F13+F14 - Set 3: F13 and F14 with break enabled (all make-break)
 static void
 test_set3_f13_f14_break (void) {
     api_init_set3_all_make_break();
-    uint8_t brk[] = {0xF0, 0x7F};
-    press(USB_KEY_F13, ((uint8_t[]){0x7F}), 1, "S3 F13 make (break enabled)");
+    uint8_t brk[] = { 0xF0, 0x7F };
+    press(USB_KEY_F13, ((uint8_t[]){ 0x7F }), 1, "S3 F13 make (break enabled)");
     release(USB_KEY_F13, brk, 2, "S3 F13 break");
 }
 
@@ -1530,8 +1604,8 @@ static void
 test_set3_f24 (void) {
 #if defined(ENABLE_PS2_DEVICE_SET_3_F24) && ENABLE_PS2_DEVICE_SET_3_F24
     api_set_scancode_set(3);
-    press(USB_KEY_F24, ((uint8_t[]){0x12, 0x5E, 0xF0, 0x12}), 4, "S3 F24 (Shift+F12)");
-    release(USB_KEY_F24, ((uint8_t[]){0xF0, 0x5E}), 2, "S3 F24 break (F12 break)");
+    press(USB_KEY_F24, ((uint8_t[]){ 0x12, 0x5E, 0xF0, 0x12 }), 4, "S3 F24 (Shift+F12)");
+    release(USB_KEY_F24, ((uint8_t[]){ 0xF0, 0x5E }), 2, "S3 F24 break (F12 break)");
 #endif
 }
 
@@ -1541,7 +1615,7 @@ test_set3_f13_with_lshift (void) {
     api_set_scancode_set(3);
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
-    press(USB_KEY_F13, ((uint8_t[]){0x7F}), 1, "S3 F13+LShift (native)");
+    press(USB_KEY_F13, ((uint8_t[]){ 0x7F }), 1, "S3 F13+LShift (native)");
 }
 
 /// S3 F13 - Set 3 F13 with RShift already down: same native scancode 0x7F
@@ -1550,7 +1624,7 @@ test_set3_f13_with_rshift (void) {
     api_set_scancode_set(3);
     usb_keys_modifier_flags = RIGHT_SHIFT_BIT;
     ps2_modifiers = RIGHT_SHIFT_BIT;
-    press(USB_KEY_F13, ((uint8_t[]){0x7F}), 1, "S3 F13+RShift (native)");
+    press(USB_KEY_F13, ((uint8_t[]){ 0x7F }), 1, "S3 F13+RShift (native)");
 }
 
 /// CMD INVALID - PS/2 command: invalid command → RESEND
@@ -1576,7 +1650,7 @@ static void
 test_cmd_resend (void) {
     // ps2keyboard.md line 208: FE → resend last byte
     // Press A to have a byte to resend
-    press(USB_KEY_A, ((uint8_t[]){0x1C}), 1, "resend: A make");
+    press(USB_KEY_A, ((uint8_t[]){ 0x1C }), 1, "resend: A make");
     queue_recv(PS2_COMMAND_RESEND);
     drain_commands();
     if (sent_count == 1 && sent_buffer[0] == 0x1C) {
@@ -1637,33 +1711,37 @@ test_set2_keypad_nav_shift_numlock_right_shift (void) {
     usb_keys_modifier_flags = RIGHT_SHIFT_BIT;
     ps2_modifiers = RIGHT_SHIFT_BIT;
     // ps2scancodes.md: Num Lock ON + any shift → bare key, no prefix/suffix
-    press(USB_KEY_END, ((uint8_t[]){0xE0, 0x69}), 2, "S2 End numlock ON+RShift make");
-    release(USB_KEY_END, ((uint8_t[]){0xE0, 0xF0, 0x69}), 3, "S2 End numlock ON+RShift break");
+    press(USB_KEY_END, ((uint8_t[]){ 0xE0, 0x69 }), 2, "S2 End numlock ON+RShift make");
+    release(USB_KEY_END, ((uint8_t[]){ 0xE0, 0xF0, 0x69 }), 3, "S2 End numlock ON+RShift break");
 }
 
 /// S2 NAV - Set 2 navigation with Num Lock ON and both shifts held
 static void
 test_set2_keypad_nav_shift_numlock_both (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     usb_keys_modifier_flags = SHIFT_BIT | RIGHT_SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT | RIGHT_SHIFT_BIT;
     // ps2scancodes.md: Num Lock ON + any shift → bare key, no prefix/suffix
-    press(USB_KEY_END, ((uint8_t[]){0xE0, 0x69}), 2, "S2 End numlock ON+both shifts make");
-    release(USB_KEY_END, ((uint8_t[]){0xE0, 0xF0, 0x69}), 3, "S2 End numlock ON+both shifts break");
+    press(USB_KEY_END, ((uint8_t[]){ 0xE0, 0x69 }), 2, "S2 End numlock ON+both shifts make");
+    release(USB_KEY_END, ((uint8_t[]){ 0xE0, 0xF0, 0x69 }), 3, "S2 End numlock ON+both shifts break");
+#endif
 }
 
 /// S1 NAV - Set 1 navigation with Num Lock OFF and Right Shift held
 static void
 test_set1_keypad_nav_numlock_right_shift (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_scancode_set(1);
     api_set_leds(0x00);
     usb_keys_modifier_flags = RIGHT_SHIFT_BIT;
     ps2_modifiers = RIGHT_SHIFT_BIT;
     // ps2scancodes.md line 389: RShift + key → E0 B6 / E0 36 (Set 1 Num OFF)
-    uint8_t make[] = {0xE0, 0xB6, 0xE0, 0x4F};
-    uint8_t brk[] = {0xE0, 0xCF, 0xE0, 0x36};
+    uint8_t make[] = { 0xE0, 0xB6, 0xE0, 0x4F };
+    uint8_t brk[] = { 0xE0, 0xCF, 0xE0, 0x36 };
     press(USB_KEY_END, make, 4, "S1 End numlock OFF+RShift make");
     release(USB_KEY_END, brk, 4, "S1 End numlock OFF+RShift break");
+#endif
 }
 
 // ----- Model M reference behavior tests -----
@@ -1673,202 +1751,191 @@ test_set1_keypad_nav_numlock_right_shift (void) {
 /// released when count returns to zero
 static void
 test_set2_tenkey_virtual_shift_refcount (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     usb_keys_modifier_flags = 0;
     ps2_modifiers = 0;
     press_key(USB_KEY_UP_ARROW);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x75}), 4,
-        "S2 NL Up make (E0 12 + scan)");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x75 }), 4, "S2 NL Up make (E0 12 + scan)");
     press_key(USB_KEY_LEFT_ARROW);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x6B}), 7,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x6B }), 7,
         "S2 NL Left make (break, make, scan)");
     release_key(USB_KEY_LEFT_ARROW);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x6B}), 3,
-        "S2 NL Left break (no LShift release)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x6B }), 3, "S2 NL Left break (no LShift release)");
     release_key(USB_KEY_UP_ARROW);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x75, 0xE0, 0xF0, 0x12}), 6,
-        "S2 NL Up break (LShift released)");
+    check_result(
+        ((uint8_t[]){ 0xE0, 0xF0, 0x75, 0xE0, 0xF0, 0x12 }), 6, "S2 NL Up break (LShift released)");
+#endif
 }
 
 /// Model M observed: Num Lock ON, press and release Insert
 static void
 test_set2_tenkey_model_m_insert_press_release (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x70}), 4,
-        "Model M: Insert make (E0 12 E0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x70 }), 4, "Model M: Insert make (E0 12 E0 70)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70, 0xE0, 0xF0, 0x12}), 6,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70, 0xE0, 0xF0, 0x12 }), 6,
         "Model M: Insert break (E0 F0 70 E0 F0 12)");
+#endif
 }
 
 /// Model M observed: Num Lock ON, hold Left Shift, toggle Insert, release Shift.
 /// Physical shift suppresses virtual LShift (Num Lock ON + any shift = bare key).
 static void
 test_set2_tenkey_model_m_shift_held_insert (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
     press_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0x12}), 1,
-        "Model M: LShift make (12)");
+    check_result(((uint8_t[]){ 0x12 }), 1, "Model M: LShift make (12)");
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0x70}), 2,
-        "Model M: Insert make (E0 70, no LShift)");
+    check_result(((uint8_t[]){ 0xE0, 0x70 }), 2, "Model M: Insert make (E0 70, no LShift)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
-        "Model M: Insert break (E0 F0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70 }), 3, "Model M: Insert break (E0 F0 70)");
     release_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0xF0, 0x12}), 2,
-        "Model M: LShift break (F0 12)");
+    check_result(((uint8_t[]){ 0xF0, 0x12 }), 2, "Model M: LShift break (F0 12)");
+#endif
 }
 
 /// Model M observed: Num Lock OFF, hold Left Shift, toggle Insert, release Shift.
 /// Shift is temporarily removed (E0 F0 12), Insert sent, then restored (E0 12).
 static void
 test_set2_tenkey_model_m_numlock_off_shift_insert (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(0);
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
     press_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0x12}), 1,
-        "Model M: LShift make (12)");
+    check_result(((uint8_t[]){ 0x12 }), 1, "Model M: LShift make (12)");
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x70}), 5,
-        "Model M: Insert make (E0 F0 12 E0 70)");
+    check_result(
+        ((uint8_t[]){ 0xE0, 0xF0, 0x12, 0xE0, 0x70 }), 5, "Model M: Insert make (E0 F0 12 E0 70)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70, 0xE0, 0x12}), 5,
-        "Model M: Insert break (E0 F0 70 E0 12)");
+    check_result(
+        ((uint8_t[]){ 0xE0, 0xF0, 0x70, 0xE0, 0x12 }), 5, "Model M: Insert break (E0 F0 70 E0 12)");
     release_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0xF0, 0x12}), 2,
-        "Model M: LShift break (F0 12)");
+    check_result(((uint8_t[]){ 0xF0, 0x12 }), 2, "Model M: LShift break (F0 12)");
+#endif
 }
 
 /// Model M observed: Num Lock OFF, hold Left Shift, hold Insert until repeats,
 /// release Insert, release Shift. Shift removed once across all repeats.
 static void
 test_set2_tenkey_model_m_numlock_off_shift_insert_repeat (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(0);
     api_set_repeat_rate(0x00);
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
     mock_timer = 0;
     press_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0x12}), 1,
-        "Model M: LShift make (12)");
+    check_result(((uint8_t[]){ 0x12 }), 1, "Model M: LShift make (12)");
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x70}), 5,
-        "Model M: Insert make (E0 F0 12 E0 70)");
+    check_result(
+        ((uint8_t[]){ 0xE0, 0xF0, 0x12, 0xE0, 0x70 }), 5, "Model M: Insert make (E0 F0 12 E0 70)");
     // Repeats — no LShift manipulation
     mock_timer += decode_repeat_delay_ms(repeat_rate) + 1;
     drain_commands();
-    check_result(((uint8_t[]){0xE0, 0x70}), 2,
-        "Model M: Insert repeat (E0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0x70 }), 2, "Model M: Insert repeat (E0 70)");
     mock_timer += decode_repeat_period_ms(repeat_rate);
     drain_commands();
-    check_result(((uint8_t[]){0xE0, 0x70}), 2,
-        "Model M: Insert repeat 2 (E0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0x70 }), 2, "Model M: Insert repeat 2 (E0 70)");
     // Release Insert: break + restore shift
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70, 0xE0, 0x12}), 5,
-        "Model M: Insert break (E0 F0 70 E0 12)");
+    check_result(
+        ((uint8_t[]){ 0xE0, 0xF0, 0x70, 0xE0, 0x12 }), 5, "Model M: Insert break (E0 F0 70 E0 12)");
     // Release physical shift
     release_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0xF0, 0x12}), 2,
-        "Model M: LShift break (F0 12)");
+    check_result(((uint8_t[]){ 0xF0, 0x12 }), 2, "Model M: LShift break (F0 12)");
+#endif
 }
 
 /// Model M observed: Num Lock ON, hold Insert, press/release Left Arrow,
 /// release Insert. LShift broken before next press, re-made for each tenkey.
 static void
 test_set2_tenkey_model_m_insert_hold_left_arrow (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x70}), 4,
-        "Model M: Insert make (E0 12 E0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x70 }), 4, "Model M: Insert make (E0 12 E0 70)");
     press_key(USB_KEY_LEFT_ARROW);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x6B}), 7,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x6B }), 7,
         "Model M: Left make (E0 F0 12 E0 12 E0 6B)");
     release_key(USB_KEY_LEFT_ARROW);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x6B}), 3,
-        "Model M: Left break (E0 F0 6B)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x6B }), 3, "Model M: Left break (E0 F0 6B)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70, 0xE0, 0xF0, 0x12}), 6,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70, 0xE0, 0xF0, 0x12 }), 6,
         "Model M: Insert break (E0 F0 70 E0 F0 12)");
+#endif
 }
 
 /// Model M observed: Num Lock ON, hold Insert, press/release H, release Insert.
 /// LShift broken before H, not restored (H is lowercase).
 static void
 test_set2_tenkey_model_m_insert_hold_h (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x70}), 4,
-        "Model M: Insert make (E0 12 E0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x70 }), 4, "Model M: Insert make (E0 12 E0 70)");
     press_key(USB_KEY_H);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0x33}), 4,
-        "Model M: H make (E0 F0 12 33)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x12, 0x33 }), 4, "Model M: H make (E0 F0 12 33)");
     release_key(USB_KEY_H);
-    check_result(((uint8_t[]){0xF0, 0x33}), 2,
-        "Model M: H break (F0 33)");
+    check_result(((uint8_t[]){ 0xF0, 0x33 }), 2, "Model M: H break (F0 33)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
-        "Model M: Insert break (E0 F0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70 }), 3, "Model M: Insert break (E0 F0 70)");
+#endif
 }
 
 /// Model M observed: Num Lock ON, hold Insert, type hi (h then i), release Insert.
 static void
 test_set2_tenkey_model_m_insert_type_hi (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x70}), 4,
-        "Model M: Insert make (E0 12 E0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x70 }), 4, "Model M: Insert make (E0 12 E0 70)");
     press_key(USB_KEY_H);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0x33}), 4,
-        "Model M: H make (E0 F0 12 33)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x12, 0x33 }), 4, "Model M: H make (E0 F0 12 33)");
     release_key(USB_KEY_H);
-    check_result(((uint8_t[]){0xF0, 0x33}), 2,
-        "Model M: H break (F0 33)");
+    check_result(((uint8_t[]){ 0xF0, 0x33 }), 2, "Model M: H break (F0 33)");
     press_key(USB_KEY_I);
-    check_result(((uint8_t[]){0x43}), 1,
-        "Model M: I make (43)");
+    check_result(((uint8_t[]){ 0x43 }), 1, "Model M: I make (43)");
     release_key(USB_KEY_I);
-    check_result(((uint8_t[]){0xF0, 0x43}), 2,
-        "Model M: I break (F0 43)");
+    check_result(((uint8_t[]){ 0xF0, 0x43 }), 2, "Model M: I break (F0 43)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
-        "Model M: Insert break (E0 F0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70 }), 3, "Model M: Insert break (E0 F0 70)");
+#endif
 }
 
 /// Model M observed: Num Lock ON, hold Insert until it repeats, then release.
 /// LShift is sent with initial press only — repeats are bare scancodes.
 static void
 test_set2_tenkey_model_m_insert_repeat (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     api_set_repeat_rate(0x00);
     mock_timer = 0;
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x70}), 4,
-        "Model M: Insert make (E0 12 E0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x70 }), 4, "Model M: Insert make (E0 12 E0 70)");
     // First repeat after delay
     mock_timer += decode_repeat_delay_ms(repeat_rate) + 1;
     drain_commands();
-    check_result(((uint8_t[]){0xE0, 0x70}), 2,
-        "Model M: Insert repeat (E0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0x70 }), 2, "Model M: Insert repeat (E0 70)");
     // Second repeat
     mock_timer += decode_repeat_period_ms(repeat_rate);
     drain_commands();
-    check_result(((uint8_t[]){0xE0, 0x70}), 2,
-        "Model M: Insert repeat 2 (E0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0x70 }), 2, "Model M: Insert repeat 2 (E0 70)");
     // Third repeat
     mock_timer += decode_repeat_period_ms(repeat_rate);
     drain_commands();
-    check_result(((uint8_t[]){0xE0, 0x70}), 2,
-        "Model M: Insert repeat 3 (E0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0x70 }), 2, "Model M: Insert repeat 3 (E0 70)");
     // Release: key break + LShift break
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70, 0xE0, 0xF0, 0x12}), 6,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70, 0xE0, 0xF0, 0x12 }), 6,
         "Model M: Insert break (E0 F0 70 E0 F0 12)");
+#endif
 }
 
 /// Model M observed: hold Print Screen until it repeats, then release.
@@ -1878,18 +1945,15 @@ test_set2_prtscr_repeat (void) {
     api_set_repeat_rate(0x00);
     mock_timer = 0;
     press_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x7C}), 4,
-        "Model M: PrtScr make (E0 12 E0 7C)");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x7C }), 4, "Model M: PrtScr make (E0 12 E0 7C)");
     mock_timer += decode_repeat_delay_ms(repeat_rate) + 1;
     drain_commands();
-    check_result(((uint8_t[]){0xE0, 0x7C}), 2,
-        "Model M: PrtScr repeat (E0 7C)");
+    check_result(((uint8_t[]){ 0xE0, 0x7C }), 2, "Model M: PrtScr repeat (E0 7C)");
     mock_timer += decode_repeat_period_ms(repeat_rate);
     drain_commands();
-    check_result(((uint8_t[]){0xE0, 0x7C}), 2,
-        "Model M: PrtScr repeat 2 (E0 7C)");
+    check_result(((uint8_t[]){ 0xE0, 0x7C }), 2, "Model M: PrtScr repeat 2 (E0 7C)");
     release_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x7C, 0xE0, 0xF0, 0x12}), 6,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x7C, 0xE0, 0xF0, 0x12 }), 6,
         "Model M: PrtScr break (E0 F0 7C E0 F0 12)");
 }
 
@@ -1902,86 +1966,74 @@ test_set2_prtscr_alt_repeat (void) {
     ps2_modifiers = ALT_BIT;
     mock_timer = 0;
     press_key(USB_KEY_LEFT_ALT);
-    check_result(((uint8_t[]){0x11}), 1,
-        "Model M: Alt make (11)");
+    check_result(((uint8_t[]){ 0x11 }), 1, "Model M: Alt make (11)");
     press_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0x84}), 1,
-        "Model M: Alt+PrtScr make (84)");
+    check_result(((uint8_t[]){ 0x84 }), 1, "Model M: Alt+PrtScr make (84)");
     mock_timer += decode_repeat_delay_ms(repeat_rate) + 1;
     drain_commands();
-    check_result(((uint8_t[]){0x84}), 1,
-        "Model M: Alt+PrtScr repeat (84)");
+    check_result(((uint8_t[]){ 0x84 }), 1, "Model M: Alt+PrtScr repeat (84)");
     release_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0xF0, 0x84}), 2,
-        "Model M: Alt+PrtScr break (F0 84)");
+    check_result(((uint8_t[]){ 0xF0, 0x84 }), 2, "Model M: Alt+PrtScr break (F0 84)");
     release_key(USB_KEY_LEFT_ALT);
-    check_result(((uint8_t[]){0xF0, 0x11}), 2,
-        "Model M: Alt break (F0 11)");
+    check_result(((uint8_t[]){ 0xF0, 0x11 }), 2, "Model M: Alt break (F0 11)");
 }
 
 /// Model M observed: Num Lock ON, hold Insert, press Num Lock key, release Insert.
 /// Num Lock scancode (0x77) acts as intervening key — LShift broken before it.
 static void
 test_set2_tenkey_model_m_insert_numlock_key (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x70}), 4,
-        "Model M: Insert make (E0 12 E0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x70 }), 4, "Model M: Insert make (E0 12 E0 70)");
     // Pressing Num Lock key triggers LShift break before 0x77
     press_key(USB_KEY_NUM_LOCK);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0x77}), 4,
-        "Model M: NumLock make (E0 F0 12 77)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x12, 0x77 }), 4, "Model M: NumLock make (E0 F0 12 77)");
     release_key(USB_KEY_NUM_LOCK);
-    check_result(((uint8_t[]){0xF0, 0x77}), 2,
-        "Model M: NumLock break (F0 77)");
+    check_result(((uint8_t[]){ 0xF0, 0x77 }), 2, "Model M: NumLock break (F0 77)");
     // Insert released with Num Lock now OFF — no LShift break
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
-        "Model M: Insert break (E0 F0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70 }), 3, "Model M: Insert break (E0 F0 70)");
+#endif
 }
 
 /// Model M observed: Num Lock OFF, hold Insert, press Num Lock, release Insert.
 static void
 test_set2_tenkey_model_m_insert_numlock_toggle_release (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(0);
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0x70}), 2,
-        "Model M: Insert make (E0 70, NL off)");
+    check_result(((uint8_t[]){ 0xE0, 0x70 }), 2, "Model M: Insert make (E0 70, NL off)");
     press_key(USB_KEY_NUM_LOCK);
-    check_result(((uint8_t[]){0x77}), 1,
-        "Model M: NumLock make (77)");
+    check_result(((uint8_t[]){ 0x77 }), 1, "Model M: NumLock make (77)");
     release_key(USB_KEY_NUM_LOCK);
-    check_result(((uint8_t[]){0xF0, 0x77}), 2,
-        "Model M: NumLock break (F0 77)");
+    check_result(((uint8_t[]){ 0xF0, 0x77 }), 2, "Model M: NumLock break (F0 77)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
-        "Model M: Insert break (E0 F0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70 }), 3, "Model M: Insert break (E0 F0 70)");
+#endif
 }
 
 /// Num Lock OFF, hold Insert, press Num Lock, Set Num Lock LED
 /// (host sends ED 02), then release Insert.
 static void
 test_set2_nl_led_then_release (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
 #ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
     api_set_leds(0);
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0x70}), 2,
-        "NL LED->ON: Insert make (E0 70, NL off)");
+    check_result(((uint8_t[]){ 0xE0, 0x70 }), 2, "NL LED->ON: Insert make (E0 70, NL off)");
     press_key(USB_KEY_NUM_LOCK);
-    check_result(((uint8_t[]){0x77}), 1,
-        "NL LED->ON: NumLock make (77)");
+    check_result(((uint8_t[]){ 0x77 }), 1, "NL LED->ON: NumLock make (77)");
     release_key(USB_KEY_NUM_LOCK);
-    check_result(((uint8_t[]){0xF0, 0x77}), 2,
-        "NL LED->ON: NumLock break (F0 77)");
+    check_result(((uint8_t[]){ 0xF0, 0x77 }), 2, "NL LED->ON: NumLock break (F0 77)");
     // Host sets Num Lock LED
     queue_recv(PS2_COMMAND_SET_LEDS);
     queue_recv(PS2_LED_NUM_LOCK_BIT);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK}), 2,
-        "NL LED->ON: Set NL LED (FA FA)");
+    check_result(((uint8_t[]){ PS2_REPLY_ACK, PS2_REPLY_ACK }), 2, "NL LED->ON: Set NL LED (FA FA)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
-        "NL LED->ON: Insert break (E0 F0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70 }), 3, "NL LED->ON: Insert break (E0 F0 70)");
+#endif
 #endif
 }
 
@@ -1989,108 +2041,95 @@ test_set2_nl_led_then_release (void) {
 /// release Insert, release Shift. Shift restored before H (uppercase H).
 static void
 test_set2_tenkey_model_m_off_shift_insert_h (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(0);
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
     mock_timer = 0;
     press_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0x12}), 1,
-        "Model M: LShift make (12)");
+    check_result(((uint8_t[]){ 0x12 }), 1, "Model M: LShift make (12)");
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x70}), 5,
-        "Model M: Insert make (E0 F0 12 E0 70)");
+    check_result(
+        ((uint8_t[]){ 0xE0, 0xF0, 0x12, 0xE0, 0x70 }), 5, "Model M: Insert make (E0 F0 12 E0 70)");
     // Shift restored before H — H is uppercase on host
     press_key(USB_KEY_H);
-    check_result(((uint8_t[]){0xE0, 0x12, 0x33}), 3,
-        "Model M: H make (E0 12 33)");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0x33 }), 3, "Model M: H make (E0 12 33)");
     release_key(USB_KEY_H);
-    check_result(((uint8_t[]){0xF0, 0x33}), 2,
-        "Model M: H break (F0 33)");
+    check_result(((uint8_t[]){ 0xF0, 0x33 }), 2, "Model M: H break (F0 33)");
     // Insert release — no shift manipulation (already restored)
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
-        "Model M: Insert break (E0 F0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70 }), 3, "Model M: Insert break (E0 F0 70)");
     release_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0xF0, 0x12}), 2,
-        "Model M: LShift break (F0 12)");
+    check_result(((uint8_t[]){ 0xF0, 0x12 }), 2, "Model M: LShift break (F0 12)");
+#endif
 }
 
 /// Model M observed: Num Lock OFF, hold Left Shift, hold Insert until repeats,
 /// toggle H, release Insert, release Shift. Shift restored before H.
 static void
 test_set2_tenkey_model_m_off_shift_insert_repeat_h (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(0);
     api_set_repeat_rate(0x00);
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
     mock_timer = 0;
     press_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0x12}), 1,
-        "Model M: LShift make (12)");
+    check_result(((uint8_t[]){ 0x12 }), 1, "Model M: LShift make (12)");
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x70}), 5,
-        "Model M: Insert make (E0 F0 12 E0 70)");
+    check_result(
+        ((uint8_t[]){ 0xE0, 0xF0, 0x12, 0xE0, 0x70 }), 5, "Model M: Insert make (E0 F0 12 E0 70)");
     // Insert repeats — no shift manipulation
     mock_timer += decode_repeat_delay_ms(repeat_rate) + 1;
     drain_commands();
-    check_result(((uint8_t[]){0xE0, 0x70}), 2,
-        "Model M: Insert repeat (E0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0x70 }), 2, "Model M: Insert repeat (E0 70)");
     mock_timer += decode_repeat_period_ms(repeat_rate);
     drain_commands();
-    check_result(((uint8_t[]){0xE0, 0x70}), 2,
-        "Model M: Insert repeat 2 (E0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0x70 }), 2, "Model M: Insert repeat 2 (E0 70)");
     // Shift restored before H
     press_key(USB_KEY_H);
-    check_result(((uint8_t[]){0xE0, 0x12, 0x33}), 3,
-        "Model M: H make (E0 12 33)");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0x33 }), 3, "Model M: H make (E0 12 33)");
     release_key(USB_KEY_H);
-    check_result(((uint8_t[]){0xF0, 0x33}), 2,
-        "Model M: H break (F0 33)");
+    check_result(((uint8_t[]){ 0xF0, 0x33 }), 2, "Model M: H break (F0 33)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
-        "Model M: Insert break (E0 F0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70 }), 3, "Model M: Insert break (E0 F0 70)");
     release_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0xF0, 0x12}), 2,
-        "Model M: LShift break (F0 12)");
+    check_result(((uint8_t[]){ 0xF0, 0x12 }), 2, "Model M: LShift break (F0 12)");
+#endif
 }
 
 /// Model M observed: Num Lock OFF, hold Left Shift, hold Insert, hold H until
 /// H repeats. Shift restored once before H, all repeats are bare scancodes.
 static void
 test_set2_tenkey_model_m_off_shift_insert_h_repeat (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(0);
     api_set_repeat_rate(0x00);
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
     mock_timer = 0;
     press_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0x12}), 1,
-        "Model M: LShift make (12)");
+    check_result(((uint8_t[]){ 0x12 }), 1, "Model M: LShift make (12)");
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x70}), 5,
-        "Model M: Insert make (E0 F0 12 E0 70)");
+    check_result(
+        ((uint8_t[]){ 0xE0, 0xF0, 0x12, 0xE0, 0x70 }), 5, "Model M: Insert make (E0 F0 12 E0 70)");
     // Shift restored before H
     press_key(USB_KEY_H);
-    check_result(((uint8_t[]){0xE0, 0x12, 0x33}), 3,
-        "Model M: H make (E0 12 33)");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0x33 }), 3, "Model M: H make (E0 12 33)");
     // H repeats — just bare scancode, no shift manipulation
     mock_timer += decode_repeat_delay_ms(repeat_rate) + 1;
     drain_commands();
-    check_result(((uint8_t[]){0x33}), 1,
-        "Model M: H repeat (33)");
+    check_result(((uint8_t[]){ 0x33 }), 1, "Model M: H repeat (33)");
     mock_timer += decode_repeat_period_ms(repeat_rate);
     drain_commands();
-    check_result(((uint8_t[]){0x33}), 1,
-        "Model M: H repeat 2 (33)");
+    check_result(((uint8_t[]){ 0x33 }), 1, "Model M: H repeat 2 (33)");
     release_key(USB_KEY_H);
-    check_result(((uint8_t[]){0xF0, 0x33}), 2,
-        "Model M: H break (F0 33)");
+    check_result(((uint8_t[]){ 0xF0, 0x33 }), 2, "Model M: H break (F0 33)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
-        "Model M: Insert break (E0 F0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70 }), 3, "Model M: Insert break (E0 F0 70)");
     release_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0xF0, 0x12}), 2,
-        "Model M: LShift break (F0 12)");
+    check_result(((uint8_t[]){ 0xF0, 0x12 }), 2, "Model M: LShift break (F0 12)");
+#endif
 }
 
 /// Model M observed: Num Lock OFF, hold Right Shift, hold Insert, hold H until
@@ -2099,71 +2138,64 @@ test_set2_tenkey_model_m_off_shift_insert_h_repeat (void) {
 /// released (F0 59). No shift manipulation on Insert or H release.
 static void
 test_set2_tenkey_model_m_off_rshift_insert_h_shift_first (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(0);
     api_set_repeat_rate(0x00);
     usb_keys_modifier_flags = RIGHT_SHIFT_BIT;
     ps2_modifiers = RIGHT_SHIFT_BIT;
     mock_timer = 0;
     press_key(USB_KEY_RIGHT_SHIFT);
-    check_result(((uint8_t[]){0x59}), 1,
-        "Model M: RShift make (59)");
+    check_result(((uint8_t[]){ 0x59 }), 1, "Model M: RShift make (59)");
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x59, 0xE0, 0x70}), 5,
-        "Model M: Insert make (E0 F0 59 E0 70)");
+    check_result(
+        ((uint8_t[]){ 0xE0, 0xF0, 0x59, 0xE0, 0x70 }), 5, "Model M: Insert make (E0 F0 59 E0 70)");
     // Shift restored before H
     press_key(USB_KEY_H);
-    check_result(((uint8_t[]){0xE0, 0x59, 0x33}), 3,
-        "Model M: H make (E0 59 33)");
+    check_result(((uint8_t[]){ 0xE0, 0x59, 0x33 }), 3, "Model M: H make (E0 59 33)");
     mock_timer += decode_repeat_delay_ms(repeat_rate) + 1;
     drain_commands();
-    check_result(((uint8_t[]){0x33}), 1,
-        "Model M: H repeat (33)");
+    check_result(((uint8_t[]){ 0x33 }), 1, "Model M: H repeat (33)");
     // Release physical shift first
     release_key(USB_KEY_RIGHT_SHIFT);
-    check_result(((uint8_t[]){0xF0, 0x59}), 2,
-        "Model M: RShift break (F0 59)");
+    check_result(((uint8_t[]){ 0xF0, 0x59 }), 2, "Model M: RShift break (F0 59)");
     // H continues repeating (now lowercase on host, same scancode)
     mock_timer += decode_repeat_period_ms(repeat_rate);
     drain_commands();
-    check_result(((uint8_t[]){0x33}), 1,
-        "Model M: H repeat after shift (33)");
+    check_result(((uint8_t[]){ 0x33 }), 1, "Model M: H repeat after shift (33)");
     // Release Insert — no shift manipulation
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
-        "Model M: Insert break (E0 F0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70 }), 3, "Model M: Insert break (E0 F0 70)");
     // H continues repeating
     mock_timer += decode_repeat_period_ms(repeat_rate);
     drain_commands();
-    check_result(((uint8_t[]){0x33}), 1,
-        "Model M: H repeat after Insert (33)");
+    check_result(((uint8_t[]){ 0x33 }), 1, "Model M: H repeat after Insert (33)");
     // Release H
     release_key(USB_KEY_H);
-    check_result(((uint8_t[]){0xF0, 0x33}), 2,
-        "Model M: H break (F0 33)");
+    check_result(((uint8_t[]){ 0xF0, 0x33 }), 2, "Model M: H break (F0 33)");
+#endif
 }
 
 /// S2 TENKEY - toggle Num Lock OFF while tenkey keys held
 static void
 test_set2_tenkey_numlock_toggle_off_while_held (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
 #ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x70}), 4,
-        "S2 NL Insert ON make");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x70 }), 4, "S2 NL Insert ON make");
     press_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x6C}), 7,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x6C }), 7,
         "S2 NL Home ON make (LShift + scan)");
     queue_recv(PS2_COMMAND_SET_LEDS);
     queue_recv(0);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK, 0xE0, 0xF0, 0x12}), 5,
+    check_result(((uint8_t[]){ PS2_REPLY_ACK, PS2_REPLY_ACK, 0xE0, 0xF0, 0x12 }), 5,
         "S2 NL toggle OFF + virtual LShift break");
     release_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x6C}), 3,
-        "S2 NL Home break (no LShift)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x6C }), 3, "S2 NL Home break (no LShift)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
-        "S2 NL Insert break (LShift already released)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70 }), 3, "S2 NL Insert break (LShift already released)");
+#endif
 #endif
 }
 
@@ -2171,19 +2203,18 @@ test_set2_tenkey_numlock_toggle_off_while_held (void) {
 /// release Insert. LShift broken before KP Divide like any intervening key.
 static void
 test_set2_tenkey_model_m_kp_divide_intervening (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x70}), 4,
-        "Model M: Insert make (E0 12 E0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x70 }), 4, "Model M: Insert make (E0 12 E0 70)");
     press_key(USB_KEY_KP_DIVIDE);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x4A}), 5,
-        "Model M: KP/ make (E0 F0 12 E0 4A)");
+    check_result(
+        ((uint8_t[]){ 0xE0, 0xF0, 0x12, 0xE0, 0x4A }), 5, "Model M: KP/ make (E0 F0 12 E0 4A)");
     release_key(USB_KEY_KP_DIVIDE);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x4A}), 3,
-        "Model M: KP/ break (E0 F0 4A)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x4A }), 3, "Model M: KP/ break (E0 F0 4A)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
-        "Model M: Insert break (E0 F0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70 }), 3, "Model M: Insert break (E0 F0 70)");
+#endif
 }
 
 /// Model M observed: NL ON, hold Insert, press/release PrtScr, release
@@ -2191,19 +2222,19 @@ test_set2_tenkey_model_m_kp_divide_intervening (void) {
 /// release — it belongs to Insert's tenkey wrapper.
 static void
 test_set2_tenkey_model_m_prtscr_intervening (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x70}), 4,
-        "Model M: Insert make (E0 12 E0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x70 }), 4, "Model M: Insert make (E0 12 E0 70)");
     press_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x7C}), 7,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x7C }), 7,
         "Model M: PrtScr make (E0 F0 12 E0 12 E0 7C)");
     release_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x7C}), 3,
-        "Model M: PrtScr break (no fake Shift break)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x7C }), 3, "Model M: PrtScr break (no fake Shift break)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70, 0xE0, 0xF0, 0x12}), 6,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70, 0xE0, 0xF0, 0x12 }), 6,
         "Model M: Insert break + deferred fake Shift break");
+#endif
 }
 
 /// Model M observed: Num Lock ON, hold Insert, press/release Pause/Break,
@@ -2211,65 +2242,56 @@ test_set2_tenkey_model_m_prtscr_intervening (void) {
 /// E1 sequence (make+break) in a single press call.
 static void
 test_set2_tenkey_model_m_pause_intervening (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x70}), 4,
-        "Model M: Insert make (E0 12 E0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x70 }), 4, "Model M: Insert make (E0 12 E0 70)");
     press_key(USB_KEY_PAUSE_BREAK);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE1, 0x14, 0x77,
-                     0xE1, 0xF0, 0x14, 0xF0, 0x77}),
-        11,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x12, 0xE1, 0x14, 0x77, 0xE1, 0xF0, 0x14, 0xF0, 0x77 }), 11,
         "Model M: Pause (E0 F0 12 E1 14 77 E1 F0 14 F0 77)");
     release_key(USB_KEY_PAUSE_BREAK);
-    check_result(((uint8_t[]){0}), 0,
-        "Model M: Pause release (no bytes)");
+    check_result(((uint8_t[]){ 0 }), 0, "Model M: Pause release (no bytes)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
-        "Model M: Insert break (E0 F0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70 }), 3, "Model M: Insert break (E0 F0 70)");
+#endif
 }
 
 /// Model M observed: Num Lock ON, hold Insert, press Ctrl+Pause, release
 /// Insert. LShift broken before Ctrl (intervening key).
 static void
 test_set2_tenkey_model_m_ctrl_pause_intervening (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x70}), 4,
-        "Model M: Insert make (E0 12 E0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x70 }), 4, "Model M: Insert make (E0 12 E0 70)");
     press_key(USB_KEY_LEFT_CTRL);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0x14}), 4,
-        "Model M: Ctrl make (E0 F0 12 14)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x12, 0x14 }), 4, "Model M: Ctrl make (E0 F0 12 14)");
     press_key(USB_KEY_PAUSE_BREAK);
-    check_result(((uint8_t[]){0xE0, 0x7E}), 2,
-        "Model M: Ctrl+Pause make (E0 7E)");
+    check_result(((uint8_t[]){ 0xE0, 0x7E }), 2, "Model M: Ctrl+Pause make (E0 7E)");
     release_key(USB_KEY_PAUSE_BREAK);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x7E}), 3,
-        "Model M: Ctrl+Pause break (E0 F0 7E)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x7E }), 3, "Model M: Ctrl+Pause break (E0 F0 7E)");
     release_key(USB_KEY_LEFT_CTRL);
-    check_result(((uint8_t[]){0xF0, 0x14}), 2,
-        "Model M: Ctrl break (F0 14)");
+    check_result(((uint8_t[]){ 0xF0, 0x14 }), 2, "Model M: Ctrl break (F0 14)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
-        "Model M: Insert break (E0 F0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70 }), 3, "Model M: Insert break (E0 F0 70)");
+#endif
 }
 
 /// Model M observed: Num Lock ON, hold Insert (virtual LShift active),
 /// press/release Left Shift (physical), release Insert.
 static void
 test_set2_tenkey_model_m_insert_held_then_shift (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x70}), 4,
-        "Model M: Insert make (E0 12 E0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x70 }), 4, "Model M: Insert make (E0 12 E0 70)");
     press_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0x12}), 4,
-        "Model M: LShift press (E0 F0 12 12)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x12, 0x12 }), 4, "Model M: LShift press (E0 F0 12 12)");
     release_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0xF0, 0x12}), 2,
-        "Model M: LShift release (F0 12)");
+    check_result(((uint8_t[]){ 0xF0, 0x12 }), 2, "Model M: LShift release (F0 12)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
-        "Model M: Insert break (E0 F0 70)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70 }), 3, "Model M: Insert break (E0 F0 70)");
+#endif
 }
 
 /// Race condition: NL OFF, shift MAKE already sent, Insert queued but not
@@ -2278,6 +2300,7 @@ test_set2_tenkey_model_m_insert_held_then_shift (void) {
 /// that reflects what we've actually sent on the wire.
 static void
 test_set2_tenkey_race_usb_flags_cleared_before_drain (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(0);
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
@@ -2290,8 +2313,9 @@ test_set2_tenkey_race_usb_flags_cleared_before_drain (void) {
     ps2_release_key(USB_KEY_LEFT_SHIFT);
     // Drain — Insert press should still see shift as held despite cleared flags
     drain_all();
-    check_result(((uint8_t[]){0x12, 0xE0, 0xF0, 0x12, 0xE0, 0x70, 0xF0, 0x12}), 8,
+    check_result(((uint8_t[]){ 0x12, 0xE0, 0xF0, 0x12, 0xE0, 0x70, 0xF0, 0x12 }), 8,
         "Insert w/ shift race (12 E0 F0 12 E0 70 F0 12)");
+#endif
 }
 
 /// Race condition: Alt held, Alt+Prtscr queued but not drained, then
@@ -2307,33 +2331,29 @@ test_set2_prtscr_race_alt_cleared_before_drain (void) {
     // Only clear USB flags — ps2_modifiers must survive
     usb_keys_modifier_flags = 0;
     drain_all();
-    check_result(((uint8_t[]){0x11, 0x84}), 2,
-        "Alt+PrtScr race (11 84)");
+    check_result(((uint8_t[]){ 0x11, 0x84 }), 2, "Alt+PrtScr race (11 84)");
 }
 
 /// S2 TENKEY - toggle Num Lock ON while tenkey keys held (pressed before
 /// toggle have no LShift, pressed after get LShift)
 static void
 test_set2_tenkey_numlock_toggle_on_while_held (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
 #ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
     api_set_leds(0);
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0x70}), 2,
-        "S2 NL Insert OFF make");
+    check_result(((uint8_t[]){ 0xE0, 0x70 }), 2, "S2 NL Insert OFF make");
     press_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0x6C}), 2,
-        "S2 NL Home OFF make");
+    check_result(((uint8_t[]){ 0xE0, 0x6C }), 2, "S2 NL Home OFF make");
     queue_recv(PS2_COMMAND_SET_LEDS);
     queue_recv(PS2_LED_NUM_LOCK_BIT);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK}), 2,
-        "S2 NL toggle ON");
+    check_result(((uint8_t[]){ PS2_REPLY_ACK, PS2_REPLY_ACK }), 2, "S2 NL toggle ON");
     release_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x6C}), 3,
-        "S2 NL Home break (no LShift)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x6C }), 3, "S2 NL Home break (no LShift)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
-        "S2 NL Insert break");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70 }), 3, "S2 NL Insert break");
+#endif
 #endif
 }
 
@@ -2341,27 +2361,26 @@ test_set2_tenkey_numlock_toggle_on_while_held (void) {
 /// tenkey key — future events react to the new state (get LShift).
 static void
 test_set2_tenkey_numlock_led_toggle_affects_future_keys (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
 #ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
     api_set_leds(0);
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0x70}), 2,
-        "S2 NL Insert OFF make");
+    check_result(((uint8_t[]){ 0xE0, 0x70 }), 2, "S2 NL Insert OFF make");
     // Host toggles Num Lock ON
     queue_recv(PS2_COMMAND_SET_LEDS);
     queue_recv(PS2_LED_NUM_LOCK_BIT);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK}), 2,
-        "S2 NL LED toggle ON");
+    check_result(((uint8_t[]){ PS2_REPLY_ACK, PS2_REPLY_ACK }), 2, "S2 NL LED toggle ON");
     // New tenkey key pressed after the toggle — gets LShift since NL now ON
     press_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x6C}), 4,
-        "S2 NL Home make after toggle (E0 12 E0 6C)");
+    check_result(
+        ((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x6C }), 4, "S2 NL Home make after toggle (E0 12 E0 6C)");
     release_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x6C}), 3,
-        "S2 NL Home break (no LShift, count > 0)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x6C }), 3, "S2 NL Home break (no LShift, count > 0)");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70, 0xE0, 0xF0, 0x12}), 6,
-        "S2 NL Insert break (LShift released)");
+    check_result(
+        ((uint8_t[]){ 0xE0, 0xF0, 0x70, 0xE0, 0xF0, 0x12 }), 6, "S2 NL Insert break (LShift released)");
+#endif
 #endif
 }
 
@@ -2370,26 +2389,24 @@ test_set2_tenkey_numlock_led_toggle_affects_future_keys (void) {
 /// gets no LShift.
 static void
 test_set2_tenkey_numlock_off_led_new_key (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
 #ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x70}), 4,
-        "S2 NL Insert ON make");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x70 }), 4, "S2 NL Insert ON make");
     queue_recv(PS2_COMMAND_SET_LEDS);
     queue_recv(0);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK, 0xE0, 0xF0, 0x12}), 5,
+    check_result(((uint8_t[]){ PS2_REPLY_ACK, PS2_REPLY_ACK, 0xE0, 0xF0, 0x12 }), 5,
         "S2 NL LED toggle OFF + virtual LShift break");
     // Forced state was already cleared by the toggle, Home needs no cleanup
     press_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0x6C}), 2,
-        "S2 NL Home make after toggle (E0 6C, no LShift)");
+    check_result(((uint8_t[]){ 0xE0, 0x6C }), 2, "S2 NL Home make after toggle (E0 6C, no LShift)");
     release_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x6C}), 3,
-        "S2 NL Home break");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x6C }), 3, "S2 NL Home break");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
-        "S2 NL Insert break (no LShift)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70 }), 3, "S2 NL Insert break (no LShift)");
+#endif
 #endif
 }
 
@@ -2397,23 +2414,22 @@ test_set2_tenkey_numlock_off_led_new_key (void) {
 /// shift before the intervening key (uppercase on host)
 static void
 test_set2_tenkey_non_tenkey_restores_shift_numlock_off (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(0);
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x70}), 5,
-        "S2 NL Insert make (LShift removed)");
+    check_result(
+        ((uint8_t[]){ 0xE0, 0xF0, 0x12, 0xE0, 0x70 }), 5, "S2 NL Insert make (LShift removed)");
     // Shift restored before 'a' — 'a' is uppercase on host
     press_key(USB_KEY_A);
-    check_result(((uint8_t[]){0xE0, 0x12, 0x1C}), 3,
-        "S2 'a' make (E0 12 1C)");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0x1C }), 3, "S2 'a' make (E0 12 1C)");
     release_key(USB_KEY_A);
-    check_result(((uint8_t[]){0xF0, 0x1C}), 2,
-        "S2 'a' break");
+    check_result(((uint8_t[]){ 0xF0, 0x1C }), 2, "S2 'a' break");
     // Shift already restored before 'a', no duplicate on Insert release
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
-        "S2 NL Insert break (no LShift)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70 }), 3, "S2 NL Insert break (no LShift)");
+#endif
 }
 
 /// CMD FA - PS/2 command: FA — set all keys to typematic/make/break
@@ -2432,8 +2448,8 @@ test_cmd_set_all_keys_normal (void) {
 static void
 test_repeat_extended_key (void) {
     api_set_repeat_rate(0x20);
-    uint8_t make[] = {0xE0, 0x74};
-    uint8_t brk[] = {0xE0, 0xF0, 0x74};
+    uint8_t make[] = { 0xE0, 0x74 };
+    uint8_t brk[] = { 0xE0, 0xF0, 0x74 };
     mock_timer = 0;
     press(USB_KEY_RIGHT_ARROW, make, 2, "S2 ext repeat A make");
     mock_timer = 500;
@@ -2451,13 +2467,15 @@ test_repeat_extended_key (void) {
 /// S1 NAV - Set 1 navigation with Num Lock ON and both shifts
 static void
 test_set1_keypad_nav_numlock_on_both_shifts (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_scancode_set(1);
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     usb_keys_modifier_flags = SHIFT_BIT | RIGHT_SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT | RIGHT_SHIFT_BIT;
     // ps2scancodes.md: Num Lock ON + any shift → bare key
-    press(USB_KEY_END, ((uint8_t[]){0xE0, 0x4F}), 2, "S1 End numlock ON+both shifts make");
-    release(USB_KEY_END, ((uint8_t[]){0xE0, 0xCF}), 2, "S1 End numlock ON+both shifts break");
+    press(USB_KEY_END, ((uint8_t[]){ 0xE0, 0x4F }), 2, "S1 End numlock ON+both shifts make");
+    release(USB_KEY_END, ((uint8_t[]){ 0xE0, 0xCF }), 2, "S1 End numlock ON+both shifts break");
+#endif
 }
 
 /// CMD FB - Set 3 per-key typematic (FB) via command list
@@ -2527,45 +2545,51 @@ test_cmd_recursive_term (void) {
 /// S1 NAV - Set 1 navigation with Num Lock ON and Right Shift held
 static void
 test_set1_keypad_nav_numlock_on_right_shift (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_scancode_set(1);
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     usb_keys_modifier_flags = RIGHT_SHIFT_BIT;
     ps2_modifiers = RIGHT_SHIFT_BIT;
     // ps2scancodes.md: Num Lock ON + any shift → bare key
-    press(USB_KEY_END, ((uint8_t[]){0xE0, 0x4F}), 2, "S1 End numlock ON+RShift make");
-    release(USB_KEY_END, ((uint8_t[]){0xE0, 0xCF}), 2, "S1 End numlock ON+RShift break");
+    press(USB_KEY_END, ((uint8_t[]){ 0xE0, 0x4F }), 2, "S1 End numlock ON+RShift make");
+    release(USB_KEY_END, ((uint8_t[]){ 0xE0, 0xCF }), 2, "S1 End numlock ON+RShift break");
+#endif
 }
 
 /// S1 NAV - Set 1 navigation with Num Lock ON and LShift held
 static void
 test_set1_keypad_nav_numlock_on_left_shift (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_scancode_set(1);
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
     // ps2scancodes.md: Num Lock ON + any shift → bare key
-    press(USB_KEY_END, ((uint8_t[]){0xE0, 0x4F}), 2, "S1 End numlock ON+LShift make");
-    release(USB_KEY_END, ((uint8_t[]){0xE0, 0xCF}), 2, "S1 End numlock ON+LShift break");
+    press(USB_KEY_END, ((uint8_t[]){ 0xE0, 0x4F }), 2, "S1 End numlock ON+LShift make");
+    release(USB_KEY_END, ((uint8_t[]){ 0xE0, 0xCF }), 2, "S1 End numlock ON+LShift break");
+#endif
 }
 
 /// S1 KP / - Set 1 KP_Divide with Left Shift held
 static void
 test_set1_kp_divide_left_shift (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_scancode_set(1);
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
     // ps2scancodes.md "Keypad / with Shift (Note 3)" lines 586-594
-    uint8_t make[] = {0xE0, 0xAA, 0xE0, 0x35};
-    uint8_t brk[] = {0xE0, 0xB5, 0xE0, 0x2A};
+    uint8_t make[] = { 0xE0, 0xAA, 0xE0, 0x35 };
+    uint8_t brk[] = { 0xE0, 0xB5, 0xE0, 0x2A };
     press(USB_KEY_KP_DIVIDE, make, 4, "S1 KP_Divide+LShift make");
     release(USB_KEY_KP_DIVIDE, brk, 4, "S1 KP_Divide+LShift break");
+#endif
 }
 
 /// HW INVALID SCANCODE SET - release with invalid scancode set hits default
 static void
 test_release_invalid_scancode_set (void) {
     ps2_active_scancode_set = 0;
-    press(USB_KEY_A, ((uint8_t[]){0x1C}), 1, "invalid set: A make still sends");
+    press(USB_KEY_A, ((uint8_t[]){ 0x1C }), 1, "invalid set: A make still sends");
     ps2_active_scancode_set = 0;
     ps2_release_key(USB_KEY_A);
     expect_none("invalid set: A release has no output");
@@ -2574,27 +2598,31 @@ test_release_invalid_scancode_set (void) {
 /// S1 KP / - Set 1 KP_Divide with Right Shift held
 static void
 test_set1_kp_divide_right_shift (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_scancode_set(1);
     usb_keys_modifier_flags = RIGHT_SHIFT_BIT;
     ps2_modifiers = RIGHT_SHIFT_BIT;
     // ps2scancodes.md Note 3: RShift + KP_Divide (Set 1)
-    uint8_t make[] = {0xE0, 0xB6, 0xE0, 0x35};
-    uint8_t brk[] = {0xE0, 0xB5, 0xE0, 0x36};
+    uint8_t make[] = { 0xE0, 0xB6, 0xE0, 0x35 };
+    uint8_t brk[] = { 0xE0, 0xB5, 0xE0, 0x36 };
     press(USB_KEY_KP_DIVIDE, make, 4, "S1 KP_Divide+RShift make");
     release(USB_KEY_KP_DIVIDE, brk, 4, "S1 KP_Divide+RShift break");
+#endif
 }
 
 /// S1 KP / - Set 1 KP_Divide with both shifts held
 static void
 test_set1_kp_divide_both_shifts (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_scancode_set(1);
     usb_keys_modifier_flags = SHIFT_BIT | RIGHT_SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT | RIGHT_SHIFT_BIT;
     // ps2scancodes.md Note 3: both shifts + KP_Divide (Set 1)
-    uint8_t make[] = {0xE0, 0xAA, 0xE0, 0xB6, 0xE0, 0x35};
-    uint8_t brk[] = {0xE0, 0xB5, 0xE0, 0x36, 0xE0, 0x2A};
+    uint8_t make[] = { 0xE0, 0xAA, 0xE0, 0xB6, 0xE0, 0x35 };
+    uint8_t brk[] = { 0xE0, 0xB5, 0xE0, 0x36, 0xE0, 0x2A };
     press(USB_KEY_KP_DIVIDE, make, 6, "S1 KP_Divide+both shifts make");
     release(USB_KEY_KP_DIVIDE, brk, 6, "S1 KP_Divide+both shifts break");
+#endif
 }
 
 /// HW SEND FAIL - send_byte retry exhausts then flush fails (no bytes sent)
@@ -2624,7 +2652,7 @@ static void
 test_repeat_rate_fast_delay (void) {
     api_set_repeat_rate(0x00);
     // ps2keyboard.md lines 237-238: bits 5-6 = 00 → 250ms delay
-    uint8_t make[] = {0x1C};
+    uint8_t make[] = { 0x1C };
     mock_timer = 0;
     press(USB_KEY_A, make, 1, "S2 fast delay A make");
     mock_timer = 249;
@@ -2644,7 +2672,7 @@ test_repeat_rate_fast_delay (void) {
 static void
 test_repeat_within_period (void) {
     api_set_repeat_rate(0x20);
-    uint8_t make[] = {0x1C};
+    uint8_t make[] = { 0x1C };
     mock_timer = 0;
     press(USB_KEY_A, make, 1, "S2 A make (period test)");
     mock_timer = 600;
@@ -2696,8 +2724,8 @@ test_set1_prtsc_both_shifts (void) {
     api_set_scancode_set(1);
     usb_keys_modifier_flags = SHIFT_BIT | RIGHT_SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT | RIGHT_SHIFT_BIT;
-    uint8_t make[] = {0xE0, 0x37};
-    uint8_t brk[] = {0xE0, 0xB7};
+    uint8_t make[] = { 0xE0, 0x37 };
+    uint8_t brk[] = { 0xE0, 0xB7 };
     press(USB_KEY_PRINT_SCREEN, make, 2, "S1 PrtSc+both shifts make");
     release(USB_KEY_PRINT_SCREEN, brk, 2, "S1 PrtSc+both shifts break");
 }
@@ -2709,8 +2737,8 @@ test_set1_prtsc_alt (void) {
     usb_keys_modifier_flags = ALT_BIT;
     ps2_modifiers = ALT_BIT;
     // ps2scancodes.md Note 4: Set 1 Alt+PrtSc = 0x54 / D4
-    uint8_t make[] = {0x54};
-    uint8_t brk[] = {0xD4};
+    uint8_t make[] = { 0x54 };
+    uint8_t brk[] = { 0xD4 };
     press(USB_KEY_PRINT_SCREEN, make, 1, "S1 PrtSc+Alt make");
     release(USB_KEY_PRINT_SCREEN, brk, 1, "S1 PrtSc+Alt break");
 }
@@ -2721,8 +2749,8 @@ test_set1_prtsc_right_alt (void) {
     api_set_scancode_set(1);
     usb_keys_modifier_flags = RIGHT_ALT_BIT;
     ps2_modifiers = RIGHT_ALT_BIT;
-    uint8_t make[] = {0x54};
-    uint8_t brk[] = {0xD4};
+    uint8_t make[] = { 0x54 };
+    uint8_t brk[] = { 0xD4 };
     press(USB_KEY_PRINT_SCREEN, make, 1, "S1 PrtSc+Right Alt make");
     release(USB_KEY_PRINT_SCREEN, brk, 1, "S1 PrtSc+Right Alt break");
 }
@@ -2733,8 +2761,8 @@ test_set1_prtsc_right_shift (void) {
     api_set_scancode_set(1);
     usb_keys_modifier_flags = RIGHT_SHIFT_BIT;
     ps2_modifiers = RIGHT_SHIFT_BIT;
-    uint8_t make[] = {0xE0, 0x37};
-    uint8_t brk[] = {0xE0, 0xB7};
+    uint8_t make[] = { 0xE0, 0x37 };
+    uint8_t brk[] = { 0xE0, 0xB7 };
     press(USB_KEY_PRINT_SCREEN, make, 2, "S1 PrtSc+RShift make");
     release(USB_KEY_PRINT_SCREEN, brk, 2, "S1 PrtSc+RShift break");
 }
@@ -2745,8 +2773,8 @@ test_set1_prtsc_ctrl_shift (void) {
     api_set_scancode_set(1);
     usb_keys_modifier_flags = CTRL_BIT | SHIFT_BIT;
     ps2_modifiers = CTRL_BIT | SHIFT_BIT;
-    uint8_t make[] = {0xE0, 0x37};
-    uint8_t brk[] = {0xE0, 0xB7};
+    uint8_t make[] = { 0xE0, 0x37 };
+    uint8_t brk[] = { 0xE0, 0xB7 };
     press(USB_KEY_PRINT_SCREEN, make, 2, "S1 PrtSc+Ctrl+Shift make");
     release(USB_KEY_PRINT_SCREEN, brk, 2, "S1 PrtSc+Ctrl+Shift break");
 }
@@ -2757,8 +2785,8 @@ test_set1_prtsc_left_shift (void) {
     api_set_scancode_set(1);
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
-    uint8_t make[] = {0xE0, 0x37};
-    uint8_t brk[] = {0xE0, 0xB7};
+    uint8_t make[] = { 0xE0, 0x37 };
+    uint8_t brk[] = { 0xE0, 0xB7 };
     press(USB_KEY_PRINT_SCREEN, make, 2, "S1 PrtSc+LShift make");
     release(USB_KEY_PRINT_SCREEN, brk, 2, "S1 PrtSc+LShift break");
 }
@@ -2769,8 +2797,8 @@ test_set2_prtsc_right_alt (void) {
     usb_keys_modifier_flags = RIGHT_ALT_BIT;
     ps2_modifiers = RIGHT_ALT_BIT;
     // ps2scancodes.md Note 4: Set 2 Alt+PrtSc = 0x84 / F0 84
-    uint8_t make[] = {0x84};
-    uint8_t brk[] = {0xF0, 0x84};
+    uint8_t make[] = { 0x84 };
+    uint8_t brk[] = { 0xF0, 0x84 };
     press(USB_KEY_PRINT_SCREEN, make, 1, "S2 PrtSc+Right Alt make");
     release(USB_KEY_PRINT_SCREEN, brk, 2, "S2 PrtSc+Right Alt break");
 }
@@ -2782,8 +2810,8 @@ test_set1_ctrl_pause (void) {
     usb_keys_modifier_flags = CTRL_BIT;
     ps2_modifiers = CTRL_BIT;
     // ps2scancodes.md Note 5 line 614: Set 1 Ctrl+Pause (Break) = E0 46 / E0 C6
-    uint8_t make[] = {0xE0, 0x46};
-    uint8_t brk[] = {0xE0, 0xC6};
+    uint8_t make[] = { 0xE0, 0x46 };
+    uint8_t brk[] = { 0xE0, 0xC6 };
     press(USB_KEY_PAUSE_BREAK, make, 2, "S1 Ctrl+Pause make");
     release(USB_KEY_PAUSE_BREAK, brk, 2, "S1 Ctrl+Pause break");
 }
@@ -2791,24 +2819,28 @@ test_set1_ctrl_pause (void) {
 /// S1 KP / - Set 1 KP_Divide (no shift)
 static void
 test_set1_kp_divide_no_shift (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_scancode_set(1);
     // ps2scancodes.md line 325: KP_Divide Set 1 = E0 35 / E0 B5
-    uint8_t make[] = {0xE0, 0x35};
-    uint8_t brk[] = {0xE0, 0xB5};
+    uint8_t make[] = { 0xE0, 0x35 };
+    uint8_t brk[] = { 0xE0, 0xB5 };
     press(USB_KEY_KP_DIVIDE, make, 2, "S1 KP_Divide make");
     release(USB_KEY_KP_DIVIDE, brk, 2, "S1 KP_Divide break");
+#endif
 }
 
 /// S2 KP / - Set 2 KP_Divide with Right Shift only
 static void
 test_set2_kp_divide_right_shift (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     usb_keys_modifier_flags = RIGHT_SHIFT_BIT;
     ps2_modifiers = RIGHT_SHIFT_BIT;
     // ps2scancodes.md Note 3 lines 591-594: RShift + KP_Divide Set 2
-    uint8_t make[] = {0xE0, 0xF0, 0x59, 0xE0, 0x4A};
-    uint8_t brk[] = {0xE0, 0xF0, 0x4A, 0xE0, 0x59};
+    uint8_t make[] = { 0xE0, 0xF0, 0x59, 0xE0, 0x4A };
+    uint8_t brk[] = { 0xE0, 0xF0, 0x4A, 0xE0, 0x59 };
     press(USB_KEY_KP_DIVIDE, make, 5, "S2 KP_Divide+RShift make");
     release(USB_KEY_KP_DIVIDE, brk, 5, "S2 KP_Divide+RShift break");
+#endif
 }
 
 /// S2 PRTSCR CTRL - Set 2 PrtSc with only Ctrl held (any modifier except Alt)
@@ -2816,8 +2848,8 @@ static void
 test_set2_prtsc_ctrl_only (void) {
     usb_keys_modifier_flags = CTRL_BIT;
     ps2_modifiers = CTRL_BIT;
-    uint8_t make[] = {0xE0, 0x7C};
-    uint8_t brk[] = {0xE0, 0xF0, 0x7C};
+    uint8_t make[] = { 0xE0, 0x7C };
+    uint8_t brk[] = { 0xE0, 0xF0, 0x7C };
     press(USB_KEY_PRINT_SCREEN, make, 2, "S2 PrtSc+Ctrl make");
     release(USB_KEY_PRINT_SCREEN, brk, 3, "S2 PrtSc+Ctrl break");
 }
@@ -2825,24 +2857,28 @@ test_set2_prtsc_ctrl_only (void) {
 /// S1 NAV - Set 1 navigation press with Right Shift held
 static void
 test_set1_keypad_nav_numlock_right_shift_press (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_scancode_set(1);
     usb_keys_modifier_flags = RIGHT_SHIFT_BIT;
     ps2_modifiers = RIGHT_SHIFT_BIT;
     // ps2scancodes.md line 389: RShift + key (Set 1 Num OFF) = E0 B6
-    uint8_t make[] = {0xE0, 0xB6, 0xE0, 0x4F};
+    uint8_t make[] = { 0xE0, 0xB6, 0xE0, 0x4F };
     press(USB_KEY_END, make, 4, "S1 End numlock OFF+RShift press");
+#endif
 }
 
 /// S1 NAV - Set 1 navigation release suffix with Right Shift held
 static void
 test_set1_keypad_nav_suffix_rshift (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_scancode_set(1);
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     usb_keys_modifier_flags = RIGHT_SHIFT_BIT;
     ps2_modifiers = RIGHT_SHIFT_BIT;
     // ps2scancodes.md: Num Lock ON + any shift → bare key
-    press(USB_KEY_END, ((uint8_t[]){0xE0, 0x4F}), 2, "S1 End NL+RShift suffix make");
-    release(USB_KEY_END, ((uint8_t[]){0xE0, 0xCF}), 2, "S1 End NL+RShift suffix break");
+    press(USB_KEY_END, ((uint8_t[]){ 0xE0, 0x4F }), 2, "S1 End NL+RShift suffix make");
+    release(USB_KEY_END, ((uint8_t[]){ 0xE0, 0xCF }), 2, "S1 End NL+RShift suffix break");
+#endif
 }
 
 /// S2 PRTSCR - Set 2 PrtSc with Right Shift only (any modifier except Alt)
@@ -2850,8 +2886,8 @@ static void
 test_set2_prtsc_right_shift (void) {
     usb_keys_modifier_flags = RIGHT_SHIFT_BIT;
     ps2_modifiers = RIGHT_SHIFT_BIT;
-    uint8_t make[] = {0xE0, 0x7C};
-    uint8_t brk[] = {0xE0, 0xF0, 0x7C};
+    uint8_t make[] = { 0xE0, 0x7C };
+    uint8_t brk[] = { 0xE0, 0xF0, 0x7C };
     press(USB_KEY_PRINT_SCREEN, make, 2, "S2 PrtSc+RShift make");
     release(USB_KEY_PRINT_SCREEN, brk, 3, "S2 PrtSc+RShift break");
 }
@@ -2861,8 +2897,8 @@ static void
 test_set2_prtsc_left_shift_release (void) {
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
-    uint8_t make[] = {0xE0, 0x7C};
-    uint8_t brk[] = {0xE0, 0xF0, 0x7C};
+    uint8_t make[] = { 0xE0, 0x7C };
+    uint8_t brk[] = { 0xE0, 0xF0, 0x7C };
     press(USB_KEY_PRINT_SCREEN, make, 2, "S2 PrtSc+LShift make");
     release(USB_KEY_PRINT_SCREEN, brk, 3, "S2 PrtSc+LShift break");
 }
@@ -2875,8 +2911,8 @@ test_set3_no_repeat_after_f8 (void) {
     // F8: break=1, repeat=0
     expect_cmd(PS2_COMMAND_SET_ALL_KEYS_MAKE_BREAK, "F8: ACK");
     // A should have break=1, repeat=0 after F8
-    uint8_t brk_a[] = {0xF0, 0x1C};
-    press(USB_KEY_A, ((uint8_t[]){0x1C}), 1, "S3 F8 no-repeat A make");
+    uint8_t brk_a[] = { 0xF0, 0x1C };
+    press(USB_KEY_A, ((uint8_t[]){ 0x1C }), 1, "S3 F8 no-repeat A make");
     release(USB_KEY_A, brk_a, 2, "S3 F8 no-repeat A break");
     expect_repeat(USB_KEY_A, false, "S3 F8 no-repeat A");
 }
@@ -2890,18 +2926,19 @@ test_set1_media_keys (void) {
     // media keys (lines 337-353 of ps2scancodes.md are wrong).
     // Corrected values from set2_to_set1:
     //   Mute=0x20 VolUp=0x30 VolDown=0x2E Play=0x22 Next=0x19 Prev=0x10
-    press(USB_KEY_VOLUME_MUTE, ((uint8_t[]){0xE0, 0x20}), 2, "S1 Mute make");
-    press(USB_KEY_VOLUME_UP, ((uint8_t[]){0xE0, 0x30}), 2, "S1 VolUp make");
-    press(USB_KEY_VOLUME_DOWN, ((uint8_t[]){0xE0, 0x2E}), 2, "S1 VolDown make");
-    press(USB_KEY_PLAY_PAUSE, ((uint8_t[]){0xE0, 0x22}), 2, "S1 PlayPause make");
-    press(USB_KEY_NEXT_TRACK, ((uint8_t[]){0xE0, 0x19}), 2, "S1 NextTrack make");
-    press(USB_KEY_PREVIOUS_TRACK, ((uint8_t[]){0xE0, 0x10}), 2, "S1 PrevTrack make");
+    press(USB_KEY_VOLUME_MUTE, ((uint8_t[]){ 0xE0, 0x20 }), 2, "S1 Mute make");
+    press(USB_KEY_VOLUME_UP, ((uint8_t[]){ 0xE0, 0x30 }), 2, "S1 VolUp make");
+    press(USB_KEY_VOLUME_DOWN, ((uint8_t[]){ 0xE0, 0x2E }), 2, "S1 VolDown make");
+    press(USB_KEY_PLAY_PAUSE, ((uint8_t[]){ 0xE0, 0x22 }), 2, "S1 PlayPause make");
+    press(USB_KEY_NEXT_TRACK, ((uint8_t[]){ 0xE0, 0x19 }), 2, "S1 NextTrack make");
+    press(USB_KEY_PREVIOUS_TRACK, ((uint8_t[]){ 0xE0, 0x10 }), 2, "S1 PrevTrack make");
 }
 
 /// S1 INS - Set 1 Insert with Num Lock OFF, both shifts — exact
 /// Microsoft example (MS doc erroneously called this "KP0/Insert")
 static void
 test_set1_insert_both_shifts_numlock_off (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_scancode_set(1);
     // Microsoft doc: Num Lock OFF, press LShift, RShift, then Insert:
     // 2A (LShift make)  36 (RShift make)  E0 AA E0 B6 E0 52 (Insert make)
@@ -2911,17 +2948,18 @@ test_set1_insert_both_shifts_numlock_off (void) {
     press_key(USB_KEY_LEFT_SHIFT);
     press_key(USB_KEY_RIGHT_SHIFT);
     // Now both shifts are held — press Insert
-    uint8_t make[] = {0x2A, 0x36, 0xE0, 0xAA, 0xE0, 0xB6, 0xE0, 0x52};
+    uint8_t make[] = { 0x2A, 0x36, 0xE0, 0xAA, 0xE0, 0xB6, 0xE0, 0x52 };
     press(USB_KEY_INSERT, make, 8, "S1 Insert both shifts NumOFF make");
     // Release Insert — break + restore shifts
-    uint8_t brk[] = {0xE0, 0xD2, 0xE0, 0x36, 0xE0, 0x2A};
+    uint8_t brk[] = { 0xE0, 0xD2, 0xE0, 0x36, 0xE0, 0x2A };
     release(USB_KEY_INSERT, brk, 6, "S1 Insert both shifts NumOFF break");
     // Release RShift
     release_key(USB_KEY_RIGHT_SHIFT);
-    check_result(((uint8_t[]){0xB6}), 1, "S1 RShift break after Insert");
+    check_result(((uint8_t[]){ 0xB6 }), 1, "S1 RShift break after Insert");
     // Release LShift
     release_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0xAA}), 1, "S1 LShift break after Insert");
+    check_result(((uint8_t[]){ 0xAA }), 1, "S1 LShift break after Insert");
+#endif
 }
 
 /// MISC GUI - Right GUI (Win) in both sets — a problem case that should now
@@ -2929,12 +2967,12 @@ test_set1_insert_both_shifts_numlock_off (void) {
 static void
 test_right_gui_both_sets (void) {
     // Set 2: E0 27 / E0 F0 27 (ps2scancodes.md line 143)
-    press(USB_KEY_RIGHT_WIN, ((uint8_t[]){0xE0, 0x27}), 2, "S2 Right Win make");
-    release(USB_KEY_RIGHT_WIN, ((uint8_t[]){0xE0, 0xF0, 0x27}), 3, "S2 Right Win break");
+    press(USB_KEY_RIGHT_WIN, ((uint8_t[]){ 0xE0, 0x27 }), 2, "S2 Right Win make");
+    release(USB_KEY_RIGHT_WIN, ((uint8_t[]){ 0xE0, 0xF0, 0x27 }), 3, "S2 Right Win break");
     // Set 1: E0 5C / E0 DC (set2_to_set1[0x27] = 0x5C, line 336 of doc)
     api_set_scancode_set(1);
-    press(USB_KEY_RIGHT_WIN, ((uint8_t[]){0xE0, 0x5C}), 2, "S1 Right Win make");
-    release(USB_KEY_RIGHT_WIN, ((uint8_t[]){0xE0, 0xDC}), 2, "S1 Right Win break");
+    press(USB_KEY_RIGHT_WIN, ((uint8_t[]){ 0xE0, 0x5C }), 2, "S1 Right Win make");
+    release(USB_KEY_RIGHT_WIN, ((uint8_t[]){ 0xE0, 0xDC }), 2, "S1 Right Win break");
 }
 
 /// S1 PAUSE - Set 1 Pause with Right Ctrl
@@ -2944,8 +2982,8 @@ test_set1_pause_right_ctrl (void) {
     usb_keys_modifier_flags = RIGHT_CTRL_BIT;
     ps2_modifiers = RIGHT_CTRL_BIT;
     // ps2scancodes.md Note 5: Ctrl+Pause (Break) same for both Ctrl variants
-    uint8_t make[] = {0xE0, 0x46};
-    uint8_t brk[] = {0xE0, 0xC6};
+    uint8_t make[] = { 0xE0, 0x46 };
+    uint8_t brk[] = { 0xE0, 0xC6 };
     press(USB_KEY_PAUSE_BREAK, make, 2, "S1 Pause+Right Ctrl make");
     release(USB_KEY_PAUSE_BREAK, brk, 2, "S1 Pause+Right Ctrl break");
 }
@@ -2955,8 +2993,8 @@ static void
 test_set2_pause_right_ctrl (void) {
     usb_keys_modifier_flags = RIGHT_CTRL_BIT;
     ps2_modifiers = RIGHT_CTRL_BIT;
-    uint8_t make[] = {0xE0, 0x7E};
-    uint8_t brk[] = {0xE0, 0xF0, 0x7E};
+    uint8_t make[] = { 0xE0, 0x7E };
+    uint8_t brk[] = { 0xE0, 0xF0, 0x7E };
     press(USB_KEY_PAUSE_BREAK, make, 2, "S2 Pause+Right Ctrl make");
     release(USB_KEY_PAUSE_BREAK, brk, 3, "S2 Pause+Right Ctrl break");
 }
@@ -2967,8 +3005,8 @@ test_set2_ctrl_pause (void) {
     usb_keys_modifier_flags = CTRL_BIT;
     ps2_modifiers = CTRL_BIT;
     // ps2scancodes.md Note 5 line 614: Ctrl+Pause = Break → E0 7E / E0 F0 7E
-    uint8_t make[] = {0xE0, 0x7E};
-    uint8_t brk[] = {0xE0, 0xF0, 0x7E};
+    uint8_t make[] = { 0xE0, 0x7E };
+    uint8_t brk[] = { 0xE0, 0xF0, 0x7E };
     press(USB_KEY_PAUSE_BREAK, make, 2, "S2 Ctrl+Pause make");
     release(USB_KEY_PAUSE_BREAK, brk, 3, "S2 Ctrl+Pause break");
 }
@@ -2979,10 +3017,10 @@ test_set3_no_extended (void) {
     api_init_set3_all_make_break();
     // ps2scancodes.md line 422: Set 3 has no extended (E0 prefix) keys
     // Home = 0x6E, Insert = 0x67, Delete = 0x64, Left Arrow = 0x61
-    press(USB_KEY_HOME, ((uint8_t[]){0x6E}), 1, "S3 Home make (no E0)");
-    press(USB_KEY_INSERT, ((uint8_t[]){0x67}), 1, "S3 Insert make (no E0)");
-    press(USB_KEY_DELETE, ((uint8_t[]){0x64}), 1, "S3 Delete make (no E0)");
-    press(USB_KEY_LEFT_ARROW, ((uint8_t[]){0x61}), 1, "S3 Left Arrow make (no E0)");
+    press(USB_KEY_HOME, ((uint8_t[]){ 0x6E }), 1, "S3 Home make (no E0)");
+    press(USB_KEY_INSERT, ((uint8_t[]){ 0x67 }), 1, "S3 Insert make (no E0)");
+    press(USB_KEY_DELETE, ((uint8_t[]){ 0x64 }), 1, "S3 Delete make (no E0)");
+    press(USB_KEY_LEFT_ARROW, ((uint8_t[]){ 0x61 }), 1, "S3 Left Arrow make (no E0)");
 }
 
 /// RPT - Repeat: pressing a new key switches repeat target
@@ -2990,9 +3028,9 @@ static void
 test_repeat_last_key (void) {
     api_all_keys_typematic();
     api_set_repeat_rate(0x20);
-    uint8_t mk_a[] = {0x1C};
-    uint8_t mk_b[] = {0x32};
-    uint8_t brk_b[] = {0xF0, 0x32};
+    uint8_t mk_a[] = { 0x1C };
+    uint8_t mk_b[] = { 0x32 };
+    uint8_t brk_b[] = { 0xF0, 0x32 };
     mock_timer = 0;
     press(USB_KEY_A, mk_a, 1, "S2 repeat A make");
     mock_timer = 600;
@@ -3013,7 +3051,7 @@ test_repeat_last_key (void) {
     ps2_release_key(USB_KEY_A);
     mock_timer = 2000;
     drain_all();
-    check_result(((uint8_t[]){0xF0, 0x1C, 0x32}), 3, "S2 repeat B still repeats after A released");
+    check_result(((uint8_t[]){ 0xF0, 0x1C, 0x32 }), 3, "S2 repeat B still repeats after A released");
     // Release B — stops
     release(USB_KEY_B, brk_b, 2, "S2 repeat B break");
     mock_timer = 2500;
@@ -3026,8 +3064,8 @@ static void
 test_set1_repeat (void) {
     api_set_scancode_set(1);
     api_set_repeat_rate(0x20);
-    uint8_t make[] = {0x1E};
-    uint8_t brk[] = {0x9E};
+    uint8_t make[] = { 0x1E };
+    uint8_t brk[] = { 0x9E };
     mock_timer = 0;
     press(USB_KEY_A, make, 1, "S1 repeat A make");
     mock_timer = 500;
@@ -3041,8 +3079,8 @@ static void
 test_repeat_delay_new_key_resets (void) {
     api_all_keys_typematic();
     api_set_repeat_rate(0x20);
-    uint8_t mk_a[] = {0x1C};
-    uint8_t mk_b[] = {0x32};
+    uint8_t mk_a[] = { 0x1C };
+    uint8_t mk_b[] = { 0x32 };
     mock_timer = 0;
     press(USB_KEY_A, mk_a, 1, "S2 delay reset A make");
     mock_timer = 600;
@@ -3075,7 +3113,8 @@ test_cmd_set_key_f4_required (void) {
     queue_recv(PS2_COMMAND_ENABLE);
     drain_commands();
     // F4 re-enabled scanning — A should now be make-only (no break)
-    press(USB_KEY_A, ((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, 0x1C}), 4, "S3 F4 re-enabled A make");
+    press(USB_KEY_A, ((uint8_t[]){ PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, 0x1C }), 4,
+        "S3 F4 re-enabled A make");
     expect_none_release(USB_KEY_A, "S3 F4 re-enabled A no break (make-only)");
 }
 
@@ -3089,9 +3128,9 @@ test_set3_f9_clears_both_break_and_repeat (void) {
     // F9 should clear both: break=0, repeat=0
     expect_cmd(PS2_COMMAND_SET_ALL_KEYS_MAKE, "F9: ACK");
     // After F9: no break for A or CapsLock
-    press(USB_KEY_A, ((uint8_t[]){0x1C}), 1, "S3 F9 clear-both A make");
+    press(USB_KEY_A, ((uint8_t[]){ 0x1C }), 1, "S3 F9 clear-both A make");
     expect_none_release(USB_KEY_A, "S3 F9 clear-both A no break");
-    press(USB_KEY_CAPS_LOCK, ((uint8_t[]){0x14}), 1, "S3 F9 clear-both CapsLock make");
+    press(USB_KEY_CAPS_LOCK, ((uint8_t[]){ 0x14 }), 1, "S3 F9 clear-both CapsLock make");
     expect_none_release(USB_KEY_CAPS_LOCK, "S3 F9 clear-both CapsLock no break");
     // Repeat disabled for both keys
     expect_repeat(USB_KEY_A, false, "F9: A no repeat");
@@ -3109,12 +3148,12 @@ test_set3_f8_clears_repeat (void) {
     // Verify no repeat for A after F8
     expect_repeat(USB_KEY_A, false, "F8: A no repeat");
     // A should still send break (break bit set by F8)
-    uint8_t brk_a[] = {0xF0, 0x1C};
+    uint8_t brk_a[] = { 0xF0, 0x1C };
     ps2_release_key(USB_KEY_A);
     check_result(brk_a, 2, "S3 F8 clear-repeat A break");
     // Same for CapsLock
     expect_repeat(USB_KEY_CAPS_LOCK, false, "F8: CapsLock no repeat");
-    uint8_t brk_caps[] = {0xF0, 0x14};
+    uint8_t brk_caps[] = { 0xF0, 0x14 };
     ps2_release_key(USB_KEY_CAPS_LOCK);
     check_result(brk_caps, 2, "S3 F8 clear-repeat CapsLock break");
 }
@@ -3127,10 +3166,10 @@ test_set3_f7_clears_break (void) {
     api_all_keys_typematic();
     // After F7: break should be disabled → no break on release
     // Current buggy behavior: F7 only enables repeat, break still active
-    press(USB_KEY_A, ((uint8_t[]){0x1C}), 1, "S3 F7 clear-break A make");
+    press(USB_KEY_A, ((uint8_t[]){ 0x1C }), 1, "S3 F7 clear-break A make");
     expect_none_release(USB_KEY_A, "S3 F7 clear-break A no break");
     // CapsLock previously had break=1, should also be cleared by F7
-    press(USB_KEY_CAPS_LOCK, ((uint8_t[]){0x14}), 1, "S3 F7 clear-break CapsLock make");
+    press(USB_KEY_CAPS_LOCK, ((uint8_t[]){ 0x14 }), 1, "S3 F7 clear-break CapsLock make");
     expect_none_release(USB_KEY_CAPS_LOCK, "S3 F7 clear-break CapsLock no break");
     // After F7: repeat should be enabled
     expect_repeat(USB_KEY_A, true, "S3 F7 clear-break A repeats");
@@ -3151,8 +3190,9 @@ test_set3_set_key_typematic_clears_break (void) {
     drain_commands();
     // Key A should send break? NO — typematic-only means no break.
     // Current buggy behavior: FB sets both break=1 AND repeat=1.
-    press(USB_KEY_A, ((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, 0x1C}), 5, "S3 FB typematic A make");
-    release(USB_KEY_A, ((uint8_t[]){0x1C}), 0, "S3 FB typematic A no break expected");
+    press(USB_KEY_A, ((uint8_t[]){ PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, PS2_REPLY_ACK, 0x1C }),
+        5, "S3 FB typematic A make");
+    release(USB_KEY_A, ((uint8_t[]){ 0x1C }), 0, "S3 FB typematic A no break expected");
     if (verbose) {
         if (sent_count > 0) {
             (void) printf("S3 FB typematic A sent %d bytes (break should be disabled)\n", sent_count);
@@ -3193,7 +3233,7 @@ test_cmd_led_byte_is_command (void) {
     queue_recv(PS2_COMMAND_SET_LEDS);
     queue_recv(PS2_COMMAND_ECHO);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_COMMAND_ECHO}), 2, "ED+EE: ACK + echo");
+    check_result(((uint8_t[]){ PS2_REPLY_ACK, PS2_COMMAND_ECHO }), 2, "ED+EE: ACK + echo");
 }
 
 /// Command byte instead of scancode set argument should process the command.
@@ -3204,7 +3244,7 @@ test_cmd_scancode_set_arg_is_command (void) {
     queue_recv(PS2_COMMAND_SET_SCAN_CODES);
     queue_recv(PS2_COMMAND_ECHO);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_COMMAND_ECHO}), 2, "F0+EE: ACK + echo");
+    check_result(((uint8_t[]){ PS2_REPLY_ACK, PS2_COMMAND_ECHO }), 2, "F0+EE: ACK + echo");
 }
 
 /// Command byte instead of set-rate argument should process the command.
@@ -3214,7 +3254,7 @@ test_cmd_set_rate_arg_is_command (void) {
     queue_recv(PS2_COMMAND_SET_RATE);
     queue_recv(PS2_COMMAND_ECHO);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_COMMAND_ECHO}), 2, "F3+EE: ACK + echo");
+    check_result(((uint8_t[]){ PS2_REPLY_ACK, PS2_COMMAND_ECHO }), 2, "F3+EE: ACK + echo");
 }
 
 /// All-keys commands that change repeat behaviour should stop active repeats.
@@ -3452,241 +3492,237 @@ static void
 test_set2_prtsc_rctrl_sysrq (void) {
     usb_keys_modifier_flags = RIGHT_CTRL_BIT;
     ps2_modifiers = RIGHT_CTRL_BIT;
-    uint8_t make[] = {0xE0, 0x7C};
-    uint8_t brk[] = {0xE0, 0xF0, 0x7C};
+    uint8_t make[] = { 0xE0, 0x7C };
+    uint8_t brk[] = { 0xE0, 0xF0, 0x7C };
     press(USB_KEY_PRINT_SCREEN, make, 2, "S2 RCtrl+PrtSc make");
     release(USB_KEY_PRINT_SCREEN, brk, 3, "S2 RCtrl+PrtSc break");
 }
 
 static void
 test_set2_printscreen_model_m_plain (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     press_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x7C}), 4,
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x7C }), 4,
         "Model M: PrintScreen make (E0 12 E0 7C, fake LShift + real key)");
     release_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x7C, 0xE0, 0xF0, 0x12}), 6,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x7C, 0xE0, 0xF0, 0x12 }), 6,
         "Model M: PrintScreen break (E0 F0 7C E0 F0 12, real key + fake LShift break)");
+#endif
 }
 
 static void
 test_set2_printscreen_model_m_shift_held_first (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
     press_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0x12}), 1,
-        "Model M: LShift make (12)");
+    check_result(((uint8_t[]){ 0x12 }), 1, "Model M: LShift make (12)");
     press_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0xE0, 0x7C}), 2,
+    check_result(((uint8_t[]){ 0xE0, 0x7C }), 2,
         "Model M: PrintScreen make (E0 7C, no fake LShift since real Shift held)");
     release_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x7C}), 3,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x7C }), 3,
         "Model M: PrintScreen break (E0 F0 7C, no fake LShift break)");
     release_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0xF0, 0x12}), 2,
-        "Model M: LShift break (F0 12)");
+    check_result(((uint8_t[]){ 0xF0, 0x12 }), 2, "Model M: LShift break (F0 12)");
+#endif
 }
 
 static void
 test_set2_printscreen_model_m_shift_pressed_while_held (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     press_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x7C}), 4,
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x7C }), 4,
         "Model M: PrintScreen make (E0 12 E0 7C, fake LShift + real key)");
 
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
     press_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0x12}), 4,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x12, 0x12 }), 4,
         "Model M: fake LShift EXTENDED break (E0 F0 12), then real LShift make (12)");
 
     release_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x7C}), 3,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x7C }), 3,
         "Model M: PrintScreen break (E0 F0 7C only, real Shift now covers it, no fake break)");
 
     release_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0xF0, 0x12}), 2,
-        "Model M: LShift break (F0 12)");
+    check_result(((uint8_t[]){ 0xF0, 0x12 }), 2, "Model M: LShift break (F0 12)");
+#endif
 }
 
 static void
 test_set2_printscreen_model_m_ctrl_held (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     usb_keys_modifier_flags = CTRL_BIT;
     ps2_modifiers = CTRL_BIT;
     press_key(USB_KEY_LEFT_CTRL);
-    check_result(((uint8_t[]){0x14}), 1,
-        "Model M: LCtrl make (14)");
+    check_result(((uint8_t[]){ 0x14 }), 1, "Model M: LCtrl make (14)");
     press_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0xE0, 0x7C}), 2,
+    check_result(((uint8_t[]){ 0xE0, 0x7C }), 2,
         "Model M: PrintScreen make (E0 7C, Ctrl suppresses fake LShift same as real Shift)");
     release_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x7C}), 3,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x7C }), 3,
         "Model M: PrintScreen break (E0 F0 7C, no fake LShift break)");
     release_key(USB_KEY_LEFT_CTRL);
-    check_result(((uint8_t[]){0xF0, 0x14}), 2,
-        "Model M: LCtrl break (F0 14)");
+    check_result(((uint8_t[]){ 0xF0, 0x14 }), 2, "Model M: LCtrl break (F0 14)");
+#endif
 }
 
 static void
 test_set2_printscreen_model_m_alt_held (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     usb_keys_modifier_flags = ALT_BIT;
     ps2_modifiers = ALT_BIT;
     press_key(USB_KEY_LEFT_ALT);
-    check_result(((uint8_t[]){0x11}), 1,
-        "Model M: LAlt make (11)");
+    check_result(((uint8_t[]){ 0x11 }), 1, "Model M: LAlt make (11)");
     press_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0x84}), 1,
+    check_result(((uint8_t[]){ 0x84 }), 1,
         "Model M: SysRq make (84, dedicated non-extended byte, no fake LShift)");
     release_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0xF0, 0x84}), 2,
-        "Model M: SysRq break (F0 84)");
+    check_result(((uint8_t[]){ 0xF0, 0x84 }), 2, "Model M: SysRq break (F0 84)");
     release_key(USB_KEY_LEFT_ALT);
-    check_result(((uint8_t[]){0xF0, 0x11}), 2,
-        "Model M: LAlt break (F0 11)");
+    check_result(((uint8_t[]){ 0xF0, 0x11 }), 2, "Model M: LAlt break (F0 11)");
+#endif
 }
 
 static void
 test_set2_pause_model_m_ctrl_held (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     usb_keys_modifier_flags = CTRL_BIT;
     ps2_modifiers = CTRL_BIT;
     press_key(USB_KEY_LEFT_CTRL);
-    check_result(((uint8_t[]){0x14}), 1,
-        "Model M: LCtrl make (14)");
+    check_result(((uint8_t[]){ 0x14 }), 1, "Model M: LCtrl make (14)");
     press_key(USB_KEY_PAUSE_BREAK);
-    check_result(((uint8_t[]){0xE0, 0x7E}), 2,
+    check_result(((uint8_t[]){ 0xE0, 0x7E }), 2,
         "Model M: Ctrl+Pause make (E0 7E, dedicated code, not the normal 6-byte Pause sequence)");
     release_key(USB_KEY_PAUSE_BREAK);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x7E}), 3,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x7E }), 3,
         "Model M: Ctrl+Pause break (E0 F0 7E, unlike plain Pause which has no break at all)");
     release_key(USB_KEY_LEFT_CTRL);
-    check_result(((uint8_t[]){0xF0, 0x14}), 2,
-        "Model M: LCtrl break (F0 14)");
+    check_result(((uint8_t[]){ 0xF0, 0x14 }), 2, "Model M: LCtrl break (F0 14)");
+#endif
 }
 
 static void
 test_set2_kp_divide_model_m_shift_swap (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
     press_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0x12}), 1,
-        "Model M: LShift make (12)");
+    check_result(((uint8_t[]){ 0x12 }), 1, "Model M: LShift make (12)");
 
     press_key(USB_KEY_KP_DIVIDE);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x4A}), 5,
-        "Model M: LShift suppressed, KP_Divide make");
+    check_result(
+        ((uint8_t[]){ 0xE0, 0xF0, 0x12, 0xE0, 0x4A }), 5, "Model M: LShift suppressed, KP_Divide make");
 
     // KP_Div break restores LShift because LShift is still held
     release_key(USB_KEY_KP_DIVIDE);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x4A, 0xE0, 0x12}), 5,
-        "Model M: KP_Divide break + LShift restore");
+    check_result(
+        ((uint8_t[]){ 0xE0, 0xF0, 0x4A, 0xE0, 0x12 }), 5, "Model M: KP_Divide break + LShift restore");
 
     release_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0xF0, 0x12}), 2,
-        "Model M: LShift break");
+    check_result(((uint8_t[]){ 0xF0, 0x12 }), 2, "Model M: LShift break");
 
     // Second cycle with RShift
     usb_keys_modifier_flags = RIGHT_SHIFT_BIT;
     ps2_modifiers = RIGHT_SHIFT_BIT;
     press_key(USB_KEY_RIGHT_SHIFT);
-    check_result(((uint8_t[]){0x59}), 1,
-        "Model M: RShift make (59)");
+    check_result(((uint8_t[]){ 0x59 }), 1, "Model M: RShift make (59)");
 
     press_key(USB_KEY_KP_DIVIDE);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x59, 0xE0, 0x4A}), 5,
-        "Model M: RShift suppressed, KP_Divide make");
+    check_result(
+        ((uint8_t[]){ 0xE0, 0xF0, 0x59, 0xE0, 0x4A }), 5, "Model M: RShift suppressed, KP_Divide make");
 
     release_key(USB_KEY_KP_DIVIDE);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x4A, 0xE0, 0x59}), 5,
-        "Model M: KP_Divide break + RShift restore");
+    check_result(
+        ((uint8_t[]){ 0xE0, 0xF0, 0x4A, 0xE0, 0x59 }), 5, "Model M: KP_Divide break + RShift restore");
 
     release_key(USB_KEY_RIGHT_SHIFT);
-    check_result(((uint8_t[]){0xF0, 0x59}), 2,
-        "Model M: RShift break");
+    check_result(((uint8_t[]){ 0xF0, 0x59 }), 2, "Model M: RShift break");
+#endif
 }
 
 /// Model M observed: NL ON, hold Home, hold End, press Num Lock (host then
 /// sends ED to update LED), release End, release Home.
 static void
 test_set2_tenkey_model_m_numlock_toggle_mid_hold (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
 
     press_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x6C}), 4,
-        "Model M: Home make (E0 12 E0 6C)");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x6C }), 4, "Model M: Home make (E0 12 E0 6C)");
 
     press_key(USB_KEY_END);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x69}), 7,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x69 }), 7,
         "Model M: End make (E0 F0 12 E0 12 E0 69)");
 
     press_key(USB_KEY_NUM_LOCK);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0x77}), 4,
-        "Model M: Num Lock make (E0 F0 12 77)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x12, 0x77 }), 4, "Model M: Num Lock make (E0 F0 12 77)");
 
     release_key(USB_KEY_NUM_LOCK);
-    check_result(((uint8_t[]){0xF0, 0x77}), 2,
-        "Model M: Num Lock break (F0 77)");
+    check_result(((uint8_t[]){ 0xF0, 0x77 }), 2, "Model M: Num Lock break (F0 77)");
 
     api_set_leds(0); // Host acknowledges NL OFF via ED
 
     release_key(USB_KEY_END);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x69}), 3,
-        "Model M: End break, no Shift");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x69 }), 3, "Model M: End break, no Shift");
 
     release_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x6C}), 3,
-        "Model M: Home break, no Shift");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x6C }), 3, "Model M: Home break, no Shift");
+#endif
 }
 
 /// Host-driven Num Lock toggle while nav keys held (no physical Num Lock key
 /// press): ED changes LED state and should recalculate virtual shift.
 static void
 test_set2_tenkey_nl_led_toggle_mid_hold_ed_only (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
 #ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
 
     press_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x6C}), 4,
-        "ED-only: Home make (E0 12 E0 6C)");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x6C }), 4, "ED-only: Home make (E0 12 E0 6C)");
 
     press_key(USB_KEY_END);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x69}), 7,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x69 }), 7,
         "ED-only: End make (E0 F0 12 E0 12 E0 69)");
 
     // Host toggles NL OFF via ED while keys held
     queue_recv(PS2_COMMAND_SET_LEDS);
     queue_recv(0);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK, 0xE0, 0xF0, 0x12}), 5,
+    check_result(((uint8_t[]){ PS2_REPLY_ACK, PS2_REPLY_ACK, 0xE0, 0xF0, 0x12 }), 5,
         "ED-only: ACK ACK + break forced LShift (E0 F0 12)");
 
     release_key(USB_KEY_END);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x69}), 3,
-        "ED-only: End break (no LShift)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x69 }), 3, "ED-only: End break (no LShift)");
 
     release_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x6C}), 3,
-        "ED-only: Home break (no LShift)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x6C }), 3, "ED-only: Home break (no LShift)");
+#endif
 #endif
 }
 
 /// Model M observed: NL ON, hold both shifts + Home, release shifts one by one
 static void
 test_set2_tenkey_nl_on_both_shifts_release_mid_hold (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     usb_keys_modifier_flags = SHIFT_BIT | RIGHT_SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT | RIGHT_SHIFT_BIT;
     press_key(USB_KEY_LEFT_SHIFT);
     press_key(USB_KEY_RIGHT_SHIFT);
     press_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0x12, 0x59, 0xE0, 0x6C}), 4,
-        "NL ON+both shifts: Home make (bare key)");
+    check_result(((uint8_t[]){ 0x12, 0x59, 0xE0, 0x6C }), 4, "NL ON+both shifts: Home make (bare key)");
     release_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0xF0, 0x12}), 2,
-        "NL ON+both shifts: LShift break");
+    check_result(((uint8_t[]){ 0xF0, 0x12 }), 2, "NL ON+both shifts: LShift break");
     release_key(USB_KEY_RIGHT_SHIFT);
-    check_result(((uint8_t[]){0xF0, 0x59, 0xE0, 0x12}), 4,
+    check_result(((uint8_t[]){ 0xF0, 0x59, 0xE0, 0x12 }), 4,
         "NL ON+both shifts: RShift break + forced LShift make");
     release_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x6C, 0xE0, 0xF0, 0x12}), 6,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x6C, 0xE0, 0xF0, 0x12 }), 6,
         "NL ON+both shifts: Home break + forced LShift break");
+#endif
 }
 
 /// PrtScr, then Num Lock ON via ED, then both shifts + Home, release shifts.
@@ -3694,12 +3730,13 @@ test_set2_tenkey_nl_on_both_shifts_release_mid_hold (void) {
 /// has keypress instead).
 static void
 test_set2_prtscr_then_nl_then_both_shifts_home (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     // PrtScr press+release (sets WAS_ACTIVE via virtual_shift_off)
     press_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x7C}), 4,
-        "PrtScr->NL->Home: PrtScr make (E0 12 E0 7C)");
+    check_result(
+        ((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x7C }), 4, "PrtScr->NL->Home: PrtScr make (E0 12 E0 7C)");
     release_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x7C, 0xE0, 0xF0, 0x12}), 6,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x7C, 0xE0, 0xF0, 0x12 }), 6,
         "PrtScr->NL->Home: PrtScr break + forced LShift break");
 
     // Num Lock ON via host command (NL ON)
@@ -3711,42 +3748,41 @@ test_set2_prtscr_then_nl_then_both_shifts_home (void) {
     press_key(USB_KEY_LEFT_SHIFT);
     press_key(USB_KEY_RIGHT_SHIFT);
     press_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0x12, 0x59, 0xE0, 0x6C}), 4,
-        "PrtScr->NL->Home: Home make (bare key)");
+    check_result(((uint8_t[]){ 0x12, 0x59, 0xE0, 0x6C }), 4, "PrtScr->NL->Home: Home make (bare key)");
     release_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0xF0, 0x12}), 2,
-        "PrtScr->NL->Home: LShift break");
+    check_result(((uint8_t[]){ 0xF0, 0x12 }), 2, "PrtScr->NL->Home: LShift break");
     release_key(USB_KEY_RIGHT_SHIFT);
-    check_result(((uint8_t[]){0xF0, 0x59, 0xE0, 0x12}), 4,
+    check_result(((uint8_t[]){ 0xF0, 0x59, 0xE0, 0x12 }), 4,
         "PrtScr->NL->Home: RShift break + forced LShift make");
     release_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x6C, 0xE0, 0xF0, 0x12}), 6,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x6C, 0xE0, 0xF0, 0x12 }), 6,
         "PrtScr->NL->Home: Home break + forced LShift break");
+#endif
 }
 
 /// NL OFF + LShift + Insert (shift suppressed), then NL ON via host ED while
 /// held, release Insert, release LShift (uses ED).
 static void
 test_set2_nl_toggle_on_while_shift_suppressed (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
 #ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
     api_set_leds(0);
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
     press_key(USB_KEY_LEFT_SHIFT);
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0x12, 0xE0, 0xF0, 0x12, 0xE0, 0x70}), 6,
+    check_result(((uint8_t[]){ 0x12, 0xE0, 0xF0, 0x12, 0xE0, 0x70 }), 6,
         "NL OFF->ON: Insert make (suppress LShift)");
     queue_recv(PS2_COMMAND_SET_LEDS);
     queue_recv(PS2_LED_NUM_LOCK_BIT);
     drain_commands();
-    check_result(((uint8_t[]){PS2_REPLY_ACK, PS2_REPLY_ACK, 0xE0, 0x12}), 4,
+    check_result(((uint8_t[]){ PS2_REPLY_ACK, PS2_REPLY_ACK, 0xE0, 0x12 }), 4,
         "NL OFF->ON: NL ON via ED + LShift restore");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3,
-        "NL OFF->ON: Insert break");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70 }), 3, "NL OFF->ON: Insert break");
     release_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0xF0, 0x12}), 2,
-        "NL OFF->ON: LShift break");
+    check_result(((uint8_t[]){ 0xF0, 0x12 }), 2, "NL OFF->ON: LShift break");
+#endif
 #endif
 }
 
@@ -3754,156 +3790,168 @@ test_set2_nl_toggle_on_while_shift_suppressed (void) {
 /// then press+release shifts again (alternating modifiers).
 static void
 test_set2_nl_on_home_alternating_modifiers (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     usb_keys_modifier_flags = SHIFT_BIT | RIGHT_SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT | RIGHT_SHIFT_BIT;
     press_key(USB_KEY_LEFT_SHIFT);
     press_key(USB_KEY_RIGHT_SHIFT);
     press_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0x12, 0x59, 0xE0, 0x6C}), 4,
-        "Alternating mods: Home make (bare key)");
+    check_result(((uint8_t[]){ 0x12, 0x59, 0xE0, 0x6C }), 4, "Alternating mods: Home make (bare key)");
     // Relase both shifts, then restore shifts and do a second sequence
     release_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0xF0, 0x12}), 2,
-        "Alternating mods: LShift break");
+    check_result(((uint8_t[]){ 0xF0, 0x12 }), 2, "Alternating mods: LShift break");
     release_key(USB_KEY_RIGHT_SHIFT);
-    check_result(((uint8_t[]){0xF0, 0x59, 0xE0, 0x12}), 4,
+    check_result(((uint8_t[]){ 0xF0, 0x59, 0xE0, 0x12 }), 4,
         "Alternating mods: RShift break + forced LShift make");
     // Press and release LShift, then press and release RShift again
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
     press_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0x12}), 4,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x12, 0x12 }), 4,
         "Alternating mods: LShift press (break forced, make real)");
     usb_keys_modifier_flags = RIGHT_SHIFT_BIT;
     ps2_modifiers = RIGHT_SHIFT_BIT;
     press_key(USB_KEY_RIGHT_SHIFT);
     release_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0x59, 0xF0, 0x12}), 3,
-        "Alternating mods: RShift make + LShift break");
+    check_result(((uint8_t[]){ 0x59, 0xF0, 0x12 }), 3, "Alternating mods: RShift make + LShift break");
     release_key(USB_KEY_RIGHT_SHIFT);
     // WAS_ACTIVE already set from first LShift press, so no reactivation
-    check_result(((uint8_t[]){0xF0, 0x59}), 2,
-        "Alternating mods: RShift break (no forced LShift)");
+    check_result(((uint8_t[]){ 0xF0, 0x59 }), 2, "Alternating mods: RShift break (no forced LShift)");
     release_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x6C}), 3,
-        "Alternating mods: Home break");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x6C }), 3, "Alternating mods: Home break");
+#endif
 }
 
 static void
 test_set2_model_m_printscreen_release_does_not_kill_tenkey_wrapper (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     press_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x6C}), 4,
-        "Model M: fake Shift make + Home make");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x6C }), 4, "Model M: fake Shift make + Home make");
     press_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x7C}), 7,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x7C }), 7,
         "Model M: wrapper torn down + rebuilt for PrintScreen, then PrtSc make");
     release_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x7C}), 3,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x7C }), 3,
         "Model M: PrtSc break ONLY -- no fake Shift break here, unlike PrintScreen-alone case");
     release_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x6C, 0xE0, 0xF0, 0x12}), 6,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x6C, 0xE0, 0xF0, 0x12 }), 6,
         "Model M: Home break, THEN the deferred fake Shift break belonging to the tenkey wrapper");
+#endif
 }
 
 static void
 test_set2_model_m_suppress_mode_restores_shift_on_interrupt (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(0);
     usb_keys_modifier_flags = SHIFT_BIT;
     ps2_modifiers = SHIFT_BIT;
     press_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0x12}), 1,
-        "Model M: real LShift make");
+    check_result(((uint8_t[]){ 0x12 }), 1, "Model M: real LShift make");
     press_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x6C}), 5,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x12, 0xE0, 0x6C }), 5,
         "Model M: LShift suppressed (extended break), Home make");
     press_key(USB_KEY_H);
-    check_result(((uint8_t[]){0xE0, 0x12, 0x33}), 3,
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0x33 }), 3,
         "Model M: suppressed Shift RESTORED (extended make) before H, then H make");
     release_key(USB_KEY_H);
-    check_result(((uint8_t[]){0xF0, 0x33}), 2,
-        "Model M: H break");
+    check_result(((uint8_t[]){ 0xF0, 0x33 }), 2, "Model M: H break");
     release_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x6C}), 3,
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x6C }), 3,
         "Model M: Home break, no Shift byte (already restored earlier)");
     usb_keys_modifier_flags = 0;
     ps2_modifiers = 0;
     release_key(USB_KEY_LEFT_SHIFT);
-    check_result(((uint8_t[]){0xF0, 0x12}), 2,
-        "Model M: real LShift break (plain, physical release)");
+    check_result(
+        ((uint8_t[]){ 0xF0, 0x12 }), 2, "Model M: real LShift break (plain, physical release)");
+#endif
 }
 
 static void
 test_set2_model_m_divide_kills_tenkey_wrapper_no_rebuild (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     press_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x6C}), 4, "fake Shift + Home make");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x6C }), 4, "fake Shift + Home make");
     press_key(USB_KEY_KP_DIVIDE);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x4A}), 5, "wrapper torn down, Divide make (no rebuild)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x12, 0xE0, 0x4A }), 5,
+        "wrapper torn down, Divide make (no rebuild)");
     release_key(USB_KEY_KP_DIVIDE);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x4A}), 3, "Divide break");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x4A }), 3, "Divide break");
     release_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x6C}), 3, "Home break, no Shift byte");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x6C }), 3, "Home break, no Shift byte");
+#endif
 }
 
 static void
 test_set2_model_m_sysrq_kills_tenkey_wrapper_no_rebuild (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     press_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x6C}), 4, "fake Shift + Home make");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x6C }), 4, "fake Shift + Home make");
     usb_keys_modifier_flags = ALT_BIT;
     ps2_modifiers = ALT_BIT;
     press_key(USB_KEY_LEFT_ALT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0x11}), 4, "wrapper torn down, LAlt make");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x12, 0x11 }), 4, "wrapper torn down, LAlt make");
     press_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0x84}), 1, "SysRq make");
+    check_result(((uint8_t[]){ 0x84 }), 1, "SysRq make");
     release_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0xF0, 0x84}), 2, "SysRq break");
+    check_result(((uint8_t[]){ 0xF0, 0x84 }), 2, "SysRq break");
     usb_keys_modifier_flags = 0;
     ps2_modifiers = 0;
     release_key(USB_KEY_LEFT_ALT);
-    check_result(((uint8_t[]){0xF0, 0x11}), 2, "LAlt break");
+    check_result(((uint8_t[]){ 0xF0, 0x11 }), 2, "LAlt break");
     release_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x6C}), 3, "Home break, no Shift byte");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x6C }), 3, "Home break, no Shift byte");
+#endif
 }
 
 static void
 test_set2_model_m_ctrl_pause_kills_tenkey_wrapper_no_rebuild (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x70}), 4, "fake Shift + Insert make");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x70 }), 4, "fake Shift + Insert make");
     usb_keys_modifier_flags = CTRL_BIT;
     ps2_modifiers = CTRL_BIT;
     press_key(USB_KEY_LEFT_CTRL);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0x14}), 4, "wrapper torn down, LCtrl make");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x12, 0x14 }), 4, "wrapper torn down, LCtrl make");
     press_key(USB_KEY_PAUSE_BREAK);
-    check_result(((uint8_t[]){0xE0, 0x7E}), 2, "Ctrl+Pause make");
+    check_result(((uint8_t[]){ 0xE0, 0x7E }), 2, "Ctrl+Pause make");
     release_key(USB_KEY_PAUSE_BREAK);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x7E}), 3, "Ctrl+Pause break");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x7E }), 3, "Ctrl+Pause break");
     usb_keys_modifier_flags = 0;
     ps2_modifiers = 0;
     release_key(USB_KEY_LEFT_CTRL);
-    check_result(((uint8_t[]){0xF0, 0x14}), 2, "LCtrl break");
+    check_result(((uint8_t[]){ 0xF0, 0x14 }), 2, "LCtrl break");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3, "Insert break, no Shift byte");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70 }), 3, "Insert break, no Shift byte");
+#endif
 }
 
 static void
 test_set2_model_m_two_tenkeys_plus_printscreen_deferred_teardown (void) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     api_set_leds(PS2_LED_NUM_LOCK_BIT);
     press_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0x12, 0xE0, 0x6C}), 4, "fake Shift + Home make");
+    check_result(((uint8_t[]){ 0xE0, 0x12, 0xE0, 0x6C }), 4, "fake Shift + Home make");
     press_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x70}), 7, "double-toggle, Insert make");
+    check_result(
+        ((uint8_t[]){ 0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x70 }), 7, "double-toggle, Insert make");
     press_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x7C}), 7, "torn down + rebuilt for PrtSc, PrtSc make");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x12, 0xE0, 0x12, 0xE0, 0x7C }), 7,
+        "torn down + rebuilt for PrtSc, PrtSc make");
     release_key(USB_KEY_PRINT_SCREEN);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x7C}), 3, "PrtSc break ONLY -- no Shift byte, tenkey_count still 2");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x7C }), 3,
+        "PrtSc break ONLY -- no Shift byte, tenkey_count still 2");
     release_key(USB_KEY_INSERT);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x70}), 3, "Insert break ONLY -- no Shift byte, tenkey_count still 1 (Home held)");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x70 }), 3,
+        "Insert break ONLY -- no Shift byte, tenkey_count still 1 (Home held)");
     release_key(USB_KEY_HOME);
-    check_result(((uint8_t[]){0xE0, 0xF0, 0x6C, 0xE0, 0xF0, 0x12}), 6, "Home break, THEN deferred wrapper teardown");
+    check_result(((uint8_t[]){ 0xE0, 0xF0, 0x6C, 0xE0, 0xF0, 0x12 }), 6,
+        "Home break, THEN deferred wrapper teardown");
+#endif
 }
 
 /// Reset the state. Run automatically before each test, do not call manually.

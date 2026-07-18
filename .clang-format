@@ -1,10 +1,11 @@
 BasedOnStyle: LLVM
 IndentWidth: 4
-ColumnLimit: 0
+ColumnLimit: 104
 InsertBraces: true
 KeepEmptyLinesAtTheStartOfBlocks: false
 BreakBeforeBraces: Custom
 BraceWrapping:
+  AfterCaseLabel: false
   AfterFunction: false
   AfterControlStatement: Never
   AfterStruct: false
@@ -30,8 +31,12 @@ SpaceBeforeParensOptions:
   AfterOverloadedOperator: true
   AfterForeachMacros: true
 SpaceAfterCStyleCast: true
-IndentCaseLabels: false
+IndentCaseLabels: true
 BreakBeforeTernaryOperators: false
 PointerAlignment: Right
 ReferenceAlignment: Right
+AlignEscapedNewlines: DontAlign
+AlignOperands: DontAlign
+Cpp11BracedListStyle: false
+BreakBeforeBinaryOperators: NonAssignment
 UseTab: Never

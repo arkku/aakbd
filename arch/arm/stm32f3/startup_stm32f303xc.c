@@ -200,10 +200,23 @@ const void *isr_vectors[98] = {
 };
 
 void Reset_Handler(void) {
-    // Bootloader magic: if set, jump to system DFU bootloader
+    // Bootloader magic: if set, jump to system DFU bootloader.
+    // Direct jump to system memory is only safe in reset context
+    // (peripherals are freshly initialised). NEVER call this from
+    // application code — use bootloader_jump() with NVIC_SystemReset!
     if (*BOOTLOADER_MAGIC_ADDRESS == BOOTLOADER_MAGIC) {
-        extern void enter_bootloader(void);
-        enter_bootloader();
+        *BOOTLOADER_MAGIC_ADDRESS = 0;
+        // Set vector table to system memory, adjust SP, jump to reset vector
+        __asm volatile (
+            "LDR R0, =%[sysmem]  \n\t"
+            "STR R0, [%[vtor]]   \n\t"
+            "LDR SP, [R0]        \n\t"
+            "LDR PC, [R0, #4]    \n\t"
+            :
+            : [sysmem] "i" (SYSTEM_MEMORY_BASE),
+              [vtor] "r" (0xE000ED00U)
+            : "r0"
+        );
     }
 
     // Copy .data from flash to RAM

@@ -172,6 +172,10 @@ kbd_recv_byte (void) {
     return byte;
 }
 
+void
+keyboard_clear_settings (void) {
+}
+
 #if PS2USB_DEBUG_COMMANDS
 static uint16_t debug_led_toggle_countdown = 0;
 static uint8_t debug_last_led_tick = 0;
@@ -363,7 +367,7 @@ kbd_input (void) {
         have_changes = true;
         process_key(is_extended ? usb_keycode_for_ps2_extended_keycode(key)
                                 : usb_keycode_for_ps2_keycode(key, scancode_set),
-                    is_key_release);
+                    is_key_release, 0, key);
     }
 
     if (kbd_key_state & KEY_FLAG_OVERFLOW) {
@@ -726,7 +730,12 @@ main (void) {
             kbd_init(true);
         }
 
-        if (!usb_is_suspended() && !is_debug_active && kbd_idle_10ms_count > MAX_IDLE_10MS) {
+#if PS2USB_DEBUG_SCANCODES
+        if (!usb_is_suspended() && !is_debug_active && kbd_idle_10ms_count > MAX_IDLE_10MS)
+#else
+        if (!usb_is_suspended() && kbd_idle_10ms_count > MAX_IDLE_10MS)
+#endif
+        {
             // Ping the keyboard when idle to detect unplugging
             if (send_cmd(PS2_COMMAND_ECHO) != PS2_COMMAND_ECHO) {
                 kbd_error_count = MAX_ERROR_COUNT + 1;

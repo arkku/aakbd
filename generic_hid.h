@@ -24,7 +24,14 @@
 #ifndef KK_GENERIC_HID_H
 #define KK_GENERIC_HID_H
 
+#if VIAL_ENABLE
+#include "vial_config.h"
+#endif
+
 #ifndef ENABLE_GENERIC_HID_ENDPOINT
+#ifndef ENABLE_GENERIC_HID_OUTPUT
+#define ENABLE_GENERIC_HID_OUTPUT 0
+#endif
 #define ENABLE_GENERIC_HID_ENDPOINT 0
 #endif
 
@@ -70,7 +77,9 @@
 #define ENABLE_GENERIC_HID_OUTPUT           0
 #endif
 #if ENABLE_GENERIC_HID_OUTPUT
+#ifndef GENERIC_HID_ENDPOINT_OUT_NUM
 #define GENERIC_HID_ENDPOINT_OUT_NUM        (GENERIC_HID_ENDPOINT_IN_NUM + 1)
+#endif
 #endif
 
 #define RESPONSE_OK                 (0)
@@ -101,5 +110,10 @@ bool send_generic_hid_report(uint8_t report_id, uint8_t count, const uint8_t rep
 /// Call `make_generic_hid_report` and send the report, if one is returned.
 bool make_and_send_generic_hid_report(void);
 
+#else
+#if !defined(ENABLE_GENERIC_HID_OUTPUT) || ENABLE_GENERIC_HID_OUTPUT
+#undef ENABLE_GENERIC_HID_OUTPUT
+#define ENABLE_GENERIC_HID_OUTPUT 0
+#endif
 #endif
 #endif

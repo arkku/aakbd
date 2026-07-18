@@ -1,11 +1,12 @@
+#include <stdint.h>
+#include <stdbool.h>
 #include "eeconfig.h"
-#include <avr/eeprom.h>
+#include "dynamic_storage.h"
 
-#if defined(EEPROM_DRIVER)
+#ifdef EEPROM_DRIVER
 #include "eeprom_driver.h"
 #endif
-
-#if defined(HAPTIC_ENABLE)
+#ifdef HAPTIC_ENABLE
 #include "haptic.h"
 #endif
 
@@ -47,21 +48,18 @@ __attribute__((weak)) void eeconfig_init_kb(void) {
 void eeconfig_init_quantum(void) {
 #if defined(EEPROM_DRIVER)
     eeprom_driver_erase();
+#else
+    for (intptr_t i = 0; i < EECONFIG_SIZE; ++i) {
+        eeprom_update_byte((uint8_t *) i, 0);
+    }
 #endif
+
     eeprom_update_word(EECONFIG_MAGIC_NUMBER_PTR, EECONFIG_MAGIC_NUMBER);
-    eeprom_update_byte(EECONFIG_BACKLIGHT, 0);
-    eeprom_update_dword(EECONFIG_RGBLIGHT, 0);
-    eeprom_update_dword(EECONFIG_RGB_MATRIX, 0);
-    eeprom_update_word(EECONFIG_RGB_MATRIX_EXTENDED, 0);
 
 #if defined(HAPTIC_ENABLE)
     haptic_reset();
-#else
-    // this is used in case haptic is disabled, but we still want sane defaults
-    // in the haptic configuration eeprom. All zero will trigger a haptic_reset
-    // when a haptic-enabled firmware is loaded onto the keyboard.
-    eeprom_update_dword(EECONFIG_HAPTIC, 0);
 #endif
+
     eeconfig_init_kb();
 }
 
@@ -86,4 +84,12 @@ bool eeconfig_is_enabled(void) {
 
 bool eeconfig_is_disabled(void) {
     return (eeprom_read_word(EECONFIG_MAGIC_NUMBER_PTR) == EECONFIG_MAGIC_NUMBER_OFF);
+}
+
+layer_state_t eeconfig_read_default_layer(void) {
+    return (layer_state_t)eeprom_read_byte(EECONFIG_DEFAULT_LAYER);
+}
+
+void eeconfig_update_default_layer(layer_state_t state) {
+    eeprom_update_byte(EECONFIG_DEFAULT_LAYER, (uint8_t)state);
 }

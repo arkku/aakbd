@@ -1,6 +1,6 @@
 /*
 Copyright 2013 Jun Wako <wakojun@gmail.com>
-Copyright 2022 Kimmo Kulovesi
+Copyright 2022-2026 Kimmo Kulovesi (AAKBD changes)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -212,13 +212,16 @@ void     eeconfig_init_user_datablock(void);
 // migrate to that as well.
 // See: quantum/nvm/eeprom/nvm_eeprom_eeconfig_internal.h in QMK
 
+// AAKBD stores the default layer as a layer number, not a bitmask.
+#define DEFAULT_LAYER_STATE_IS_VALUE_NOT_BITMASK
+
 #define EECONFIG_SIZE 35
 #define EECONFIG_KEYMAP_UPPER_BYTE ((uint8_t *) 34)
 
 #define EECONFIG_MAGIC              0xFEE9
-#define EECONFIG_MAGIC_NUMBER ((uint16_t) 0xFEE8)
-#define EECONFIG_MAGIC_NUMBER_OFF ((uint16_t) 0xFFFF)
-#define EECONFIG_MAGIC_NUMBER_PTR ((uint16_t *) 0)
+#define EECONFIG_MAGIC_NUMBER       ((uint16_t) 0xFEE8)
+#define EECONFIG_MAGIC_NUMBER_OFF   ((uint16_t) 0xFFFF)
+#define EECONFIG_MAGIC_NUMBER_PTR   ((uint16_t *) 0)
 #define EECONFIG_DEBUG              ((uint8_t *) 2)
 #define EECONFIG_DEFAULT_LAYER      ((uint8_t *) 3)
 #define EECONFIG_KEYMAP             ((uint8_t *) 4)

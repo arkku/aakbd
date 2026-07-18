@@ -19,124 +19,177 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#define KEYS_C_START // guards against incorrectly doing #include "macros.h"
 #include <assert.h>
-#include "keys.h"
 #include "aakbd.h"
 
+#define USB_KEYBOARD_ACCESS_STATE 1
 #include "usbkbd.h"
+#include "keys.h"
 #include "usb_keys.h"
 #include "keycodes.h"
 
+#if VIAL_ENABLE
+#include "vial.h"
+#include "vial_magic.h"
+#endif
+
+#undef KEYS_C_START
 #ifndef LAYERS_INCLUDE
 #define LAYERS_INCLUDE <layers.c>
 #endif
-#include LAYERS_INCLUDE
-
-#if LAYER_COUNT > 0
 #ifndef MACROS_INCLUDE
 #define MACROS_INCLUDE <macros.c>
 #endif
-#include MACROS_INCLUDE
-#endif
+
+#include LAYERS_INCLUDE
 
 #ifndef DEFAULT_BASE_LAYER
 #define DEFAULT_BASE_LAYER 1
 #endif
+
+#if !defined(LAYER_COUNT) && VIAL_ENABLE
+#define LAYER_COUNT VIAL_LAYER_COUNT
+#endif
+
+#if LAYER_COUNT > 0
+/// The bit for layer `num` is the layer mask.
+#define layer_bit(num)          (((layer_mask_t) 1) << ((num) - 1))
+
+/// Is the layer `num` active? (base layer, or above base layer and enabled)
+#define is_layer_active(num)    ((num) >= base_layer && (((num) == base_layer) || (layer_mask & layer_bit(num))))
+
+#include MACROS_INCLUDE
+
+/// The current base layer number.
+static uint8_t base_layer = DEFAULT_BASE_LAYER;
+static uint8_t previous_base_layer = DEFAULT_BASE_LAYER;
+
+/// The bitmask for active layers.
+static layer_mask_t layer_mask = 0;
+static layer_mask_t previous_layer_mask = 0;
+
+/// "Strong" modifiers mask. These are real modifier keys that are active as
+/// long as they are held.
+static uint8_t strong_modifiers = 0;
+
+/// "Weak" modififers mask. These are modifiers not set by the actual modifier
+/// keys, but rather mapped from extended keycodes, such as for keys that
+/// simulate the actual key + a modifier. Weak modifiers are cleared whenever
+/// another key is pressed, so that they don't influence them.
+static uint8_t weak_modifiers = 0;
+
+#endif // ^ LAYER_COUNT > 0
+
+_Static_assert(LAYER_COUNT >= VIAL_LAYER_COUNT);
+_Static_assert(EXT_KEYCODE_COUNT <= 64);
+
 #if LAYER_COUNT > 1
 // To simplify code elsewhere, define arrays of 1 element for every layer,
 // it's only a few dozen wasted bytes at worst (and in practice it will get
 // optimised away by the compiler)
-#if LAYER_COUNT < 3
+#if VIAL_LAYER_COUNT >= 1
+DEFINE_EMPTY_LAYER(1);
+#endif
+#if LAYER_COUNT < 2 || VIAL_LAYER_COUNT >= 2
+DEFINE_EMPTY_LAYER(2);
+#endif
+#if LAYER_COUNT < 3 || VIAL_LAYER_COUNT >= 3
 DEFINE_EMPTY_LAYER(3);
 #endif
-#if LAYER_COUNT < 4
+#if LAYER_COUNT < 4 || VIAL_LAYER_COUNT >= 4
 DEFINE_EMPTY_LAYER(4);
 #endif
-#if LAYER_COUNT < 5
+#if LAYER_COUNT < 5 || VIAL_LAYER_COUNT >= 5
 DEFINE_EMPTY_LAYER(5);
 #endif
-#if LAYER_COUNT < 6
+#if LAYER_COUNT < 6 || VIAL_LAYER_COUNT >= 6
 DEFINE_EMPTY_LAYER(6);
 #endif
-#if LAYER_COUNT < 7
+#if LAYER_COUNT < 7 || VIAL_LAYER_COUNT >= 7
 DEFINE_EMPTY_LAYER(7);
 #endif
-#if LAYER_COUNT < 8
+#if LAYER_COUNT < 8 || VIAL_LAYER_COUNT >= 8
 DEFINE_EMPTY_LAYER(8);
 #endif
 #if LAYER_COUNT > 8
-#if LAYER_COUNT < 10
+#if VIAL_LAYER_COUNT >= 9
+DEFINE_EMPTY_LAYER(9);
+#endif
+#if LAYER_COUNT < 10 || VIAL_LAYER_COUNT >= 10
 DEFINE_EMPTY_LAYER(10);
 #endif
-#if LAYER_COUNT < 11
+#if LAYER_COUNT < 11 || VIAL_LAYER_COUNT >= 11
 DEFINE_EMPTY_LAYER(11);
 #endif
-#if LAYER_COUNT < 12
+#if LAYER_COUNT < 12 || VIAL_LAYER_COUNT >= 12
 DEFINE_EMPTY_LAYER(12);
 #endif
-#if LAYER_COUNT < 13
+#if LAYER_COUNT < 13 || VIAL_LAYER_COUNT >= 13
 DEFINE_EMPTY_LAYER(13);
 #endif
-#if LAYER_COUNT < 14
+#if LAYER_COUNT < 14 || VIAL_LAYER_COUNT >= 14
 DEFINE_EMPTY_LAYER(14);
 #endif
-#if LAYER_COUNT < 15
+#if LAYER_COUNT < 15 || VIAL_LAYER_COUNT >= 15
 DEFINE_EMPTY_LAYER(15);
 #endif
-#if LAYER_COUNT < 16
+#if LAYER_COUNT < 16 || VIAL_LAYER_COUNT >= 16
 DEFINE_EMPTY_LAYER(16);
 #endif
 #if LAYER_COUNT > 16
-#if LAYER_COUNT < 18
+#if VIAL_LAYER_COUNT >= 17
+DEFINE_EMPTY_LAYER(17);
+#endif
+#if LAYER_COUNT < 18 || VIAL_LAYER_COUNT >= 18
 DEFINE_EMPTY_LAYER(18);
 #endif
-#if LAYER_COUNT < 19
+#if LAYER_COUNT < 19 || VIAL_LAYER_COUNT >= 19
 DEFINE_EMPTY_LAYER(19);
 #endif
-#if LAYER_COUNT < 20
+#if LAYER_COUNT < 20 || VIAL_LAYER_COUNT >= 20
 DEFINE_EMPTY_LAYER(20);
 #endif
-#if LAYER_COUNT < 21
+#if LAYER_COUNT < 21 || VIAL_LAYER_COUNT >= 21
 DEFINE_EMPTY_LAYER(21);
 #endif
-#if LAYER_COUNT < 22
+#if LAYER_COUNT < 22 || VIAL_LAYER_COUNT >= 22
 DEFINE_EMPTY_LAYER(22);
 #endif
-#if LAYER_COUNT < 23
+#if LAYER_COUNT < 23 || VIAL_LAYER_COUNT >= 23
 DEFINE_EMPTY_LAYER(23);
 #endif
-#if LAYER_COUNT < 24
+#if LAYER_COUNT < 24 || VIAL_LAYER_COUNT >= 24
 DEFINE_EMPTY_LAYER(24);
 #endif
-#if LAYER_COUNT < 25
+#if LAYER_COUNT < 25 || VIAL_LAYER_COUNT >= 25
 DEFINE_EMPTY_LAYER(25);
 #endif
-#if LAYER_COUNT < 26
+#if LAYER_COUNT < 26 || VIAL_LAYER_COUNT >= 26
 DEFINE_EMPTY_LAYER(26);
 #endif
-#if LAYER_COUNT < 27
+#if LAYER_COUNT < 27 || VIAL_LAYER_COUNT >= 27
 DEFINE_EMPTY_LAYER(27);
 #endif
-#if LAYER_COUNT < 28
+#if LAYER_COUNT < 28 || VIAL_LAYER_COUNT >= 28
 DEFINE_EMPTY_LAYER(28);
 #endif
-#if LAYER_COUNT < 29
+#if LAYER_COUNT < 29 || VIAL_LAYER_COUNT >= 29
 DEFINE_EMPTY_LAYER(29);
 #endif
-#if LAYER_COUNT < 30
+#if LAYER_COUNT < 30 || VIAL_LAYER_COUNT >= 30
 DEFINE_EMPTY_LAYER(30);
 #endif
-#if LAYER_COUNT < 31
+#if LAYER_COUNT < 31 || VIAL_LAYER_COUNT >= 31
 DEFINE_EMPTY_LAYER(31);
 #endif
 #endif // LAYER_COUNT > 16
 #endif // LAYER_COUNT > 8
 #endif // LAYER_COUNT > 1
 
-#if MAX_KEY_ROLLOVER <= 10
-#define MAX_REMAPPED_KEY_ROLLOVER MAX_KEY_ROLLOVER
-#else
-#define MAX_REMAPPED_KEY_ROLLOVER 10
+#ifndef MAX_REMAPPED_KEY_ROLLOVER
+/// How many _remapped_ keys can be pressed at once?
+#define MAX_REMAPPED_KEY_ROLLOVER 8
 #endif
 
 struct key_source {
@@ -168,49 +221,71 @@ static inline bool
 is_keylock_enabled (void) {
     return false;
 }
-#endif
+#endif // ^ ENABLE_KEYLOCK
 
-/// Get the key code for `key` in layer number `num`. This has to be a macro
-/// because this needs the name of a specific array.
-#define get_key_from_layer(key, num) (              \
+#define get_key_from_static_layer(key, num) (       \
     (sizeof(keycode_t) == 1) ?                      \
         pgm_read_byte(LAYER_ARRAY(num) + (key)) :   \
         pgm_read_word(LAYER_ARRAY(num) + (key))     \
 )
-#define layer_bit(num)              (((layer_mask_t) 1) << ((num) - 1))
-#define is_key_in_layer(key, num)   ((key) < LAYER_SIZE(num))
-#define is_layer_enabled(num)       (((num) == base_layer) || (layer_mask & layer_bit(num)))
 
-#define layer_enabled(num)          layer_state_changed((num), true)
-#define layer_disabled(num)         layer_state_changed((num), false)
+#define is_key_in_static_layer(key, num)   ((key) < LAYER_SIZE(num))
 
-// Note: This sets local variables inside `process_key`
-#define set_keycode_from_layer(key, num) do {                               \
-    if (keycode == 0 && (num) >= base_layer && is_key_in_layer((key), num) && is_layer_enabled(num)) { \
-        keycode = get_key_from_layer((key), num);                           \
-    }                                                                       \
+#if VIAL_ENABLE
+#define get_key_from_layer(key, num) \
+    ((num) <= VIAL_LAYER_COUNT \
+        ? vial_get_keycode_for_physical_key((key), (num)) \
+        : (is_key_in_static_layer((key), num) ? get_key_from_static_layer((key), num) : 0) \
+    )
+
+#define set_keycode_from_layer(key, num, row, col) do {                     \
+    if (keycode == 0 && is_layer_active(num)) { \
+        if (num <= VIAL_LAYER_COUNT) { \
+            keycode = vial_get_keycode_at((row), (col), (num)); \
+        } else if (is_key_in_static_layer((key), num)) { \
+            keycode = get_key_from_static_layer((key), num); \
+        } \
+        if (keycode != 0) { layer = (num); } \
+    } \
 } while (0)
+#else // ^ VIAL_ENABLE
+#define get_key_from_layer(key, num) \
+    (is_key_in_static_layer((key), num) ? get_key_from_static_layer((key), num) : 0)
 
-#if LAYER_COUNT > 0
-/// The current base layer number.
-static uint8_t base_layer = DEFAULT_BASE_LAYER;
-static uint8_t previous_base_layer = DEFAULT_BASE_LAYER;
+#define set_keycode_from_layer(key, num, row, col) do { \
+    if (keycode == 0 && is_key_in_static_layer((key), num) && is_layer_active(num)) { \
+        keycode = get_key_from_static_layer((key), num); \
+        if (keycode != 0) { layer = (num); } \
+    } \
+} while (0)
+#endif
 
-/// The bitmask for active layers.
-static layer_mask_t layer_mask = 0;
-static layer_mask_t previous_layer_mask = 0;
+#define layer_enabled(num)  layer_state_changed((num), true)
+#define layer_disabled(num) layer_state_changed((num), false)
 
-/// "Strong" modifiers mask. These are real modifier keys that are active as
-/// long as they are held.
-static uint8_t strong_modifiers = 0;
+/// If we have a simulated keypress in progress, this is the pending keycode
+/// to release.
+static uint8_t pending_release = 0;
 
-/// "Weak" modififers mask. These are modifiers not set by the actual modifier
-/// keys, but rather mapped from extended keycodes, such as for keys that
-/// simulate the actual key + a modifier. Weak modifiers are cleared whenever
-/// another key is pressed, so that they don't influence them.
-static uint8_t weak_modifiers = 0;
+/// The tick since which `pending_release` has been pending.
+static uint8_t pending_release_since = 0;
 
 static inline void
+send_pending_release (void) {
+    usb_keyboard_release(pending_release);
+    pending_release = 0;
+    (void) usb_keyboard_send_if_needed();
+}
+
+static inline void
+set_pending_release (const uint8_t key) {
+    pending_release = key;
+    pending_release_since = current_10ms_tick_count();
+}
+
+#if LAYER_COUNT > 0
+
+static_or_vial void
 set_base_layer (const uint8_t num) {
     previous_base_layer = base_layer;
     if (base_layer == num) {
@@ -220,21 +295,26 @@ set_base_layer (const uint8_t num) {
 
     for (int_fast8_t i = previous_base_layer; i < num; ++i) {
         // Active layers with a lower number than the new base became disabled
-        if (i == previous_base_layer || is_layer_active(i)) {
+        if (i == previous_base_layer || is_layer_enabled(i)) {
             layer_disabled(i);
         }
     }
+
     if (previous_base_layer > num) {
-        for (int_fast8_t i = num; i < previous_base_layer; ++i) {
+        layer_enabled(num);
+
+        for (int_fast8_t i = num + 1; i < previous_base_layer; ++i) {
             // Active layers with a higher number than the new base became enabled
-            if (i == num || is_layer_active(i)) {
+            if (is_layer_enabled(i)) {
                 layer_enabled(i);
             }
         }
-        if (!is_layer_active(previous_base_layer)) {
+        if (!is_layer_enabled(previous_base_layer)) {
             // The previous base can still have become disabled
             layer_disabled(previous_base_layer);
         }
+    } else if (!is_layer_enabled(num)) {
+        layer_enabled(num);
     }
 }
 
@@ -244,7 +324,7 @@ restore_previous_base_layer (void) {
 }
 
 static inline bool
-is_layer_active (const uint8_t num) {
+is_layer_enabled (const uint8_t num) {
     return (layer_mask & layer_bit(num)) != 0;
 }
 
@@ -265,12 +345,17 @@ active_layers_mask (void) {
     return layer_mask;
 }
 
-static inline uint8_t
+static_or_vial uint8_t
 current_base_layer (void) {
     return base_layer;
 }
 
-static inline void
+static_or_vial void
+register_modifiers (void) {
+    usb_keyboard_set_modifiers(strong_modifiers_mask() | weak_modifiers_mask());
+}
+
+static_or_vial void
 clear_weak_modifiers (void) {
     weak_modifiers = 0U;
 }
@@ -280,32 +365,32 @@ clear_strong_modifiers (void) {
     strong_modifiers = 0U;
 }
 
-static inline void
+static_or_vial void
 add_weak_modifiers (const uint8_t mods) {
     weak_modifiers |= mods;
 }
 
-static inline void
+static_or_vial void
 remove_weak_modifiers (const uint8_t mods) {
     weak_modifiers &= ~(mods);
 }
 
-static inline uint8_t
+static_or_vial uint8_t
 weak_modifiers_mask (void) {
     return weak_modifiers;
 }
 
-static inline void
+static_or_vial void
 add_strong_modifiers (const uint8_t mods) {
     strong_modifiers |= mods;
 }
 
-static inline void
+static_or_vial void
 remove_strong_modifiers (const uint8_t mods) {
     strong_modifiers &= ~(mods);
 }
 
-static inline uint8_t
+static_or_vial uint8_t
 strong_modifiers_mask (void) {
     return strong_modifiers;
 }
@@ -385,13 +470,6 @@ static inline keycode_t keycode_from_layer(uint8_t key, uint8_t num);
 /// another keypress.
 static bool is_pending_keypress = false;
 
-/// If we have a simulated keypress in progress, this is the pending keycode
-/// to release either based on time elapsed or the 
-static uint8_t pending_release = 0;
-
-/// The tick since which `pending_release` has been pending.
-static uint8_t pending_release_since = 0;
-
 static inline void
 set_pending_keypress (const bool is_pending) {
     is_pending_keypress = is_pending;
@@ -402,20 +480,7 @@ pending_keypress (void) {
     return is_pending_keypress;
 }
 
-static inline void
-send_pending_release (void) {
-    usb_keyboard_release(pending_release);
-    pending_release = 0;
-    (void) usb_keyboard_send_if_needed();
-}
-
-static inline void
-set_pending_release (const uint8_t key) {
-    pending_release = key;
-    pending_release_since = current_10ms_tick_count();
-}
-
-static inline void
+static void
 register_press_and_release (const uint8_t key, const uint8_t mods) {
     if (pending_release) {
         // Clear any previous release if there was one pending.
@@ -440,7 +505,6 @@ send_pending_key_down (const uint8_t key) {
 
 static void
 reset_layers (void) {
-    clear_override_leds();
     set_active_layers_mask(0);
     previous_layer_mask = 0;
     set_base_layer(DEFAULT_BASE_LAYER);
@@ -448,22 +512,23 @@ reset_layers (void) {
     set_pending_keypress(false);
 }
 
-static inline void
+static void
 register_key (const uint8_t key, const bool is_release) {
     if (is_release) {
         if (IS_MODIFIER(key)) {
             remove_strong_modifiers(MODIFIER_BIT(key));
-        } else {
+        } else if (key) {
             usb_keyboard_release(key);
         }
     } else {
         if (IS_MODIFIER(key)) {
             add_strong_modifiers(MODIFIER_BIT(key));
-        } else {
+        } else if (key) {
+            register_modifiers();
             usb_keyboard_press(key);
         }
     }
-    usb_keyboard_set_modifiers(strong_modifiers_mask() | weak_modifiers_mask());
+    register_modifiers();
 }
 #endif // ^ LAYER_COUNT > 0
 
@@ -472,45 +537,150 @@ report_keyboard_error (bool is_rollover_error) {
     usb_keyboard_press(is_rollover_error ? USB_KEY_ROLLOVER : USB_KEY_UNDEFINED_ERROR);
 }
 
+#if VIAL_ENABLE
+uint8_t grave_esc_override_mask = 0;
+#else
+#define grave_esc_override_mask GRAVE_ESC_OVERRIDE_MASK
+#endif
+
+#if ENABLE_ONESHOT_KEYCODES
+#if VIAL_ENABLE
+/// Runtime one-shot tap toggle (loaded from EEPROM).
+uint8_t oneshot_tap_toggle = ONESHOT_TAP_TOGGLE;
+
+/// Runtime one-shot timeout in ms (loaded from EEPROM).
+uint16_t oneshot_timeout_ms = ONESHOT_TIMEOUT_MS;
+#else
+
+#define oneshot_timeout_ms ONESHOT_TIMEOUT_MS
+#define oneshot_tap_toggle ONESHOT_TAP_TOGGLE
+
+#endif
+
+_Static_assert(ONESHOT_TIMEOUT_MS <= ONESHOT_TIMEOUT_MS_MAX, "ONESHOT_TIMEOUT_MS too large");
+
+/// One-shot modifier bitmask.
+static uint8_t oneshot_mods = 0;
+
+/// One-shot layer (1-31) that is temporarily activated. 0 = inactive.
+static uint8_t oneshot_layer = 0;
+
+/// Command used to activate the one-shot (1-5), for undo on consumption.
+static uint8_t oneshot_command = 0;
+
+/// Tap count for the current one-shot key (used for tap toggle).
+uint8_t oneshot_tap_count = 0;
+
+/// Timestamp of last one-shot layer press (for timeout).
+uint8_t oneshot_layer_time = 0;
+
+// Apply a one-shot layer command: execute command c on layer n.
+static void
+oneshot_apply (uint8_t layer, uint8_t command) {
+    switch (command) {
+    case CMD_LAYER_TOGGLE:
+        toggle_layer(layer);
+        return;
+    case CMD_LAYER_DISABLE:
+        disable_layer(layer);
+        return;
+    case CMD_LAYER_ENABLE:
+        enable_layer(layer);
+        return;
+    case CMD_LAYER_SET_MASK:
+        set_active_layer(layer);
+        return;
+    case CMD_LAYER_SET_BASE:
+        set_base_layer(layer);
+        return;
+    }
+}
+
+// Undo the previous one-shot layer command.
+static void
+restore_oneshot_layer (void) {
+    uint8_t undo = oneshot_command;
+    switch (undo) {
+    case CMD_LAYER_ENABLE:
+        undo = CMD_LAYER_DISABLE;
+        break;
+    case CMD_LAYER_DISABLE:
+        undo = CMD_LAYER_ENABLE;
+        break;
+    case CMD_LAYER_SET_MASK:
+        restore_previous_layer_state();
+        return;
+    case CMD_LAYER_SET_BASE:
+        restore_previous_base_layer();
+        return;
+    default:
+        break;
+    }
+    oneshot_apply(oneshot_layer, undo);
+}
+#endif
+
+#if ENABLE_TRI_LAYER
+static void
+update_tri_layer (void) {
+    if (is_layer_enabled(2) && is_layer_enabled(3)) {
+        enable_layer(4);
+    } else {
+        disable_layer(4);
+    }
+}
+#endif
+
 void
-process_key (uint8_t key, bool is_release) {
+process_keycode (const uint8_t physical_key, keycode_t keycode, int8_t action, uint8_t row, uint8_t col) {
 #if LAYER_COUNT > 0
-    keycode_t keycode = PASS;
-    const bool was_pending_keypress = pending_keypress();
-    const uint8_t physical_key = key;
+    uint8_t layer = 0;
+    uint8_t key = physical_key;
     uint8_t data_or_index = 0;
+    const bool was_pending_keypress = pending_keypress();
+    bool is_release = (action > PRESS);
 
     if (pending_release) {
         // If we are pending some timed key release, release it now since
-        // otherwise timing between it and this key event will be wrong.
+        // otherwise the timing between it and this key event will be wrong.
         send_pending_release();
     }
 
     if (is_release) {
 #if ENABLE_KEYLOCK
-        if (physical_key == keylock_key) {
+        if (keylock_key && physical_key == keylock_key) {
             // Do not release the locked key
             return;
         }
 #endif
-        // Find the keycode corresponding to the original press of this key,
-        // which might differ with the current layer activation state.
-        int_fast8_t ri = 0, wi = 0;
-        do {
-            if (keybuffer[ri].key != key) {
-                keybuffer[wi].key = keybuffer[ri].key;
-                keybuffer[wi].data = keybuffer[ri].data;
-                keybuffer[wi].keycode = keybuffer[ri].keycode;
-                ++wi;
-            } else {
-                keycode = keybuffer[ri].keycode;
-                data_or_index = keybuffer[ri].data;
-            }
-            ++ri;
-        } while (keybuffer[wi].key);
+
+#if VIAL_ENABLE && VIAL_COMBO_COUNT > 0
+        if (physical_key && combo_handle_release(physical_key, &keycode, &data_or_index)) {
+            // The keycode has been consumed by the combo, do not release the key
+            goto postprocess;
+        }
+#endif
+
+        if (!keycode && physical_key) {
+            // Find the keycode corresponding to the original press of this key,
+            // which might differ with the current layer activation state.
+            int_fast8_t ri = 0, wi = 0;
+            do {
+                if (keybuffer[ri].key != key) {
+                    keybuffer[wi].key = keybuffer[ri].key;
+                    keybuffer[wi].data = keybuffer[ri].data;
+                    keybuffer[wi].keycode = keybuffer[ri].keycode;
+                    ++wi;
+                } else {
+                    keycode = keybuffer[ri].keycode;
+                    data_or_index = keybuffer[ri].data;
+                }
+                ++ri;
+            } while (keybuffer[wi].key);
+        }
     } else {
 #if ENABLE_KEYLOCK
-        if (physical_key == keylock_key) {
+        if (keylock_key && physical_key == keylock_key) {
             // The locked key was pressed again, unlock it.
             // (It will be released when this new press is released.)
             keylock_key = 0;
@@ -520,50 +690,73 @@ process_key (uint8_t key, bool is_release) {
 #if LAYER_COUNT > 1
         // The reason this is unrolled is that we get more compile-time
         // constants like `sizeof` here, and the compiler is more likely to
-        // optimise away unused layers.
+        // optimise away unused layers (which is usually most of them).
 #if LAYER_MASK_BITS > 16
-        set_keycode_from_layer(key, 31);
-        set_keycode_from_layer(key, 30);
-        set_keycode_from_layer(key, 29);
-        set_keycode_from_layer(key, 28);
-        set_keycode_from_layer(key, 27);
-        set_keycode_from_layer(key, 26);
-        set_keycode_from_layer(key, 25);
-        set_keycode_from_layer(key, 24);
-        set_keycode_from_layer(key, 23);
-        set_keycode_from_layer(key, 22);
-        set_keycode_from_layer(key, 21);
-        set_keycode_from_layer(key, 20);
-        set_keycode_from_layer(key, 19);
-        set_keycode_from_layer(key, 18);
-        set_keycode_from_layer(key, 17);
+        set_keycode_from_layer(key, 31, row, col);
+        set_keycode_from_layer(key, 30, row, col);
+        set_keycode_from_layer(key, 29, row, col);
+        set_keycode_from_layer(key, 28, row, col);
+        set_keycode_from_layer(key, 27, row, col);
+        set_keycode_from_layer(key, 26, row, col);
+        set_keycode_from_layer(key, 25, row, col);
+        set_keycode_from_layer(key, 24, row, col);
+        set_keycode_from_layer(key, 23, row, col);
+        set_keycode_from_layer(key, 22, row, col);
+        set_keycode_from_layer(key, 21, row, col);
+        set_keycode_from_layer(key, 20, row, col);
+        set_keycode_from_layer(key, 19, row, col);
+        set_keycode_from_layer(key, 18, row, col);
+        set_keycode_from_layer(key, 17, row, col);
 #endif
 #if LAYER_MASK_BITS > 8
-        set_keycode_from_layer(key, 16);
-        set_keycode_from_layer(key, 15);
-        set_keycode_from_layer(key, 14);
-        set_keycode_from_layer(key, 13);
-        set_keycode_from_layer(key, 12);
-        set_keycode_from_layer(key, 11);
-        set_keycode_from_layer(key, 10);
-        set_keycode_from_layer(key, 9);
+        set_keycode_from_layer(key, 16, row, col);
+        set_keycode_from_layer(key, 15, row, col);
+        set_keycode_from_layer(key, 14, row, col);
+        set_keycode_from_layer(key, 13, row, col);
+        set_keycode_from_layer(key, 12, row, col);
+        set_keycode_from_layer(key, 11, row, col);
+        set_keycode_from_layer(key, 10, row, col);
+        set_keycode_from_layer(key, 9, row, col);
 #endif
-        set_keycode_from_layer(key, 8);
-        set_keycode_from_layer(key, 7);
-        set_keycode_from_layer(key, 6);
-        set_keycode_from_layer(key, 5);
-        set_keycode_from_layer(key, 4);
-        set_keycode_from_layer(key, 3);
-        set_keycode_from_layer(key, 2);
-#endif
-        set_keycode_from_layer(key, 1);
+        set_keycode_from_layer(key, 8, row, col);
+        set_keycode_from_layer(key, 7, row, col);
+        set_keycode_from_layer(key, 6, row, col);
+        set_keycode_from_layer(key, 5, row, col);
+        set_keycode_from_layer(key, 4, row, col);
+        set_keycode_from_layer(key, 3, row, col);
+        set_keycode_from_layer(key, 2, row, col);
+#endif // ^ LAYER_COUNT > 1
+        set_keycode_from_layer(key, 1, row, col);
 
-        keycode = preprocess_press(keycode, physical_key, &data_or_index);
+#if VIAL_ENABLE
+        if (keycode > 0 && keycode <= MODIFIERS_END) {
+            keycode = vial_magic_remap_key((uint8_t) keycode);
+        }
+#endif
+
+#if VIAL_ENABLE && VIAL_COMBO_COUNT > 0
+        if (action == PRESS)
+#endif
+        keycode = preprocess_press(keycode, physical_key, layer, &data_or_index);
 
         if (keycode == PASS) {
             keycode = key;
         }
-        if (keycode != key || data_or_index != 0) {
+
+#if VIAL_ENABLE && VIAL_TAP_DANCE_COUNT > 0
+        if (physical_key) {
+            vial_tap_dance_interrupt();
+        }
+#endif
+#if VIAL_ENABLE && VIAL_COMBO_COUNT > 0
+        if (physical_key && action == PRESS) {
+            if (combo_handle_press(keycode, physical_key, row, col, data_or_index)) {
+                goto postprocess;
+            }
+        }
+#endif
+
+        if ((keycode != key || data_or_index != 0) && physical_key) {
             // The key differs from the physical key, so we need to record
             // the keycode so that it will be correctly released even if the
             // layer configuration changes before then. Since we only do this
@@ -574,7 +767,7 @@ process_key (uint8_t key, bool is_release) {
             while (keybuffer[i].key && keybuffer[i].key != key) {
                 ++i;
             }
-            if (i == MAX_REMAPPED_KEY_ROLLOVER || keybuffer[i].key == key) {
+            if (i == MAX_REMAPPED_KEY_ROLLOVER || (key && keybuffer[i].key == key)) {
                 usb_keyboard_press(KEY_ROLLOVER_ERROR_CODE);
                 is_release = true;
                 goto postprocess;
@@ -600,7 +793,7 @@ process_key (uint8_t key, bool is_release) {
         set_pending_keypress(false);
 
 #if ENABLE_KEYLOCK
-        if (is_keylock_armed) {
+        if (is_keylock_armed && physical_key) {
             // Keylock was armed, lock this key down
             keylock_key = physical_key;
         }
@@ -621,27 +814,37 @@ process_key (uint8_t key, bool is_release) {
 
         if (command) {
             if (command == CMD_MODIFIER_OR_KEY) {
-                // The modifier must be strong to have effect
-                is_strong_modifier = true;
-                if (is_release) {
-                    mods = data_or_index; // Undo only the actual mods we added
-                    if (was_pending_keypress) {
-                        // No other key was pressed, act as a keypress
-                        remove_strong_modifiers(mods);
-                        send_pending_key_down(key);
+#if ENABLE_ONESHOT_KEYCODES
+                if (!MODIFIERS_OF_EXTENDED(keycode)) {
+                    // Zero modifiers = one-shot modifier
+                    if (!is_release) {
+                        oneshot_mods |= keycode & 0xFF;
+                        key = PASS;
                     }
-                } else {
-                    // Don't affect the same modifiers if they are already
-                    // present so that this can be used for the key and that
-                    // modifier from another key.
-                    mods &= ~strong_modifiers_mask();
-                    keybuffer[data_or_index].data = mods;
-                    set_pending_keypress(true);
+                } else
+#endif
+                {
+                    // The modifier must be strong to have effect
+                    is_strong_modifier = true;
+                    if (is_release) {
+                        mods = data_or_index; // Undo only the actual mods we added
+                        if (was_pending_keypress) {
+                            // No other key was pressed, act as a keypress
+                            remove_strong_modifiers(mods);
+                            send_pending_key_down(key);
+                        }
+                    } else {
+                        // Don't affect the same modifiers if they are already
+                        // present so that this can be used for the key and that
+                        // modifier from another key.
+                        mods &= ~strong_modifiers_mask();
+                        keybuffer[data_or_index].data = mods;
+                        set_pending_keypress(true);
+                    }
+                    key = PASS;
                 }
-                key = NONE;
             } else {
                 // Layer command
-                uint8_t layer;
                 uint8_t modifier;
 
                 if (command == CMD_LAYER_OR_KEY) {
@@ -661,12 +864,10 @@ process_key (uint8_t key, bool is_release) {
                     is_strong_modifier = true; // Need strength to have effect
                     modifier = LAYER_CMD_MODIFIER_OF(keycode);
                 }
-                key = NONE; // The key part of this keycode is not a key
+                key = PASS; // The key part of this keycode is not a key
 
                 if (layer >= 0 && layer <= LAYER_COUNT) {
                     // Layer modifying command
-
-                    int_fast8_t action; // 1 = activate, -1 = deactivate
 
                     switch (modifier) {
                     case ACT_ON_HOLD:
@@ -694,6 +895,37 @@ process_key (uint8_t key, bool is_release) {
                             set_pending_keypress(true);
                         }
                         break;
+#if ENABLE_ONESHOT_KEYCODES
+                    case ACT_ONESHOT:
+                        if (!is_release) {
+                            if (oneshot_tap_toggle > 1 &&
+                                oneshot_layer == layer &&
+                                oneshot_tap_count + 1 >= oneshot_tap_toggle) {
+                                // Tap count threshold reached — lock layer
+                                oneshot_layer = 0;
+                                oneshot_tap_count = 0;
+                                goto postprocess;
+                            }
+                            if (oneshot_layer && oneshot_layer != layer) {
+                                restore_oneshot_layer();
+                            }
+                            oneshot_layer = layer;
+                            oneshot_command = command;
+                            if (oneshot_tap_toggle > 1) {
+                                ++oneshot_tap_count;
+                            }
+                            if (oneshot_timeout_ms) {
+                                oneshot_layer_time = current_10ms_tick_count();
+                            }
+                            action = 1;
+                        } else {
+                            if (oneshot_timeout_ms) {
+                                oneshot_layer_time = current_10ms_tick_count();
+                            }
+                            action = 0;
+                        }
+                        break;
+#endif
                     default:
                         action = 0;
                         break;
@@ -735,17 +967,39 @@ process_key (uint8_t key, bool is_release) {
                 }
             }
         } else if (!mods) {
+            // Make sure to update modifier state before any macros/etc.
+            register_modifiers();
+
             // Extended keycode that is not a modifier or a command
             if (extended_keycode_is_macro(key)) {
-                // On release the previous data is in `data_or_index`
-                // since the keypress object is already overwritten, while
-                // on release it is the index of the new object.
+#if VIAL_ENABLE
+                uint8_t macro_num = MACRO_OF_EXTENDED(key);
+                if (macro_num >= VIAL_MACRO_START) {
+#if VIAL_MACRO_COUNT > 0
+                    if (physical_key && !is_release) {
+                        // Don't allow recursive Vial macros
+                        dynamic_keymap_macro_send(macro_num - VIAL_MACRO_START);
+                    }
+#endif
+                } else {
+                    execute_macro(
+                        macro_num,
+                        is_release,
+                        physical_key,
+                        layer,
+                        is_release ? &data_or_index : &(keybuffer[data_or_index].data)
+                    );
+                }
+#else
                 execute_macro(
                     MACRO_OF_EXTENDED(key),
                     is_release,
                     physical_key,
+                    layer,
                     is_release ? &data_or_index : &(keybuffer[data_or_index].data)
                 );
+#endif
+                goto postprocess;
             } else if (extended_keycode_is_exact_modifiers(key)) {
                 is_strong_modifier = true;
                 if (is_release) {
@@ -754,7 +1008,7 @@ process_key (uint8_t key, bool is_release) {
                     // released, which would leave their modifiers stuck
                     mods = data_or_index;
                 } else {
-                    mods = EXACT_MODS_OF_EXTENDED(key);
+                    mods = EXACT_MODIFIERS_OF_EXTENDED(key);
                     // Store the modifiers we added with this key
                     keybuffer[data_or_index].data = mods & ~strong_modifiers_mask();
                     // Set exactly these modifiers, nothing else
@@ -773,11 +1027,22 @@ process_key (uint8_t key, bool is_release) {
                 case EXT_ENTER_BOOTLOADER:
                     jump_to_bootloader();
                     break;
-                case EXT_RESET_LAYERS:
+                case EXT_EEPROM_RESET:
                     if (is_release) {
-                        reset_layers();
+                        keyboard_clear_settings();
                     }
                     break;
+                case EXT_GRAVE_ESCAPE:
+                    if (is_release) {
+                        key = data_or_index;
+                    } else {
+                        mods = strong_modifiers_mask() | weak_modifiers_mask();
+                        key = ((mods & (BOTH_SHIFT_BITS | CMD_BIT | RIGHT_CMD_BIT)) && !(mods & grave_esc_override_mask)) ? KEY(BACKTICK) : KEY(ESC);
+                        keybuffer[data_or_index].data = key;
+                        mods = 0;
+                    }
+                    goto extended_key_fallthrough;
+#if ENABLE_EXT_HYPER_MEH
                 case EXT_HYPER_MODIFIERS:
                     mods |= CMD_BIT;
                     // fallthrough
@@ -791,6 +1056,7 @@ process_key (uint8_t key, bool is_release) {
                     }
                     is_strong_modifier = true;
                     break;
+#endif
 #if ENABLE_KEYLOCK
                 case EXT_KEYLOCK:
                     if (!is_release) {
@@ -799,7 +1065,7 @@ process_key (uint8_t key, bool is_release) {
                             key = keylock_key;
                             keylock_key = 0;
                             if (key != physical_key) {
-                                process_key(key, true);
+                                process_key(key, true, row, col);
                             }
                         } else {
                             arm_keylock();
@@ -819,11 +1085,123 @@ process_key (uint8_t key, bool is_release) {
                     }
                     break;
 #endif
-                default:
+#if VIAL_ENABLE
+                case EXT_QMK_KEYCODE:
+                    if (!is_release) {
+                        keybuffer[data_or_index].data = layer;
+                    }
+                    vial_process_qmk_keycode(row, col, is_release ? data_or_index : layer, is_release);
+                    break;
+                case EXT_VIAL_APPLE_FN:
+#if ENABLE_APPLE_FN_KEY
+                    key = USB_KEY_VIRTUAL_APPLE_FN;
+                    goto extended_key_fallthrough;
+#else
+#ifndef APPLE_FN_LAYER
+#ifdef FN_LAYER
+#define APPLE_FN_LAYER FN_LAYER
+#else
+#define APPLE_FN_LAYER VIAL_LAYER_COUNT
+#endif
+#endif
+                    if (!is_release) {
+                        enable_layer(APPLE_FN_LAYER);
+                    } else {
+                        disable_layer(APPLE_FN_LAYER);
+                    }
+#endif
+                    break;
+#endif
+#if ENABLE_TRI_LAYER
+                case EXT_LAYER_2_4:
+                    if (!is_release) {
+                        enable_layer(2);
+                    } else {
+                        disable_layer(2);
+                    }
+                    update_tri_layer();
+                    break;
+                case EXT_LAYER_3_4:
+                    if (!is_release) {
+                        enable_layer(3);
+                    } else {
+                        disable_layer(3);
+                    }
+                    update_tri_layer();
+                    break;
+#endif
+#if ENABLE_SPACE_CADET
+                case EXT_SC_LEFT_CTRL_PARENTHESIS_OPEN:
+                    mods = SC_LCPO_HOLD;
+                    goto space_cadet_process;
+                case EXT_SC_RIGHT_CTRL_PARENTHESIS_CLOSE:
+                    mods = SC_RCPC_HOLD;
+                    goto space_cadet_process;
+                case EXT_SC_LEFT_SHIFT_PARENTHESIS_OPEN:
+                    mods = SC_LSPO_HOLD;
+                    goto space_cadet_process;
+                case EXT_SC_RIGHT_SHIFT_PARENTHESIS_CLOSE:
+                    mods = SC_RSPC_HOLD;
+                    goto space_cadet_process;
+                case EXT_SC_LEFT_ALT_PARENTHESIS_OPEN:
+                    mods = SC_LAPO_HOLD;
+                    goto space_cadet_process;
+                case EXT_SC_RIGHT_ALT_PARENTHESIS_CLOSE:
+                    mods = SC_RAPC_HOLD;
+                    goto space_cadet_process;
+                case EXT_SC_RIGHT_SHIFT_ENTER:
+                    mods = SC_SENT_HOLD;
+
+                space_cadet_process:
+                    is_strong_modifier = true;
+
+                    if (!is_release) {
+                        set_pending_keypress(true);
+                    } else if (was_pending_keypress) {
+                        // No other key pressed — send the tap sequence
+                        remove_strong_modifiers(mods);
+                        switch (extended_key) {
+                        case EXT_SC_LEFT_CTRL_PARENTHESIS_OPEN:
+                            mods = SC_LCPO_TAP_MOD;
+                            key = SC_LCPO_TAP_KEY;
+                            break;
+                        case EXT_SC_RIGHT_CTRL_PARENTHESIS_CLOSE:
+                            mods = SC_RCPC_TAP_MOD;
+                            key = SC_RCPC_TAP_KEY;
+                            break;
+                        case EXT_SC_LEFT_SHIFT_PARENTHESIS_OPEN:
+                            mods = SC_LSPO_TAP_MOD;
+                            key = SC_LSPO_TAP_KEY;
+                            break;
+                        case EXT_SC_RIGHT_SHIFT_PARENTHESIS_CLOSE:
+                            mods = SC_RSPC_TAP_MOD;
+                            key = SC_RSPC_TAP_KEY;
+                            break;
+                        case EXT_SC_LEFT_ALT_PARENTHESIS_OPEN:
+                            mods = SC_LAPO_TAP_MOD;
+                            key = SC_LAPO_TAP_KEY;
+                            break;
+                        case EXT_SC_RIGHT_ALT_PARENTHESIS_CLOSE:
+                            mods = SC_RAPC_TAP_MOD;
+                            key = SC_RAPC_TAP_KEY;
+                            break;
+                        default:
+                            mods = SC_SENT_TAP_MOD;
+                            key = SC_SENT_TAP_KEY;
+                            break;
+                        }
+                        usb_keyboard_simulate_keypress(key, mods);
+                        mods = 0;
+                    }
+                    break;
+#endif
+                case EXT_KEYCODE_COUNT:
                     break;
                 }
             }
-            key = NONE;
+            key = PASS;
+        extended_key_fallthrough:
+            // This will fall through to process `key` as normal
         }
 
         if (mods) {
@@ -842,17 +1220,54 @@ process_key (uint8_t key, bool is_release) {
             }
         }
     }
+#if ENABLE_AUTOSHIFT
+    else if (physical_key && vial_autoshift_process(keycode, key, is_release)) {
+        goto postprocess;
+    }
+#endif
+
+#if ENABLE_ONESHOT_KEYCODES
+    // Apply OSM mods as weak modifiers for this keypress
+    if (oneshot_mods) {
+        add_weak_modifiers(oneshot_mods);
+    }
+
+    // Consume one-shot layer on non-modifier keypress.
+    // Skip layer commands (command 1-5) since those are the OSL key itself.
+    if (!is_release && oneshot_layer) {
+        uint8_t cmd = COMMAND_OF(keycode);
+        if (cmd < 1 || cmd > 5) {
+            bool is_modifier_only = IS_MODIFIER(PLAIN_KEY_OF(keycode));
+            if (!is_modifier_only && keycode != NONE && keycode != PASS) {
+                bool is_consuming = (keycode <= (uint8_t)(NONE - 1)) || is_extended_keycode(keycode);
+                if (is_consuming) {
+                    restore_oneshot_layer();
+                    oneshot_layer = 0;
+                }
+            }
+        }
+    }
+#endif
+
     register_key(key, is_release);
+
+#if ENABLE_ONESHOT_KEYCODES
+    // Consume OSM if a non-modifier key is in the buffer
+    if (oneshot_mods && usb_keys_buffer[0] != 0) {
+        oneshot_mods = 0;
+    }
+#endif
+
 postprocess:
     if (is_release) {
         postprocess_release(keycode, physical_key, data_or_index);
     }
 #else // ^ LAYER_COUNT > 0
     // No layers, just use the key as is
-    if (is_release) {
-        usb_keyboard_release(key);
+    if (action > PRESS) {
+        usb_keyboard_release(physical_key);
     } else {
-        usb_keyboard_press(key);
+        usb_keyboard_press(physical_key);
     }
 #endif
     // Update the USB host if there were any changes
@@ -864,9 +1279,6 @@ reset_keys (bool is_wake_up) {
 #if LAYER_COUNT > 0
     clear_weak_modifiers();
     clear_strong_modifiers();
-    if (!is_wake_up || RESET_LAYERS_ON_SUSPEND) {
-        reset_layers();
-    }
     pending_release = 0;
 #endif
     usb_keyboard_release_all_keys();
@@ -878,23 +1290,31 @@ reset_keys (bool is_wake_up) {
         keybuffer[i].data = 0;
         keybuffer[i].keycode = 0;
     }
+#if ENABLE_AUTOSHIFT
+    vial_autoshift_reset();
+#endif
 #if LAYER_COUNT > 0
+    if (!is_wake_up || RESET_LAYERS_ON_SUSPEND) {
+        reset_layers();
+    }
+
     handle_reset();
 
 #if !RESET_LAYERS_ON_SUSPEND
     if (is_wake_up) {
         // Re-trigger layer hooks after suspend.
         for (uint8_t layer = 1; layer <= LAYER_COUNT; ++layer) {
-            if (layer == DEFAULT_BASE_LAYER) {
-                if (!is_layer_active(layer)) {
-                    layer_state_changed(layer, false);
-                }
-            } else if (is_layer_active(layer)) {
+            if (is_layer_active(layer)) {
                 layer_state_changed(layer, true);
+            } else if (layer == DEFAULT_BASE_LAYER) {
+                layer_state_changed(layer, false);
             }
         }
-    }
+    } else
 #endif
+    {
+        layer_state_changed(base_layer, true);
+    }
 #endif
 }
 
@@ -959,33 +1379,51 @@ keys_error (void) {
     return usb_key_error();
 }
 
-static inline keycode_t
+#if LAYER_COUNT > 0
+static keycode_t
 keycode_from_layer (uint8_t key, uint8_t num) {
+#if VIAL_ENABLE
+    if (num <= VIAL_LAYER_COUNT) {
+        return vial_get_keycode_for_physical_key(key, num);
+    }
+#endif
     switch (num) {
     case 0: break;
 #if LAYER_COUNT >= 1
+#if VIAL_LAYER_COUNT < 1
     _Static_assert(LAYER_SIZE(1) <= 0xFF, "Extended keycode as index in layer 1");
     case 1: return get_key_from_layer(key, 1);
 #endif
+#endif
 #if LAYER_COUNT >= 2
+#if VIAL_LAYER_COUNT < 2
     _Static_assert(LAYER_SIZE(2) <= 0xFF, "Extended keycode as index in layer 2");
     case 2: return get_key_from_layer(key, 2);
 #endif
+#endif
 #if LAYER_COUNT >= 3
+#if VIAL_LAYER_COUNT < 3
     _Static_assert(LAYER_SIZE(3) <= 0xFF, "Extended keycode as index in layer 3");
     case 3: return get_key_from_layer(key, 3);
 #endif
+#endif
 #if LAYER_COUNT >= 4
+#if VIAL_LAYER_COUNT < 4
     _Static_assert(LAYER_SIZE(4) <= 0xFF, "Extended keycode as index in layer 4");
     case 4: return get_key_from_layer(key, 4);
 #endif
+#endif
 #if LAYER_COUNT >= 5
+#if VIAL_LAYER_COUNT < 5
     _Static_assert(LAYER_SIZE(5) <= 0xFF, "Extended keycode as index in layer 5");
     case 5: return get_key_from_layer(key, 5);
 #endif
+#endif
 #if LAYER_COUNT >= 6
+#if VIAL_LAYER_COUNT < 6
     _Static_assert(LAYER_SIZE(6) <= 0xFF, "Extended keycode as index in layer 6");
     case 6: return get_key_from_layer(key, 6);
+#endif
 #endif
 #if LAYER_COUNT >= 7
     _Static_assert(LAYER_SIZE(7) <= 0xFF, "Extended keycode as index in layer 7");
@@ -1090,14 +1528,54 @@ keycode_from_layer (uint8_t key, uint8_t num) {
     }
     return key;
 }
+#endif // ^ LAYER_COUNT > 0
 
 /// Called approximately once every 10 milliseconds with an 8-bit time value.
 void
 keys_tick (uint8_t tick_10ms_count) {
-#if LAYER_COUNT > 0
     if (pending_release && is_time_to_release_at(tick_10ms_count)) {
         send_pending_release();
     }
+
+#if LAYER_COUNT > 0
+#if ENABLE_ONESHOT_KEYCODES
+    // One-shot timeout: clear if no key pressed within timeout
+    if (oneshot_timeout_ms && oneshot_layer && (uint8_t) (tick_10ms_count - oneshot_layer_time) >= (uint8_t) (oneshot_timeout_ms / 10)) {
+        restore_oneshot_layer();
+        oneshot_layer = 0;
+        if (oneshot_tap_toggle > 1) {
+            oneshot_tap_count = 0;
+        }
+    }
+#endif
+
     handle_tick(tick_10ms_count);
 #endif
+
+#if VIAL_ENABLE && VIAL_COMBO_COUNT > 0
+    combo_task(tick_10ms_count);
+#endif
 }
+
+#if VIAL_ENABLE
+void
+keys_vial_task (void) {
+#if VIAL_TAP_DANCE_COUNT > 0
+    vial_tap_dance_task();
+#endif
+#if ENABLE_AUTOSHIFT
+    vial_autoshift_task();
+#endif
+}
+
+uint16_t vial_read_progmem_keycode(uint8_t layer, uint8_t physical_key) {
+    if (layer > LAYER_COUNT || layer <= VIAL_LAYER_COUNT) {
+        return 0;
+    }
+    return keycode_from_layer(physical_key, layer);
+}
+
+uint8_t vial_total_layer_count(void) {
+    return LAYER_COUNT;
+}
+#endif

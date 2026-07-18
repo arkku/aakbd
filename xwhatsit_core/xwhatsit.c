@@ -31,3 +31,9 @@ make_generic_hid_report (uint8_t report_id, uint8_t count, uint8_t report[static
     return false;
 }
 #endif
+
+void
+eeconfig_init_kb (void) {
+    clear_saved_matrix_calibration();
+    eeconfig_init_user();
+}

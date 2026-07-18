@@ -6,61 +6,135 @@ OUT_DIR = 'release'
 OBJ_DIR = "#{OUT_DIR}/build"
 CONFIG_PATTERN = '*/release.yaml'
 
-def build_variant(device, base_flags, flags, name)
+$build_errors = []
+$build_warnings = []
+$build_logs = []
+
+def build_variant(device, flags, name, artifacts = %w[hex bin])
   hex = "#{name}.hex"
   out_hex = "#{OUT_DIR}/#{hex}"
   build_dir = "#{OBJ_DIR}/#{device}/#{name}"
   build_hex = "#{build_dir}/#{name}.hex"
   build_bin = "#{build_dir}/#{name}.bin"
+  log_file = "#{build_dir}/build.log"
 
-  return false if File.file?(out_hex) && File.file?(build_hex) && File.mtime(out_hex) >= File.mtime(build_hex)
+  want_hex = artifacts.include?('hex')
+  want_bin = artifacts.include?('bin')
+
+  return false unless want_hex || want_bin
+
+  # Skip if all artifacts are already built and up to date
+  all_done = true
+  all_done = false if want_hex && (!File.file?(out_hex) || !File.file?(build_hex) || File.mtime(out_hex) < File.mtime(build_hex))
+  all_done = false if want_bin && (!File.file?("#{OUT_DIR}/#{name}.bin") || !File.file?(build_bin) || File.mtime("#{OUT_DIR}/#{name}.bin") < File.mtime(build_bin))
+  return false if all_done
 
   custom_dir = "#{OUT_DIR}/#{device}"
-  all_flags = (base_flags + flags +
-               ["HEX=#{build_hex}", "BIN=#{build_bin}", "DEVICE=#{device}",
-                "CUSTOM_DIR=#{custom_dir}", "BUILDDIR=#{build_dir}"]).join(' ')
-  system("make -s -j$(nproc) #{all_flags}", exception: true)
-  FileUtils.cp(build_hex, out_hex)
-  true
-rescue => e
-  warn "FAILED: #{name}: #{e.message}"
-  false
-end
+  Dir.mkdir(custom_dir) unless Dir.exist?(custom_dir)
+  %w[layers macros].each do |base|
+    tmpl = "#{device}/template_#{base}_vial.c"
+    next unless File.file?(tmpl)
+    # Copy to both names: layers.c (for CUSTOM_DIR Makefile rule) and
+    # layers_vial.c (for vial_qmk.mk LAYERS_INCLUDE path lookup).
+    [base, "#{base}_vial"].each do |name|
+      dst = "#{custom_dir}/#{name}.c"
+      FileUtils.cp(tmpl, dst) unless File.file?(dst) && File.mtime(dst) >= File.mtime(tmpl)
+    end
+  end
 
-def expand_options(device, base_flags, option_groups, name = device, flags = [], &block)
-  if option_groups.empty?
-    block.call(device, base_flags, flags, name)
+  flags = flags.compact.reject(&:empty?).uniq
+
+  # Split into Make variables (non-`-D`) and C preprocessor defines (`-D`).
+  # C-level flags must be prefixed with `-D` in release.yaml; they go only
+  # to EXTRA_FLAGS. Make-level flags affect build dependencies (e.g., which
+  # objects to compile) and are passed as Make variables only — their .mk
+  # files convert them to -D defines as needed.
+  make_part = []
+  extra_part = []
+  flags.each do |flag|
+    flag.split.each do |token|
+      if token.start_with?('-D')
+        extra_part << token[2..]
+      else
+        make_part << token
+      end
+    end
+  end
+  make_part = make_part.join(' ')
+  extra_part = extra_part.map { |f| "-D#{f}" }.join(' ')
+
+  make_args = [
+    "make -s -j$(nproc)",
+    "DEVICE=#{device}",
+    want_hex ? "HEX=#{build_hex}" : "HEX=",
+    want_bin ? "BIN=#{build_bin}" : nil,
+    "BUILDDIR=#{build_dir}",
+    "CUSTOM_DIR=#{custom_dir}",
+    "NO_LOCAL_MK=1",
+    make_part.empty? ? nil : make_part,
+    "EXTRA_FLAGS=\"#{extra_part}\"",
+  ].compact.join(' ')
+
+  # Remove stale artifacts so overflowed builds don't leave old files
+  FileUtils.rm_f(out_hex) if want_hex
+  FileUtils.rm_f("#{OUT_DIR}/#{name}.bin") if want_bin
+
+  output = `#{make_args} 2>&1`
+  FileUtils.mkdir_p(build_dir)
+  File.write(log_file, output)
+
+  errors = output.scan(/^.*error:.*$/)
+  warnings = output.scan(/^.*warning:.*$/)
+
+  overflow = output.match(/FIRMWARE_OVERFLOW: exceeds flash by (\d+) bytes/)
+
+  errors.each { |e| $build_errors << "#{name}: #{e.strip}" }
+  warnings.each { |w| $build_warnings << "#{name}: #{w.strip}" unless w.include?("redefined") }
+
+  if $?.success? && !overflow
+    FileUtils.cp(build_hex, out_hex) if want_hex && File.file?(build_hex)
+    FileUtils.cp(build_bin, "#{OUT_DIR}/#{name}.bin") if want_bin && File.file?(build_bin)
+    true
   else
-    group = option_groups.first
-    rest = option_groups[1..]
-    group.each do |flag_name, flag_value|
-      next_name = flag_name.empty? ? name : "#{name}_#{flag_name}"
-      next if name.include?('rmod_arrows') && flag_name.include?('_arrows')
-      expand_options(device, base_flags, rest, next_name, flags + [flag_value], &block)
+    # Clean up artifacts from failed or overflowed builds
+    FileUtils.rm_f(out_hex) if want_hex
+    FileUtils.rm_f("#{OUT_DIR}/#{name}.bin") if want_bin
+    FileUtils.rm_f(build_hex) if want_hex
+    FileUtils.rm_f(build_bin) if want_bin
+    if overflow
+      warn "OVERFLOW (+#{overflow[1]} bytes): #{name}"
+      false
+    else
+      errors.each { |e| warn "FAILED: #{name}: #{e.strip}" }
+      raise "Build failed: #{name}"
     end
   end
 end
 
-def sync_custom_dir(device)
-  custom_dir = "#{OUT_DIR}/#{device}"
-  Dir.mkdir(custom_dir) unless Dir.exist?(custom_dir)
-  %w[layers.c macros.c].each do |file|
-    src = "#{device}/release_#{file}"
-    dst = "#{custom_dir}/#{file}"
-    next unless File.file?(src)
-    next if File.file?(dst) && File.mtime(dst) >= File.mtime(src)
-    FileUtils.cp(src, dst)
+def expand_options(device, base, option_groups, name = device, extra = [], artifacts = %w[hex bin], &block)
+  if option_groups.empty?
+    block.call(device, base + extra, name, artifacts)
+  else
+    group = option_groups.first
+    rest = option_groups[1..]
+    group.each do |suffix, flag|
+      next_name = suffix.empty? ? name : "#{name}_#{suffix}"
+      expand_options(device, base, rest, next_name, extra + [flag], artifacts, &block)
+    end
   end
 end
 
 Dir.mkdir(OUT_DIR) unless Dir.exist?(OUT_DIR)
+Dir.mkdir("#{OUT_DIR}/logs") unless Dir.exist?("#{OUT_DIR}/logs")
 
 EXTRA_DIST = [
-  ['LICENSE',         'LICENSE.aakbd.txt'],
+  ['LICENSE',               'LICENSE.aakbd.txt'],
   ['lib/CMSIS/LICENSE',     'LICENSE.CMSIS.txt'],
   ['lib/STM32F3xx/LICENSE', 'LICENSE.STM32F3xx.txt'],
   ['lib/tinyusb/LICENSE',   'LICENSE.tinyusb.txt'],
   ['README.md',             'README.md'],
+  ['vial/README.md',        'README.vial.md'],
+  ['ps2/README.md',         'README.ps2.md'],
 ]
 
 extra_dests = EXTRA_DIST.map do |src, dst|
@@ -69,25 +143,50 @@ extra_dests = EXTRA_DIST.map do |src, dst|
   dst_path
 end
 
+if __FILE__ == $0
+
 device_hexes = Hash.new { |h, k| h[k] = [] }
 built = false
 
-configs = Dir[CONFIG_PATTERN]
-configs.each do |config_file|
+targets = ARGV.empty? ? nil : ARGV.map(&:dup)
+
+Dir[CONFIG_PATTERN].each do |config_file|
   device = File.dirname(config_file)
+  next if targets && !targets.include?(device)
   config = YAML.safe_load(File.read(config_file))
-  sync_custom_dir(device)
-  expand_options(device, config['base_flags'] || [], config['options'] || []) do |*args|
+  next unless config
+
+  base = config['base_flags'] || []
+  options = config['options'] || []
+  artifacts = config['artifacts'] || %w[hex bin]
+
+  expand_options(device, base, options, device, [], artifacts) do |*args|
     built = true if build_variant(*args)
   end
   device_hexes[device] += Dir["#{OUT_DIR}/#{device}_*.hex"]
+  device_hexes[device] += Dir["#{OUT_DIR}/#{device}_*.bin"]
 end
 
 if built
-  device_hexes.each do |device, hexes|
-    next if hexes.empty?
+  device_hexes.each do |device, artifacts|
+    next if artifacts.empty?
     zip = "#{OUT_DIR}/#{device}.zip"
-    system("zip -jq #{zip} #{hexes.join(' ')} #{extra_dests.join(' ')}", exception: true)
+    system("zip -jq #{zip} #{artifacts.join(' ')} #{extra_dests.join(' ')}", exception: true)
     puts "Created #{zip}"
   end
 end
+
+# Print build summary (unique errors/warnings)
+errs = $build_errors.uniq
+warns = $build_warnings.uniq
+if errs.any?
+  puts "\n=== ERRORS (#{errs.size}) ==="
+  errs.each { |e| puts "  #{e}" }
+end
+if warns.any?
+  puts "\n=== WARNINGS (#{warns.size}) ==="
+  warns.each { |w| puts "  #{w}" }
+end
+puts "\nBuild logs in #{OBJ_DIR}/<device>/<variant>/build.log"
+
+end # __FILE__ == $0

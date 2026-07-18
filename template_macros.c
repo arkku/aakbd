@@ -19,12 +19,53 @@
 #include "layers.c"
 #endif
 
+#if ENABLE_APPLE_FN_KEY
+/// The "weak Apple fn" acts like Apple Fn alone (e.g., for things like
+/// double tap Apple Fn), but the other effects (like changing backspace to
+/// delete) can be done with FN_LAYER, so we can release the Apple Fn there
+/// (e.g., on keyboards without function keys pressing Fn + 1 is supposed to
+/// be the same as pressing the plain F1 key, but without the _weak_ Apple Fn
+/// it would always be like pressing Fn + F1).
+
+static bool is_weak_apple_fn_pressed = false;
+
+static void press_weak_apple_fn(void) {
+    if (!is_virtual_pressed(USB_KEY_VIRTUAL_APPLE_FN)) {
+        press_virtual(USB_KEY_VIRTUAL_APPLE_FN);
+        is_weak_apple_fn_pressed = true;
+    }
+}
+
+static bool release_weak_apple_fn(void) {
+    if (is_weak_apple_fn_pressed) {
+        release_virtual(USB_KEY_VIRTUAL_APPLE_FN);
+        is_weak_apple_fn_pressed = false;
+        return true;
+    } else {
+        return false;
+    }
+}
+#endif
+
 /// This function is called after resolving the keycode of a pressed key from
 /// the currently active layers. It can change the keycode and/or have any
 /// side effects wanted. A single byte of data is available to store state
 /// information for this specific keypress. The same byte is used for macros
 /// in `execute_macro` and for the release `postprocess_release`.
-static inline keycode_t preprocess_press(keycode_t keycode, uint8_t physical_key, uint8_t * restrict data) {
+static inline keycode_t preprocess_press(keycode_t keycode, uint8_t physical_key, uint8_t layer, uint8_t * restrict data) {
+#if ENABLE_APPLE_FN_KEY
+    if (keycode == KEY_APPLE_FN) {
+        // Real Apple Fn makes weak strong
+        is_weak_apple_fn_pressed = false;
+    } else if (layer < FN_LAYER && is_layer_enabled(FN_LAYER)) {
+        // A passthrough key on Apple Fn layer will be used for Fn-combos
+        press_weak_apple_fn();
+    } else if (release_weak_apple_fn()) {
+        // Release the weak Apple Fn when pressing any other key
+        usb_keyboard_send_if_needed();
+    }
+#endif
+
     return keycode;
 }
 
@@ -37,94 +78,92 @@ static inline void postprocess_release(keycode_t keycode, uint8_t physical_key, 
 
 /// This function is called to execute macro keycodes. Macros are implemented
 /// as actual code, so you can do pretty much anything with them.
-static void execute_macro(uint8_t macro_number, bool is_release, uint8_t physical_key, uint8_t * restrict data) {
+static void execute_macro(uint8_t macro_number, bool is_release, uint8_t physical_key, uint8_t layer, uint8_t * restrict data) {
     const enum macro macro = macro_number;
 
     switch (macro) {
-    case MACRO_NOP:
-        break;
-
-    case MACRO_FALLTHROUGH:
-        register_key(physical_key, is_release);
-        break;
-
-    case MACRO_SHIFT_REPLACE_ALT_WITH_CMD_IF_NOT_ALREADY:
-        // Shift, but if Cmd was not already pressed replace Alt with it.
-        if (is_release) {
-            remove_strong_modifiers(*data);
-        } else {
-            if (strong_modifiers_mask() & CMD_BIT) {
-                // There's already a Cmd, just work as a Shift
-                *data = SHIFT_BIT;
+        case FN_LAYER_ON_HOLD:
+            if (is_release) {
+#if ENABLE_APPLE_FN_KEY
+                release_weak_apple_fn();
+#endif
+                if (*data) {
+                    disable_layer(*data);
+                }
             } else {
-                // No Cmd, remove any Alt and work as Shift + Cmd
-                remove_strong_modifiers(ALT_BIT);
-                *data = SHIFT_BIT | CMD_BIT;
+#if ENABLE_APPLE_FN_KEY
+                press_weak_apple_fn();
+#endif
+                layer = FN_LAYER;
+                if (!is_layer_enabled(layer)) {
+                    enable_layer(layer);
+                    *data = layer;
+                } else {
+                    *data = 0;
+                }
             }
-            add_strong_modifiers(*data);
-        }
-        break;
+            break;
 
-    case MACRO_CMD_OR_ALT_IF_ALREADY_CMD:
-        // Works as Cmd if that modifier isn't already set, otherwise as Alt.
-        if (is_release) {
-            remove_strong_modifiers(*data);
-        } else {
-            // Use `data` to store the bit that we added.
-            if (strong_modifiers_mask() & CMD_BIT) {
-                *data = ALT_BIT;
-            } else {
-                *data = CMD_BIT;
-            }
-            add_strong_modifiers(*data);
-        }
-        break;
-
-    case MACRO_PRINT_SCREEN_BOOTLOADER:
-        // Works as a print screen key, but if both shifts are down when the
-        // key is released, enters the bootloader for firmware update. This
-        // basically duplicates the `ENABLE_RESET_SHORTCUT` option in a macro,
-        // and moves it to print screen.
-        if (is_release) {
-            usb_keyboard_release(KEY(PRINT_SCREEN));
-            if (strong_modifiers_mask() == (SHIFT_BIT | RIGHT_SHIFT_BIT)) {
-                jump_to_bootloader();
-            }
-        } else {
-            usb_keyboard_press(KEY(PRINT_SCREEN));
-        }
-        break;
-
-    default:
-        break;
+        default:
+            break;
     }
 }
 
 /// Called after enabling or disabling a layer.
 /// This can be used to do things like add/remove modifiers based on the state
 /// of a layer, or override LEDSs.
-static inline void layer_state_changed(uint8_t layer, bool is_enabled) {
-    if (layer == DVORAK_LAYER) {
-        if (is_enabled) {
-            add_override_leds_on(LED_SCROLL_LOCK);
-        } else {
-            remove_override_leds_on(LED_SCROLL_LOCK);
-        }
-    }
+static void layer_state_changed(uint8_t layer, bool is_enabled) {
+    // if (layer == FN_LAYER) {
+    //     if (is_enabled) {
+    //         add_override_leds_on(LED_SCROLL_LOCK);
+    //     } else {
+    //         remove_override_leds_on(LED_SCROLL_LOCK);
+    //     }
+    // }
 }
 
 /// Called after the keyboard has been reset. This can be used to override the
 /// default initial state, e.g., set custom layers mask, load configuration
 /// from EEPROM, etc.
 static inline void handle_reset(void) {
+    clear_override_leds();
 }
 
 /// Called approximately once every 10 milliseconds with an 8-bit time value.
-/// Long macros and simulated typing can cause this to be called less
-/// frequently, since this is not an interrupt.
+/// This function can be used to implement time-based behaviour, e.g., long
+/// press effects. Long macros and simulated typing can cause this to be
+/// called less frequently than every 10 ms, since this is not an interrupt;
+/// do not assume the count sees every value.
 static inline void handle_tick(uint8_t tick_10ms_count) {
 }
 
 /// Called when USB host LED state changes.
 static inline void keyboard_host_leds_changed(uint8_t leds) {
 }
+
+#if ENABLE_HOST_FINGERPRINT
+#include "host_fingerprint.h"
+
+/// If OS fingerprinting is enabled, this function is called when the
+/// fingerprint is updated. It can be used to configure the keyboard (e.g.,
+/// active layers) based on the operating system it is plugged into.
+void host_os_fingerprint_updated(uint8_t fingerprint) {
+    switch (host_fingerprint_os_guess()) {
+        case HOST_OS_LINUX:
+            //disable_layer(WINDOWS_LAYER);
+            //enable_layer(LINUX_LAYER);
+            break;
+        case HOST_OS_WINDOWS:
+            //disable_layer(LINUX_LAYER);
+            //enable_layer(WINDOWS_LAYER);
+            break;
+        case HOST_OS_MACOS:
+            //disable_layer(LINUX_LAYER);
+            //disable_layer(WINDOWS_LAYER);
+            break;
+        default:
+            return;
+    }
+    host_fingerprint_stop_notifications();
+}
+#endif

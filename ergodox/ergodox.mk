@@ -7,13 +7,18 @@ DEBOUNCE_TYPE = sym_eager_pr
 KEYBOARD_NAME = ergodox_ez
 MCU ?= atmega32u4
 BOOTLOADER_TYPE = halfkay
+DFU_TARGET = teensy
 
 include arch/avr/avr-common.mk
 include qmk_core/qmk_port.mk
 
 DEVICE_OBJS = ergodox_ez.o matrix.o $(QMK_CORE_OBJS) i2c_master.o
 DEVICE_FLAGS += -DBOOTLOADER_HALFKAY -DBOOTLOADER_SIZE=512 -DENABLE_I2C=1
+ifeq (1,$(VIAL_ENABLE))
+DEVICE_FLAGS += -DGENERIC_HID_REPORT_SIZE=32 -DGENERIC_HID_FEATURE_SIZE=32
+else
 DEVICE_FLAGS += -DGENERIC_HID_REPORT_SIZE=22 -DGENERIC_HID_FEATURE_SIZE=2
+endif
 
 CONFIG_FLAGS ?= \
 	-DUSB_VENDOR_ID=$(VENDOR_ID) \
@@ -23,5 +28,6 @@ CONFIG_FLAGS ?= \
 
 $(BUILDDIR)/ergodox.o: led.h ergodox_ez.h usbkbd.h usbkbd_config.h usb_hardware.h keys.h
 $(BUILDDIR)/ergodox_ez.o: ergodox_ez.h i2c_master.h $(COMMON_HEADERS)
-$(BUILDDIR)/keymap.o: device_keymap.h keymap.h ergodox_ez.h config.h usb_keys.h
+$(BUILDDIR)/keymap.o: config.h device_keymap.h keymap.h ergodox_ez.h usb_keys.h
+$(BUILDDIR)/matrix.o: matrix.h debounce.h ergodox_ez.h $(COMMON_HEADERS)
 $(BUILDDIR)/keys.o: device_keymap.h keymap.h ergodox_ez.h

@@ -34,6 +34,14 @@
 #ifndef KK_USBKBD_CONFIG_H
 #define KK_USBKBD_CONFIG_H
 
+#ifndef VIAL_ENABLE
+#define VIAL_ENABLE 0
+#endif
+
+#if VIAL_ENABLE
+#include "vial_config.h"
+#endif
+
 #ifndef USB_MAX_KEY_ROLLOVER
 /// The maximum number of keys to include in the report. The boot protocol will
 /// be supported anyway, which has 6KRO. We can gain 7KRO for free by using the
@@ -150,27 +158,15 @@
 /// Version number in binary-coded decimal (i.e., 1.00 = 0x0100).
 #define DEVICE_VERSION 0x0100U
 #endif
+
 #ifndef ENABLE_BOOTLOADER_SHORTCUT
-/// Enable Left Shift + Scroll Lock + Right Shift (in that order) key combo to
-/// reset and jump to bootloader for firmware update? Note that this can be
-/// disabled here and instead mapped to a custom key in `layers.c`.
-#define ENABLE_BOOTLOADER_SHORTCUT 1
-#endif
-#ifndef ENABLE_RESET_SHORTCUT
 /// Enable Left Shift + Esc + Right Shift (in that order) key combo to
-/// reset the keyboard and release all keys. This can be used if the PS/2
-/// keyboard has somehow got into an invalid state. It is recommended to
-/// instead map this to a key in `layers.c`, that way it can be customised.
-#define ENABLE_RESET_SHORTCUT 0
+/// reset and jump to bootloader for firmware update? Note that a better way
+/// to do the same is by mapping a key, this is mostly for development use
+/// when the mappings might not work.
+#define ENABLE_BOOTLOADER_SHORTCUT 0
 #endif
-#ifndef ENABLE_DEBUG_SHORTCUT
-/// Enable Left Shift + F1 + Right Shift (in that order) key combo to "type"
-/// debug info with the keyboard. This has little value unless you are
-/// modifying the code or debugging an issue. The first number in the debug
-/// report is the free RAM, which is the most useful info there. You can also
-/// map this in your `layers.c`, which is recommended instead of this.
-#define ENABLE_DEBUG_SHORTCUT 0
-#endif
+
 #ifndef DEBOUNCE_DEBUG
 /// Collect debounce statistics: histogram of actual debounce times needed.
 /// The debug printout will include a line showing the distribution of observed
@@ -186,9 +182,19 @@
 #define ENABLE_HOST_FINGERPRINT 0
 #endif
 
+#ifndef ONESHOT_TAP_TOGGLE
+// The number of taps on a oneshot layer to lock it in rather than oneshot.
+#define ONESHOT_TAP_TOGGLE          3
+#endif
+#ifndef ONESHOT_TIMEOUT_MS
+/// Timeout to auto-clear oneshot when no key pressed (0 = no timeout).
+#define ONESHOT_TIMEOUT_MS          2500
+#endif
+#define ONESHOT_TIMEOUT_MS_MAX      2500
+
 #ifndef ENABLE_SIMULATED_TYPING
-/// Enable function to simulate typing. This is required for the
-/// `ENABLE_DEBUG_SHORTCUT` option and for macros that wish to utilise it.
+/// Enable function to simulate typing. This is used for macros that wish
+/// to simulate typing output.
 #define ENABLE_SIMULATED_TYPING 1
 #endif
 #ifndef DVORAK_MAPPINGS
@@ -198,6 +204,14 @@
 #ifndef ENABLE_MEDIA_KEYS
 /// Enable media keys (consumer control usage).
 #define ENABLE_MEDIA_KEYS 0
+#endif
+#ifndef MEDIA_KEYS_ENDPOINT
+/// Use a separate HID endpoint for media keys (Windows-compatible array
+/// format). When 0, media keys are embedded in the keyboard report as
+/// bitfield (macOS/Linux compatible, but fewer keys). When non-zero,
+/// Apple Fn remains in the keyboard report but media keys get their own
+/// endpoint with full 16-bit consumer usage support.
+#define MEDIA_KEYS_ENDPOINT 0
 #endif
 #ifndef ENABLE_APPLE_FN_KEY
 #if USB_VENDOR_ID == USB_VENDOR_ID_APPLE
@@ -231,16 +245,6 @@
 #endif
 #endif
 
-#if ENABLE_APPLE_FN_KEY && APPLE_FN_IS_MODIFIER
-/// Repurpose the last modifier (right command) to be Apple Fn.
-#define USB_KEY_APPLE_FN    MODIFIERS_END
-#define APPLE_FN_BIT        MODIFIER_BIT(USB_KEY_APPLE_FN)
-#endif
-
-#if !ENABLE_SIMULATED_TYPING && ENABLE_DEBUG_SHORTCUT
-#error "ENABLE_DEBUG_SHORTCUT requires ENABLE_SIMULATED_TYPING"
-#endif
-
 #ifndef ENABLE_DFU_INTERFACE
 /// Enable the DFU interface? This has very low use of resources and allows
 /// resetting the device into bootloader mode easily, so this is recommended
@@ -255,11 +259,6 @@
 /// might be useful if the keyboard data is sent over PS/2 and USB exists for
 /// debugging and firmware updates only.
 #define ENABLE_KEYBOARD_ENDPOINT    1
-#endif
-
-#ifndef USE_MULTIPLE_REPORTS
-/// Possible future placeholder, not actually supported.
-#define USE_MULTIPLE_REPORTS        0
 #endif
 
 // MARK: - Constants
@@ -294,6 +293,20 @@
 #endif
 
 #if ENABLE_MEDIA_KEYS
+#if defined(MEDIA_KEYS_COUNT) && MEDIA_KEYS_COUNT > 8 && !defined(MEDIA_KEYS_ENDPOINT)
+#define MEDIA_KEYS_ENDPOINT 1
+#endif
+
+#if MEDIA_KEYS_ENDPOINT
+#ifndef MEDIA_KEYS_COUNT
+#define MEDIA_KEYS_COUNT 22
+#endif
+#if MEDIA_KEYS_COUNT != 22 && MEDIA_KEYS_COUNT != 8
+#warning "MEDIA_KEYS_COUNT can be either 22 or 8 when using MEDIA_KEYS_ENDPOINT"
+#undef MEDIA_KEYS_COUNT
+#define MEDIA_KEYS_COUNT 22
+#endif
+#else // ^ MEDIA_KEYS_ENDPOINT
 #ifndef MEDIA_KEYS_COUNT
 #if ENABLE_APPLE_FN_KEY && !(APPLE_FN_IS_MODIFIER || ENABLE_EXTRA_APPLE_KEYS)
 // Share the reserved byte with Apple Fn
@@ -308,13 +321,23 @@
 #define MEDIA_KEYS_COUNT 7
 #endif
 #endif // ^ MEDIA_KEYS_COUNT
+#if MEDIA_KEYS_COUNT > 8
+#error "MEDIA_KEYS_COUNT > 8 requires MEDIA_KEYS_ENDPOINT"
+#endif
+#endif // ^ !MEDIA_KEYS_ENDPOINT
 #else // ^ ENABLE_MEDIA_KEYS
 #undef MEDIA_KEYS_COUNT
 #define MEDIA_KEYS_COUNT            0
 #endif // ^ !ENABLE_MEDIA_KEYS
 
-#if MEDIA_KEYS_COUNT > 8
-#error "MEDIA_KEYS_COUNT must be <= 8"
+// When using the consumer endpoint with full key set, disable extra Apple keys
+// to free virtual key slots for the 23 consumer keys.
+#if MEDIA_KEYS_ENDPOINT && MEDIA_KEYS_COUNT > 8
+#if defined(ENABLE_EXTRA_APPLE_KEYS) && ENABLE_EXTRA_APPLE_KEYS
+#warning "ENABLE_EXTRA_APPLE_KEYS requires MEDIA_KEYS_COUNT <= 8"
+#endif
+#undef ENABLE_EXTRA_APPLE_KEYS
+#define ENABLE_EXTRA_APPLE_KEYS 0
 #endif
 
 #if ENABLE_APPLE_FN_KEY
@@ -327,16 +350,18 @@
 #define APPLE_KEYS_EXTRA_BITS       0
 #endif
 
-#if ENABLE_MEDIA_KEYS
+#if ENABLE_MEDIA_KEYS && !MEDIA_KEYS_ENDPOINT
+// Media keys embedded in keyboard report (bitfield)
 #if (MEDIA_KEYS_COUNT + APPLE_KEYS_EXTRA_BITS) <= 8
 #define MEDIA_KEYS_BIT_OFFSET       APPLE_KEYS_EXTRA_BITS
 #define VIRTUAL_KEY_BYTES_IN_REPORT 1
 #else
 #define VIRTUAL_KEY_BYTES_IN_REPORT 2
 #endif
-#else // ^ ENABLE_MEDIA_KEYS
+#else // ^ keyboard report media keys
+// Media keys on separate endpoint or disabled: only Apple keys in keyboard report
 #define VIRTUAL_KEY_BYTES_IN_REPORT (APPLE_KEYS_EXTRA_BITS > 0 ? 1 : 0)
-#endif // ^ !ENABLE_MEDIA_KEYS
+#endif // ^ separate endpoint or no media keys
 
 #if VIRTUAL_KEY_BYTES_IN_REPORT > 1
 #warning "There are multiple bytes of virtual keys - not fully boot protocol compatible."
@@ -412,4 +437,39 @@
 #endif
 #endif
 
+#if !VIAL_ENABLE
+#define VIAL_LAYER_COUNT 0
 #endif
+
+#ifndef ENABLE_ONESHOT_KEYCODES
+/// Enable one-shot layer and one-shot modifier keycodes.
+#define ENABLE_ONESHOT_KEYCODES     VIAL_ENABLE
+#endif
+
+#ifndef ENABLE_SPACE_CADET
+/// Enable Space Cadet extended keycodes: modifier on hold, shifted
+/// character on tap.
+#define ENABLE_SPACE_CADET          VIAL_ENABLE
+#endif
+
+#ifndef ENABLE_TRI_LAYER
+/// Enable tri-layer momentary layer keys (FN_MO13, FN_MO23): layer
+/// on hold, tri-layer adjust layer when both held together.
+#define ENABLE_TRI_LAYER            VIAL_ENABLE
+#endif
+
+#ifndef ENABLE_AUTOSHIFT
+/// Enable support for Vial auto-shift. This does not actually make
+/// auto-shift active all the time by default, it must be explicitly
+/// enabled by toggling with the auto-shift control keys.
+#define ENABLE_AUTOSHIFT           VIAL_ENABLE
+#endif
+
+#ifndef GRAVE_ESC_OVERRIDE_MASK
+/// Bitmask of modifier bits that force Grave Escape to produce Esc.
+/// Default 0: Shift/GUI+Grave → tilde/grave, Alt/Ctrl+Grave → Esc.
+/// Example: set to (SHIFT_BIT | ALT_BIT) to make Shift or Alt also produce Esc.
+#define GRAVE_ESC_OVERRIDE_MASK     0
+#endif
+
+#endif // ^ KK_USBKBD_CONFIG_H

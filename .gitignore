@@ -3,14 +3,11 @@
 *.elf
 *.hex
 *.o
-*/keymap_*.c
-*/keymap_custom.c
 *~
 .ccls
 .clangd
 .tags
 CLAUDE.local.md
-gmmkpro1/build/
 */build/
 layers.c
 layers_*.c
@@ -18,4 +15,9 @@ local.mk
 macros.c
 macros_*.c
 release/
-schematic/*
+__pycache__/
+.opencode/
+*.bin
+*.gcda
+*.gcno
+*.gcov

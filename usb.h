@@ -161,9 +161,7 @@
 #define INTERFACE_PROTOCOL_DFU_RUNTIME      0x01
 #define INTERFACE_PROTOCOL_VENDOR_SPECIFC   0xFF
 
-#ifndef HID_PROTOCOL_BOOT
 #define HID_PROTOCOL_BOOT                   0
-#endif
 #define HID_PROTOCOL_REPORT                 1
 
 #define HID_DESCRIPTOR_TYPE_REPORT          0x22

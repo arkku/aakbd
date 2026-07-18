@@ -17,4 +17,4 @@ PRODUCT ?= "PS/2 Keyboard"
 
 $(BUILDDIR)/ps2usb_keys.o: ps2usb_keys.h ps2_keys.h usb_keys.h
 $(BUILDDIR)/ps2usb.o: ps2usb.h kk_ps2_host.h led.h avrtimer.h ps2usb_keys.h usbkbd.h usbkbd_config.h usb_hardware.h aakbd.h keys.h
-$(BUILDDIR)/kk_ps2_host.o: ps2/kk_ps2_host.h
+$(BUILDDIR)/kk_ps2_host.o: ps2/kk_ps2_host.c ps2/kk_ps2_host.h ps2/kk_ps2.h ps2/kk_ps2_avr.h usbkbd_config.h $(COMMON_HEADERS)

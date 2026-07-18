@@ -32,5 +32,24 @@ const uint8_t keymaps[1][MATRIX_ROWS][MATRIX_COLS] PROGMEM = {
         KC_LCTL, KC_LGUI, KC_LALT,                            KC_SPC,                             KC_RALT, KC_RCTL, KC_APFN, KC_LEFT, KC_DOWN, KC_RGHT
     )
 };
+#endif
 
+#if VIAL_ENABLE
+#include "vial/vial.h"
+
+const uint16_t vial_default_layout_options PROGMEM = 0;
+
+const uint8_t PROGMEM vial_unlock_combo_rows[] = { 1, 10 };
+const uint8_t PROGMEM vial_unlock_combo_cols[] = { 3, 4 };
+const uint8_t vial_unlock_combo_len = 2;
+
+const uint8_t vial_keyboard_uid[8] PROGMEM = {
+    0x01, 0x47, 0x50, 0x41,
+#if ISO_LAYOUT
+    0x41,
+#else
+    0x61,
+#endif
+    0x4B, 0x42, 0x44
+};
 #endif

@@ -25,6 +25,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifdef KEYS_C_START
+#error "Do not include macros.h from keys.c, include it from macros.c!"
+#endif
+
 #ifndef KK_MACROS_H
 #define KK_MACROS_H
 
@@ -59,11 +63,11 @@ typedef uint8_t layer_mask_t;
 
 /// Register a key press or release. Note that you _must_ release each
 /// key pressed this way, or it will be stuck!
-static inline void register_key(const uint8_t key, const bool is_release);
+static void register_key(const uint8_t key, const bool is_release);
 
 /// Register a key press now, and automatically release it later, with the
 /// given modifiers mask for the press.
-static inline void register_press_and_release(const uint8_t key, const uint8_t mods);
+static void register_press_and_release(const uint8_t key, const uint8_t mods);
 
 /// Add "strong" modifiers that will persist until cleared. Strong modifiers
 /// _must_ be cleared eventually or they will be stuck!
@@ -76,22 +80,27 @@ static inline void remove_strong_modifiers(const uint8_t mods);
 static inline void clear_strong_modifiers(void);
 
 /// The currently active strong modifiers.
-static inline uint8_t strong_modifiers_mask(void);
+static_or_vial uint8_t strong_modifiers_mask(void);
 
 /// Add "strong" modifiers that will affect exactly the next keypress, after
 /// which they will be cleared automatically.
-static inline void add_weak_modifiers(const uint8_t mods);
+static_or_vial void add_weak_modifiers(const uint8_t mods);
 
 /// Remove the given set of weak modifiers.
-static inline void remove_weak_modifiers(const uint8_t mods);
+static_or_vial void remove_weak_modifiers(const uint8_t mods);
 
 /// Clear all weak modifiers. (Seldom necessary, since they are cleared
 /// automatically on the next key down event.)
-static inline void clear_weak_modifiers(void);
+static_or_vial void clear_weak_modifiers(void);
 
 /// The currently active weak modifiers. Usually zero, since they are
 /// cleared automatically on keypress.
-static inline uint8_t weak_modifiers_mask(void);
+static_or_vial uint8_t weak_modifiers_mask(void);
+
+/// Register the current strong and weak modifiers on USB. This is automatic
+/// when using process_key() and such, but if you are going to send keypresses
+/// directly to the USB layer, then you may need to do this manually first.
+static_or_vial void register_modifiers(void);
 
 /// Reset all layers to the default state.
 static void reset_layers(void);
@@ -106,7 +115,7 @@ static inline void disable_layer(const uint8_t num);
 static inline void toggle_layer(const uint8_t num);
 
 /// Is the given layer number active (excluding base layers)?
-static inline bool is_layer_active(const uint8_t num);
+static inline bool is_layer_enabled(const uint8_t num);
 
 /// The number of the highest active layer (ignoring base layer status)?
 static inline uint8_t highest_active_layer(void);
@@ -124,14 +133,14 @@ static inline void set_active_layer(const uint8_t num);
 /// `set_active_layers_mask`).
 static inline void restore_previous_layer_state(void);
 
+/// The current base layer.
+static_or_vial uint8_t current_base_layer(void);
+
 /// Set the currently active base layer.
-static inline void set_base_layer(const uint8_t num);
+static_or_vial void set_base_layer(const uint8_t num);
 
 /// Restore the previous base layer from `set_base_layer`.
 static inline void restore_previous_base_layer(void);
-
-/// The current base layer.
-static inline uint8_t current_base_layer(void);
 
 /// Set the "pending keypress" flag. This is cleared automatically when a
 /// key is pressed. This can be used to implement behaviour that differs
@@ -159,27 +168,32 @@ static inline void clear_override_leds(void);
 /// Is keylock enabled?
 static inline bool is_keylock_enabled(void);
 
+/// Returns the keycode for `key` from `layer`.
+static keycode_t keycode_from_layer(uint8_t key, uint8_t layer);
+
 /// Called after resolving keycode from the currently active layers.
 /// - Parameters:
 ///     - keycode: The resolved keycode of the key being pressed.
 ///     - physical_key: The keycode of the physical key pressed.
+///     - layer: The layer number from which the keycode was resolved.
 ///     - data: Pointer to a single byte of storage that can be written to.
 ///       This byte is later passed on to `postprocess_release` and
 ///       `execute_macro` (in case the keycode is a macro).
 /// - Returns: The new keycode to use for this keypress. Returning `NONE` will
 ///   prevent the key from having other effects except eventually calling
 ///   `postprocess_release` when released.
-static inline keycode_t preprocess_press(keycode_t keycode, uint8_t physical_key, uint8_t * restrict data);
+static inline keycode_t preprocess_press(keycode_t keycode, uint8_t physical_key, uint8_t layer, uint8_t * restrict data);
 
 /// Called to handle custom macros.
 /// - Parameters:
 ///     - macro_number: The macro number / enum case.
 ///     - is_release: `true` iff this is a key release.
 ///     - physical_key: The keycode of the physical key pressed.
+///     - layer: The layer number from which the keycode was resolved.
 ///     - data: Pointer to a single byte of storage that the macro handler may
 ///       set to any value, which will persist unchanged from the key press to
 ///       release its release.
-static void execute_macro(uint8_t macro_number, bool is_release, uint8_t physical_key, uint8_t * restrict data);
+static void execute_macro(uint8_t macro_number, bool is_release, uint8_t physical_key, uint8_t layer, uint8_t * restrict data);
 
 /// Called after all key release handlers have been called.
 /// - Parameters:
@@ -191,7 +205,7 @@ static inline void postprocess_release(keycode_t keycode, uint8_t physical_key, 
 
 /// Called after enabling or disabling a layer. This includes both base layers
 /// and the active layers mask.
-static inline void layer_state_changed(uint8_t layer, bool is_enabled);
+static void layer_state_changed(uint8_t layer, bool is_enabled);
 
 /// Called when USB host LED state changes. This enables reacting to the
 /// computer programmatically changing things like Num Lock (e.g., for

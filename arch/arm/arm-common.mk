@@ -45,8 +45,8 @@ HEX ?=
 TARGET_ELF ?= $(BUILDDIR)/$(DEVICE).elf
 ifneq (,$(HEX))
 all: $(HEX)
-$(HEX): $(TARGET_ELF)
-	$(OBJCOPY) -O ihex $< $@
+$(HEX): $(BIN)
+	$(OBJCOPY) -O ihex $(TARGET_ELF) $@
 endif
 
 PLATFORM_OBJS = syscalls.o $(MCU_OBJS) $(TINYUSB_OBJS)
@@ -88,9 +88,16 @@ $(TINYUSB_DIR)/tusb.h:
 TARGET_ELF ?= $(BUILDDIR)/$(DEVICE).elf
 
 $(BIN): | $(BUILDDIR)
-	$(CC) $(LDFLAGS) -Wl,-Map=$(BUILDDIR)/$(DEVICE).map -o $(TARGET_ELF) $^ $(LDLIBS)
-	$(SIZE) $(TARGET_ELF)
-	$(OBJCOPY) -O binary $(TARGET_ELF) $@
+	@$(CC) $(LDFLAGS) -Wl,-Map=$(BUILDDIR)/$(DEVICE).map -o $(TARGET_ELF) $^ $(LDLIBS)
+	@$(SIZE) $(TARGET_ELF)
+	@used=$$($(SIZE) $(TARGET_ELF) | tail -1 | awk '{print $$1+$$2}'); \
+	avail=$$(($(MCU_FLASH_SIZE_KB) * 1024)); \
+	free=$$((avail - used)); \
+	echo "  $$used of $$avail bytes used ($$free bytes free)"; \
+	if [ "$$free" -lt 0 ]; then \
+	  echo "  FIRMWARE_OVERFLOW: exceeds flash by $$((-free)) bytes"; \
+	fi
+	@$(OBJCOPY) -O binary $(TARGET_ELF) $@
 	@[ -n "$(DFU_SUFFIX)" ] && which "$(DFU_SUFFIX)" >/dev/null 2>&1 && \
 		$(DFU_SUFFIX) $(DFU_SUFFIX_ARGS) -a $@ || true
 	@chmod a-x $@

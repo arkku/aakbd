@@ -23,13 +23,17 @@
 #include "progmem.h"
 #include "keycodes.h"
 
+/// This adds one level of indirection, allowing the layer number macros to
+/// be used with preprocessor symbols defined as formulas rather than literals.
+#define RESOLVE(num)        num
+
 // MARK: - Internals
 
-#define LAYER_SIZE(num)     ((LAYER_COUNT >= (num)) ? (sizeof PASTE(layer, num)) / sizeof(keycode_t) : 0)
+#define LAYER_SIZE(num)     ((LAYER_COUNT >= RESOLVE(num)) ? (sizeof PASTE(layer, RESOLVE(num))) / sizeof(keycode_t) : 0)
 
-#define LAYER_ARRAY(num)    PASTE(layer, num)
+#define LAYER_ARRAY(num)    PASTE(layer, RESOLVE(num))
 
-#define DEFINE_LAYER(num)   static const keycode_t PASTE(layer, num)[] PROGMEM =
+#define DEFINE_LAYER(num)   static const keycode_t PASTE(layer, RESOLVE(num))[] PROGMEM =
 
 #define DEFINE_EMPTY_LAYER(num) DEFINE_LAYER(num) { 0 }
 

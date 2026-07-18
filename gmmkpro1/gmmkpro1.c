@@ -15,6 +15,7 @@
 #define USB_KEYBOARD_ACCESS_STATE
 #include "usbkbd.h"
 
+#if !VIAL_ENABLE
 enum generic_request {
     GENERIC_REQUEST_NONE,
     GENERIC_REQUEST_JUMP_TO_BOOTLOADER,
@@ -25,9 +26,6 @@ handle_generic_hid_report (uint8_t report_id, uint8_t count,
                            uint8_t report[static count],
                            uint8_t response_length[static 1],
                            uint8_t response[static *response_length]) {
-    (void) report_id;
-    (void) response_length;
-    (void) response;
     if (count == 0) {
         return RESPONSE_OK;
     }
@@ -40,11 +38,12 @@ handle_generic_hid_report (uint8_t report_id, uint8_t count,
         return RESPONSE_ERROR;
     }
 }
+#endif // ^ !VIAL_ENABLE
 
 bool
 make_generic_hid_report (uint8_t report_id, uint8_t count,
                          uint8_t report[static count]) {
-    (void) report_id;
+#if !VIAL_ENABLE
     if (count < 8) {
         return false;
     }
@@ -57,6 +56,9 @@ make_generic_hid_report (uint8_t report_id, uint8_t count,
     report[6] = MATRIX_COLS;
     report[7] = MATRIX_ROWS;
     return true;
+#else
+    return false;
+#endif
 }
 
 #endif // ^ ENABLE_GENERIC_HID_ENDPOINT

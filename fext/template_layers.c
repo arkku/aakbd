@@ -2,7 +2,7 @@
 #include "keymap.h"
 
 #define DEFAULT_BASE_LAYER 1
-#define APPLE_FN_LAYER 2
+#define FN_LAYER 2
 #define FN_SPACE_LAYER 3
 
 #define LAYER_COUNT FN_SPACE_LAYER
@@ -53,13 +53,13 @@ DEFINE_LAYER(1) {
 #if ENABLE_APPLE_FN_KEY
     [FN_KEY] = MACRO(MACRO_WEAK_APPLE_FN),
 #else
-    [FN_KEY] = LAYER_ON_HOLD(APPLE_FN_LAYER),
+    [FN_KEY] = LAYER_ON_HOLD(FN_LAYER),
 #endif
 };
 #endif
 
-#if LAYER_COUNT >= APPLE_FN_LAYER
-DEFINE_LAYER(APPLE_FN_LAYER) {
+#if LAYER_COUNT >= FN_LAYER
+DEFINE_LAYER(FN_LAYER) {
     // The default action of a layer is to pass through to layers below, and
     // ultimately to the key's default action. However, if you wish to disable
     // keys that you don't explicitly define, use the following line at the
@@ -152,7 +152,7 @@ DEFINE_LAYER(APPLE_FN_LAYER) {
 #endif
     [KEY(RETURN)] = KEY(KP_ENTER),
 
-    [FN_KEY] = LAYER_TOGGLE(APPLE_FN_LAYER),
+    [FN_KEY] = LAYER_TOGGLE(FN_LAYER),
 };
 #endif
 
@@ -161,7 +161,6 @@ DEFINE_LAYER(FN_SPACE_LAYER) {
     DISABLE_ALL_KEYS_NOT_DEFINED_BELOW,
 
     [KEY(ESC)] = EXT(RESET_KEYBOARD),
-    [KEY(BACKSPACE)] = EXT(RESET_LAYERS),
 
     [KEY(R)] = EXT(ENTER_BOOTLOADER),
     [KEY(DVORAK_R)] = EXT(ENTER_BOOTLOADER),

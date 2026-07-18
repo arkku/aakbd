@@ -13,7 +13,7 @@ else
 DEBOUNCE_TYPE ?= sym_defer_g
 endif
 
-DEVICE_FLAGS += -DKEYBOARD_NAME=$(KEYBOARD_NAME) -Dasm=__asm -DNO_PRINT -DNO_DEBUG -I$(QMK_DIR) -I$(QMK_DIR)/drivers -I$(QMK_PLATFORMS_DIR) -I$(PLATFORM_DIR) -Wno-old-style-declaration -Wno-pedantic -include config.h
+DEVICE_FLAGS += -DKEYBOARD_NAME=$(KEYBOARD_NAME) -Dasm=__asm -DNO_PRINT -DNO_DEBUG -I$(QMK_DIR) -I$(QMK_DIR)/drivers -I$(QMK_PLATFORMS_DIR) -I$(PLATFORM_DIR) -Wno-old-style-declaration -include config.h
 
 include $(PLATFORM_DIR)/qmk_$(QMK_PLATFORM).mk
 
@@ -79,6 +79,12 @@ $(BUILDDIR)/encoder.o: encoder.h $(COMMON_HEADERS)
 $(BUILDDIR)/rgb_matrix.o: rgb_matrix.h $(COMMON_HEADERS)
 $(BUILDDIR)/aw20216s.o: aw20216s.h spi_master.h $(COMMON_HEADERS)
 $(BUILDDIR)/bootmagic.o: bootmagic.h matrix.h keyboard.h wait.h eeconfig.h bootloader.h $(COMMON_HEADERS)
+$(BUILDDIR)/eeconfig.o: eeconfig.h dynamic_storage.h $(COMMON_HEADERS)
 $(BUILDDIR)/spi_master.o: spi_master.h $(COMMON_HEADERS)
 
 $(BUILDDIR)/config_check.o: gpio.h $(COMMON_HEADERS)
+
+# Vial support: enable for all QMK-based keyboards
+ifeq (1,$(VIAL_ENABLE))
+  include vial/vial_qmk.mk
+endif

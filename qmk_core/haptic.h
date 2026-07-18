@@ -75,6 +75,8 @@ uint8_t haptic_get_feedback(void);
 void    haptic_dwell_increase(void);
 void    haptic_dwell_decrease(void);
 void    haptic_toggle_continuous(void);
+void    haptic_enable_continuous(void);
+void    haptic_disable_continuous(void);
 void    haptic_cont_increase(void);
 void    haptic_cont_decrease(void);
 

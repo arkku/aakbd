@@ -24,7 +24,7 @@ static inline void keyboard_host_leds_changed(uint8_t leds) {
     const bool is_error = (leds & LED_VIRTUAL_USB_ERROR_BIT) != 0;
     const bool is_active = (leds & LED_VIRTUAL_USB_ACTIVE_BIT) != 0;
     const bool is_boot = (leds & LED_VIRTUAL_BOOT_PROTOCOL_BIT) != 0;
-    const bool is_fn = is_layer_active(APPLE_FN_LAYER);
+    const bool is_fn = is_layer_enabled(FN_LAYER);
 
     if (leds & LED_NUM_LOCK_BIT) {
         rgb_led_set_by_keycode(USB_KEY_ESC, is_error ? 16 : 8, is_boot ? 128 : 32, is_active ? 64 : 32);
@@ -48,14 +48,14 @@ static inline void keyboard_host_leds_changed(uint8_t leds) {
 #if ENABLE_APPLE_FN_KEY
 static bool is_weak_apple_fn_pressed = false;
 
-static inline void press_weak_apple_fn(void) {
+static void press_weak_apple_fn(void) {
     if (!is_virtual_pressed(USB_KEY_VIRTUAL_APPLE_FN)) {
         press_virtual(USB_KEY_VIRTUAL_APPLE_FN);
         is_weak_apple_fn_pressed = true;
     }
 }
 
-static inline bool release_weak_apple_fn(void) {
+static bool release_weak_apple_fn(void) {
     if (is_weak_apple_fn_pressed) {
         release_virtual(USB_KEY_VIRTUAL_APPLE_FN);
         is_weak_apple_fn_pressed = false;
@@ -69,18 +69,22 @@ static inline bool release_weak_apple_fn(void) {
 #define release_weak_apple_fn(x)    false
 #endif
 
-static inline keycode_t preprocess_press(keycode_t keycode, uint8_t physical_key, uint8_t * restrict data) {
+static inline keycode_t preprocess_press(keycode_t keycode, uint8_t physical_key, uint8_t layer, uint8_t *  restrict data) {
     rgb_led_set_by_keycode(physical_key, 128, 192, 224);
 
 #if ENABLE_APPLE_FN_KEY
-    if (keycode == PASS && is_layer_active(APPLE_FN_LAYER) && !is_layer_active(WINDOWS_FN_LAYER)) {
-        press_weak_apple_fn();
-    } else if (keycode == KEY_APPLE_FN) {
+    if (keycode == KEY_APPLE_FN) {
+        // Real Apple Fn makes weak strong
         is_weak_apple_fn_pressed = false;
+    } else if (layer < FN_LAYER && is_layer_enabled(FN_LAYER)) {
+        // A passthrough key on Apple Fn layer will be used for Fn-combos
+        press_weak_apple_fn();
     } else if (release_weak_apple_fn()) {
+        // Release the weak Apple Fn when pressing any other key
         usb_keyboard_send_if_needed();
     }
 #endif
+
     return keycode;
 }
 
@@ -92,7 +96,7 @@ static inline void postprocess_release(keycode_t keycode, uint8_t physical_key, 
     }
 }
 
-static void execute_macro(uint8_t macro_number, bool is_release, uint8_t physical_key, uint8_t * restrict data) {
+static void execute_macro(uint8_t macro_number, bool is_release, uint8_t physical_key, uint8_t layer, uint8_t * restrict data) {
     const enum macro macro = macro_number;
 
     switch (macro) {
@@ -105,10 +109,10 @@ static void execute_macro(uint8_t macro_number, bool is_release, uint8_t physica
 
     case MACRO_CYCLE_OS_LAYERS:
         if (is_release) {
-            if (is_layer_active(WINDOWS_LAYER)) {
+            if (is_layer_enabled(WINDOWS_LAYER)) {
                 disable_layer(WINDOWS_LAYER);
                 enable_layer(LINUX_LAYER);
-            } else if (is_layer_active(LINUX_LAYER)) {
+            } else if (is_layer_enabled(LINUX_LAYER)) {
                 disable_layer(LINUX_LAYER);
             } else {
                 enable_layer(WINDOWS_LAYER);
@@ -124,8 +128,8 @@ static void execute_macro(uint8_t macro_number, bool is_release, uint8_t physica
             }
         } else {
             press_weak_apple_fn();
-            const uint8_t layer = APPLE_FN_LAYER;
-            if (!is_layer_active(layer)) {
+            const uint8_t layer = FN_LAYER;
+            if (!is_layer_enabled(layer)) {
                 enable_layer(layer);
                 *data = layer;
             } else {
@@ -264,16 +268,16 @@ static inline void handle_reset(void) {
 
     // Safeguard (probably unnecessary) against momentary layers being left
     // on (e.g., when preserving active layers after wake from suspend)
-    disable_layer(APPLE_FN_LAYER);
+    disable_layer(FN_LAYER);
     disable_layer(WINDOWS_FN_LAYER);
     disable_layer(FN_SPACE_LAYER);
 }
 
-static inline void layer_state_changed(uint8_t layer, bool is_enabled) {
+static void layer_state_changed(uint8_t layer, bool is_enabled) {
     if (is_enabled) {
         switch (layer) {
         case LINUX_LAYER:
-            if (!is_layer_active(WINDOWS_LAYER)) {
+            if (!is_layer_enabled(WINDOWS_LAYER)) {
                 led_set_gradient(false, GRADIENT_GREEN_BLUE);
                 break;
             }
@@ -281,11 +285,11 @@ static inline void layer_state_changed(uint8_t layer, bool is_enabled) {
         case WINDOWS_LAYER:
             led_set_gradient(true, GRADIENT_RED_BLUE);
             break;
-        case APPLE_FN_LAYER:
+        case FN_LAYER:
             keyboard_host_leds_changed(usb_keyboard_led_state());
             break;
         case WINDOWS_FN_LAYER:
-            enable_layer(APPLE_FN_LAYER);
+            enable_layer(FN_LAYER);
             break;
         default:
             break;
@@ -293,17 +297,17 @@ static inline void layer_state_changed(uint8_t layer, bool is_enabled) {
     } else {
         switch (layer) {
         case LINUX_LAYER:
-            led_set_gradient(is_layer_active(WINDOWS_LAYER), GRADIENT_RED_BLUE);
+            led_set_gradient(is_layer_enabled(WINDOWS_LAYER), GRADIENT_RED_BLUE);
             break;
         case WINDOWS_LAYER:
-            led_set_gradient(false, is_layer_active(LINUX_LAYER) ? GRADIENT_GREEN_BLUE : GRADIENT_RED_BLUE);
+            led_set_gradient(false, is_layer_enabled(LINUX_LAYER) ? GRADIENT_GREEN_BLUE : GRADIENT_RED_BLUE);
             break;
-        case APPLE_FN_LAYER:
+        case FN_LAYER:
             (void) release_weak_apple_fn();
             keyboard_host_leds_changed(usb_keyboard_led_state());
             break;
         case WINDOWS_FN_LAYER:
-            disable_layer(APPLE_FN_LAYER);
+            disable_layer(FN_LAYER);
             break;
         default:
             break;
@@ -319,19 +323,27 @@ void os_fingerprint_updated(uint8_t evidence) {
 }
 
 void handle_encoder_rotation(bool is_clockwise) {
+#if ENABLE_MEDIA_KEYS
     if (is_clockwise) {
-        if (ENABLE_MEDIA_KEYS && !is_layer_active(WINDOWS_LAYER)) {
+        if (MEDIA_KEYS_COUNT > 8 || !is_layer_enabled(WINDOWS_LAYER)) {
             usb_keyboard_simulate_keypress(KEY(VOLUME_UP), 0);
         } else {
             usb_keyboard_simulate_keypress(KEY(F21), 0);
         }
     } else {
-        if (ENABLE_MEDIA_KEYS && !is_layer_active(WINDOWS_LAYER)) {
+        if (ENABLE_MEDIA_COUNT > 8 || !is_layer_enabled(WINDOWS_LAYER)) {
             usb_keyboard_simulate_keypress(KEY(VOLUME_DOWN), 0);
         } else {
             usb_keyboard_simulate_keypress(KEY(F20), 0);
         }
     }
+#else
+    if (is_clockwise) {
+        usb_keyboard_simulate_keypress(KEY(F21), 0);
+    } else {
+        usb_keyboard_simulate_keypress(KEY(F20), 0);
+    }
+#endif
 }
 
 #if ENABLE_HOST_FINGERPRINT

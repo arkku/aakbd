@@ -1,8 +1,9 @@
 ## AAKBD
 
-AAKBD is a USB and PS/2 keyboard implementation for AVR (e.g., ATMEGA32U4,
-ATMEGA32U2) devices, and lately some ARM-based keyboards. It's relatively
-easy to port keyboards from the [QMK](https://github.com/qmk/qmk_firmware)
+[AAKBD](https://github.com/arkku/aakbd) is a USB and PS/2 keyboard
+implementation for AVR (e.g., ATMEGA32U4, ATMEGA32U2) devices, and
+lately some ARM-based keyboards. It's relatively easy to port keyboards
+from the [QMK](https://github.com/qmk/qmk_firmware)
 firmware to AAKBD – in that case QMK is used to handle the keyboard's
 hardware, while AAKBD has its own (completely different) keypress processing
 and USB HID implementation.
@@ -16,6 +17,20 @@ do so *arbitrarily* (like "when connected to a computer detected as running
 macOS, activate this layer and set these RGB LEDs, and when my on-Fn-key-hold
 layer is active, also simulate holding down the Apple Fn key but release it
 when other keys are pressed so that it doesn't become a modifier to them").
+
+Nowadays AAKBD also supports a [Vial](https://get.vial.today) compatibility
+layer, which allows configuring AAKBD straight from the
+[Vial GUI](https://vial.rocks). This means you don't actually have to edit
+text files and compile the firmware anymore to use it – you can just download
+a pre-compiled firmware file and customize the layout and layers in Vial. AAKBD
+even supports some extra features on top of what Vial itself has (e.g.,
+auto-activating layers based on whether you plug the keyboard into a computer
+running Windows, macOS or Linux), also configurable from the Vial GUI! And it's
+entirely possible to combine the best of both worlds if you want: you can
+write the text files and arbitrary C code as usual for AAKBD, compile it with
+Vial, and you can combine your own macros, static layers with the dynamic
+layers of Vial itself. On some keyboards AAKBD also fits more stuff than Vial
+itself, because it is smaller than QMK (of which Vial is a fork).
 
 Features supported:
 
@@ -36,10 +51,7 @@ Features supported:
   key or the keylock key is pressed again)
 * simulated Apple Fn key (if you are willing to pretend to be an Apple device,
   i.e., this is for personal use only)
-* some support for media keys (volume control, playback control), at least on
-  operating systems that support embedding them in the same USB HID keyboard
-  report (this may exclude Windows - probably better off using F13-F22 keys
-  and remapping them in the system registry with SharpKeys or similar)
+* support for media keys (playback control, volume control, etc.)
 * up to 128 arbitrary macros _per physical key_ with 1 byte of automatically
   saved state for each held key (and of course each macro can save and use any
   other state as well)
@@ -66,29 +78,17 @@ Features supported:
   to share the USB connector for use with a passive adapter)
 * PS/2 keyboard input for conversion to USB (requires DIY hardware)
 
-Now, that being said, for the regular user it may be better to choose one of
-the established implementations with easy-to-use tools and configuration
-utilities / websites. However, for a more technically inclined person,
-_AAKBD_ may even be more straightforward as it is just C code and Make.
-In particular, the key maps (layers) are based on changing the default,
-named, keys rather than on a positional matrix. So, for any keyboard that
-has some kind of natural naming/mapping for the keys, remapping is simply a
-listing of the differences, rather than a set of complete layers with all
-positions listed. That is, if all you want to do is map a couple of keys,
-you only have to define those keys, not list the entire layout from scratch.
-If you want to add a layer that changes a couple of keys when activated,
-just list those changes in that layer and map the layer toggle to either the
-first layer or activate it automatically based on detected operating system
-that the keyboard is plugged in to.
-
 Currently this repository contains these implementations:
 * A [PS/2 to USB converter](ps2usb/README.md) (which I made to convert
   an IBM Model M keyboard to USB, but it should work with any PS/2 keyboard)
+* An alternative firmware for the [Brand New Model F Keyboards](https://www.modelfkeyboards.com/)
+  (F77, F62, and F50), split into the `modelf77`, `modelf62`, and `modelf50`
+  directories - these three models are the ones I personally have, but it is
+  very easy to support the others, so let me know if you would like to use
+  AAKBD with a different Model F keyboard!
 * An alternative firmware for the OG [ErgoDox Ez](https://ergodox-ez.com)
   (which I happen to have from an old job, and decided to port as a proof of
   concept that this engine is reusable)
-* An alternative firmware for the [Brand New Model F Keyboards](https://www.modelfkeyboards.com/)
-  (F77, F62, and F50), split into the `modelf77`, `modelf62`, and `modelf50` directories
 * An alternative firmware for the **Glorious GMMK Pro rev1** keyboard (no
   longer being sold. This was mostly a proof of concept that the firmware can
   be ported to ARM-based keyboards. But it also demonstrates how the
@@ -101,6 +101,12 @@ processing. So, all the AAKBD configurability and features are supported
 on the QMK-based keyboards, even if not supported in QMK. It should be fairly
 easy to port other keyboards from QMK to AAKBD – let me know if you want help
 with that!
+
+If you are here for **Vial** compatibility, download one of the releases
+and check the [Vial README](vial/README.md) for details. Others (e.g., those
+who wish to compile AAKBD themselves) may wish to keep reading this document.
+Towards there end there are some general musings about keyboard topics such as
+rollover.
 
 ~ [Kimmo Kulovesi](https://arkku.dev/), 2021-10-10 (+ updates)
 
@@ -255,7 +261,7 @@ didn't just use DFU to reset.)
 For some types of keyboards you can enable "bootmagic", i.e., plug the keyboard
 in with a specific key (like <kbd>Esc</kbd>) held down to enter the
 bootloader. Some keyboards may also default to <kbd>Left Shift</kbd> +
-<kbd>Scroll Lock</kbd> + <kbd>Right Shift</kbd> (in that order) as a special
+<kbd>Esc</kbd> + <kbd>Right Shift</kbd> (in that order) as a special
 shortcut, give it a try.
 
 ## Key Mapping
@@ -421,8 +427,7 @@ Examples of extended keycodes include:
   `EXACTLY_CMD` can be useful if you wish to have something like
   <kbd>Shift</kbd> <kbd>Ctrl</kbd> work as a <kbd>Command</kbd> key without
   including the Shift or Ctrl
-* extended keys – predefined virtual keys, e.g., `EXT(ENTER_BOOTLOADER)`,
-  `EXT(RESET_LAYERS)` and `EXT(HYPER)`
+* extended keys – predefined virtual keys, e.g., `EXT(ENTER_BOOTLOADER)`
 * the keylock key – actually another extended key, `EXT(KEYLOCK)`: press this
   key and then some other key to lock that other key down until either that
   same physical key or the keylock key is pressed again
@@ -432,11 +437,41 @@ This is not a complete list – there are many more layer commands, including
 enable or disable instead of hold, or to enable only one exact layer while
 disabling others, etc. See [keycodes.h](keycodes.h) for details.
 
-> As sidenote, the bit structure of the extended keycode is very similar to
-> that used by QMK. However, this is not by design and the keycodes are not
-> directly compatible – it just so happens that implementing a similar set of
-> features in 16 bits dictates exactly how many bits are available for each
-> field of the keycode. =)
+## Extended keys
+
+Extended keys (meaning a specific subset of extended key_codes_) can be used
+in mappings like `EXTENDED(RESET_KEYBOARD)`. These are not actual keycodes
+sent over USB or PS/2, but built-in special cases that may simulate multiple
+keys conditionally, or control the keyboard's built-in features.
+
+A partial list-of extended keys follows, see [keycodes.h](keycodes.h) for all:
+
+* `HYPER` – Sends all modifiers at once (Shift, Ctrl, Alt, Cmd), which makes
+  this easy to use for non-conflicting key bindings as it is very unlikely
+  anyone manually presses all of those
+* `MEH` – Sends almost all modifiers at once (Shift, Ctrl, Alt), i.e., like
+  `HYPER` but without the Cmd/GUI/Windows key
+* `GRAVE_ESCAPE` – The key works as <kbd>Esc</kbd> normally but if pressed
+  together with <kbd>Shift</kbd>, <kbd>Cmd</kbd> or <kbd>Alt Gr</kbd>, it works
+  as the grave/tilde key (aka backtick key) – this seems to be a popular
+  mapping for keyboards without a dedicated Esc key, but personally I would
+  recommend a Fn-key to activate a layer where the key has the alternate
+  function (and/or just map <kbd>Esc</kbd> somewhere else, like, `CTRL_OR(ESC)`
+  on the <kbd>Caps Lock</kbd> key)
+* `ENTER_BOOTLOADER` – Jumps to USB bootloader for firmware updates
+* `RESET_KEYBOARD` – Resets the keyboard state and releases all keys
+* `RESET_SETTINGS` – Resets any persistent settings stored in the keyboard's
+  memory (use with caution, you will have to reconfigure everything!)
+* `TOGGLE_BOOT_PROTOCOL` – This toggles between the normal USB HID report and
+  the boot-protocol compatible mode. This is meant to be used with BIOS or such
+  where the full HID report may not work, but at the same time it probably
+  breaks functionality in actual operating systems where the full report does
+  work.
+* `KEYLOCK` – Locks down the next key until it, or the keylock key, is pressed
+  again. Sort of like a more universal caps lock.
+* `PRINT_DEBUG_INFO` – If `ENABLE_SIMULATED_TYPING` is set, this uses the
+  keyboard to "print" (type) debug information. Activate while in a text
+  editor's input mode.
 
 ## Macros
 
@@ -536,7 +571,7 @@ execute_macro(
     // …
     case MACRO_IPAD_A_O:
         if (!is_release) {
-            const bool is_dvorak = !is_layer_active(DVORAK_ON_QWERTY_LAYER);
+            const bool is_dvorak = !is_layer_enabled(DVORAK_ON_QWERTY_LAYER);
             const uint8_t mods = strong_modifiers_mask();
 
             if ((mods & (ALT_BIT | ALTGR_BIT)) && !(mods & (CMD_BIT | RIGHT_CMD_BIT | CTRL_BIT | RIGHT_CTRL_BIT))) {
@@ -595,16 +630,17 @@ language to accomplish the same thing.
 
 ``` C
 static inline keycode_t
-preprocess_press(keycode_t keycode, uint8_t physical_key, uint8_t * restrict data) {
+preprocess_press(keycode_t keycode, uint8_t physical_key, uint8_t layer, uint8_t * restrict data) {
     return keycode;
 }
 ```
 
 The `preprocess_press` function is called after an extended keycode has been
-resolved from the currently active layers. It can alter the keycode as it
-chooses and return the changed keycode. Returning `NONE` from here causes the
-key press to have no further effect. There is one byte of data available that
-persists from this call to `postprocess_release`, if set.
+resolved from the currently active layers (layer number denoted by `layer`).
+The function can alter the keycode as it chooses and return the changed
+keycode. Returning `NONE` from here causes the key press to have no further
+effect. There is one byte of data available that persists from this call
+to `postprocess_release`, if set.
 
 ``` C
 static inline void
@@ -620,7 +656,7 @@ for the corresponding press, and `data` will contain the byte written to
 ### Layer State
 
 ``` C
-static inline void
+static void
 layer_state_changed(uint8_t layer, bool is_enabled) {
     if (layer == DVORAK_LAYER) {
         if (is_enabled) {
@@ -748,17 +784,28 @@ The main programs reside in different subdirectories, e.g., `ps2usb`:
 
 * [ps2usb.c](ps2usb/ps2usb.c) – the PS/2 to USB converter's main program,
   which handles the physical keyboard setup, and calling all the init and
-  USB/key processing functions
-* [ps2usb_keys.c](ps2usb/ps2usb_keys.c) – this is only used by `ps2usb.c` to
-  convert from PS/2 keycodes to the corresponding USB keycodes, in order to
-  give each key a unique default mapping.
-* [kk_ps2.c](ps2usb/kk_ps2.c) – again, only used by `ps2usb.c` to communicate
-  with the PS/2 keyboard. This is reused from my
-  [PS/2 to serial mouse converter](https://github.com/arkku/mouseps2serial).
-  PS/2 is implemented by bit banging and interrupts rather than the USART,
-  mainly because in that other project the USART was needed for the RS-232
-  serial port. However, this also means the USART is free on this project
-  as well, e.g., to use as a debug console.
+  USB/key processing functions.
+* [qmk_main.c](qmk_core/qmk_main.c) – the main program for keyboards ported
+  from QMK. This is structurally quite similar to the actual QMK main program,
+  but it calls AAKBD's `keys.c` to do all of the actual key processing.
+
+Internal libraries used are split into:
+
+* [arch](arch/) - the `arch` subdirectory contains low-level hardware
+  abstraction layers for different architectures (`avr` and `arm`)
+* [qmk_core](qmk_core/) - the `qmk_core` subdirectory contains a subset of the
+  QMK core drivers and hardware abstraction layers that are needed to port
+  keyboards from QMK to AAKBD's key processing
+* [vial](vial/) – the `vial` subdirectory contains a Vial compatibility layer
+  to enable configuring AAKBD keyboards using the Vial web GUI or the Vial
+  app, as well as reimplementations of some QMK features that are exposed by
+  Vial but aren't part of AAKBD itself (AAKBD enables much more specific and
+  flexible configuration through writing your own macros and such in C code,
+  but that is not possible through Vial, and presumably Vial users wish to
+  avoid doing so anyway, so here are features like tap-dance and combos
+  pre-implemented)
+* [ps2](ps2/) – the `ps2` subdirectory contains the PS/2 host (input) and
+  PS/2 device (output) implementations
 
 The main program is selected either with the `DEVICE` argument to `make` or
 from the `local.mk` file, e.g., `make DEVICE=ps2usb` targets the PS/2 to USB
@@ -767,136 +814,44 @@ i.e., `ps2usb/local.mk`.
 
 For keyboards ported from QMK, such as the [ErgoDox Ez](ergodox), it mostly
 suffices to import `config.h` and `matrix.c` files for that keyboard, create a
-keymap to define the basic mapping from the matrix positions to _unique_
-keycodes (e.g., [keymap.c](ergodox/keymap.c)), and a main program that mostly
-just needs to control the keyboard's LEDs (e.g., [ergodox.c](ergodox/ergodox.c)).
+`keymap.c` to define the basic mapping from the matrix positions to _unique_
+keycodes (e.g., [keymap.c](modelf62/keymap.c)), and whatever extra hardware
+hooks are needed (e.g., [ergodox.c](ergodox/ergodox.c) controls the LEDs).
 In theory things should Just Work if the keyboard itself is running on an
-ATMEGA32U4 device. Of course there are likely to be some adjustments needed to
-configuration, e.g., disable any non-supported feature.
-
-## About Rollover
-
-When it comes to USB keyboards, there's often talk about key rollover (KRO),
-and in particular "NKRO", i.e., the ability to press any number (_n_) keys down
-at the same time. NKRO is often contrasted with 6KRO (6-key rollover) of the
-USB "boot protocol", which is used by simple USB hosts like the BIOS and some
-devices that don't run a full general-purpose OS. However, I think that 6KRO is
-often misunderstood to imply 2KRO, which is a typical limitation of many
-key matrix -based physical keyboards. The physical rollover limit, however, is
-crucially distinct from the USB report rollover limit.
-
-First, let's define "rollover": in this context it means that _any_ combination
-of that many keys can be simultaneously recognised. Most keyboards physically
-wire the keys into a matrix such that each key is connected to one row and
-one column. When the key is pressed, both the row and the column show as
-having a keypress. In case of one or two simultaneously pressed keys, the
-keys are simply the ones at the positions where the "pressed" rows and columns
-intersect. However, pressing a third key connected to the same row or column
-as one of the other two keys can make it ambiguous which keys in that shared
-row/column in the simple matrix implementation. Hence, such keyboards often
-have _some_ combinations of only 3 keys that can't be detected, i.e.,
-2-key rollover (2KRO) since the maximum number of keys where _any_ combination
-can be detected is 2.
-
-> Modern keyboards tend to add diodes to the matrix to prevent this issue, or
-at least arrange the electrical matrix in such ways that those worst cases are
-very unlikely to occur in practice. Meanwhile older and simpler keyboards may
-use a simple matrix that closely follows the physical key layout, which can
-lead to some common combinations being impossible to detect. For example, the
-IBM Model M keyboard cannot recognise <kbd>Shift</kbd> <kbd>Caps Lock</kbd>
-<kbd>S</kbd>, which can be a problem if you remap <kbd>Caps Lock</kbd> to
-<kbd>Ctrl</kbd> or <kbd>Cmd</kbd>.
-
-Completely distinct from the limitations of the physical keyboard, we have the
-USB boot protocol limitation of 6KRO. Or, more accurately, any combination of
-all eight modifiers (left/right Shift/Ctrl/Alt/Cmd) and then any 6 other keys.
-So, if the physical keyboard can support the combination, even the boot protocol
-allows pressing one non-modifier key with each finger of one hand, one
-more non-modifier key on top of that, _and_ any combination of modifiers.
-Personally I find it hard to imagine any _real_ situation where more than this
-is needed; in gaming the other hand tends to be on the mouse, and furthermore
-the key bindings often include Shift and Ctrl, which do not count towards the
-6 keys limit. Perhaps if two people play on a single keyboard, but how common
-is that with USB devices where you can just plug in more controllers?
-Stenography might be an exception, but even that requires at most 10 keys.
-
-> I do fondly remember that Star Control for DOS came with a "Key jammin'"
-program to try which keys can be held down without jamming other keys. Each
-player needed to potentially press four keys at once, so for two players it
-was somewhat challenging, but not impossible, to find a suitable combination
-that is still ergonomic enough to be playable. But nowadays you can
-play Star Control 2 Super Melee in
-[The Ur-Quan Masters](http://sc2.sourceforge.net) with multiple controllers.
-
-Anyway, I think the desire for NKRO is more likely to be the desire for a
-keyboard that doesn't have 2KRO matrix limitations, but those limitations
-have become confused with the boot protocol modifiers + 6KRO. Of course gaming
-keyboard manufacturers are happy to take advantage of this and pretend that
-NKRO is important for gaming, which it isn't. (Even Star Control 2, two players
-on one keyboard, would work with 8-10KRO. And, yes, I consider that the
-ultimate benchmark.)
-
-This is why this project doesn't bother implementing true NKRO, which would
-increase memory use, the size of every USB report packet, and vastly complicate
-things. The rollover _is_ configurable, however. You can get modifiers + 7KRO
-"for free" since the 7th key uses the normally unused reserved byte of the
-boot protocol report. The default `USB_MAX_KEY_ROLLOVER` is set to 10, i.e.,
-modifiers + 10KRO, which really "should be enough for anybody", given that you
-can press one non-modifier key per finger _and_ any combination of modifiers
-on top of that.
-
-Ten keys with modifiers should even cover the most complex macros that press
-many virtual keys with one physical key, especially since most such combinations
-involve modifiers, e.g., the <kbd>Hyper</kbd> key of Shift Ctrl Alt Cmd is
-_only_ modifiers and thus "free" even in boot protocol mode. The cost of
-10KRO over the 6KRO is only 3 extra bytes in the report, and it is compatible
-with the boot protocol until more than 6 keys are pressed at once.
-If you really think you need more rollover, you can set `USB_MAX_KEY_ROLLOVER`
-higher, but I seriously doubt the need beyond bragging rights.
-
-> Just mash your palms on the keyboard once using the original NKRO firmware,
-> take a screenshot of the keyboard viewer to celebrate the moment, then
-> switch to a more efficient and compatible 6-10KRO (+ modifiers) for real use.
-
-Oh, and if you are wondering about boot protocol compatibility, this keyboard
-defaults to the "report" (non-boot) protocol unless the host (e.g., BIOS)
-specifically requests boot protocol. I believe this to be as
-specified. However, some BIOSes do not request the boot protocol. Yet, as
-long as they can handle more than 8 bytes in the report, the first 8 bytes
-are compatible with the boot protocol even in report protocol mode. To get
-similar compatibility with a bitmap NKRO, these bytes would typically be
-wasted. If you encounter a BIOS that does not work, the options are to
-decrease `USB_MAX_KEY_ROLLOVER` to 7 (or 6 if you need `ENABLE_APPLE_FN_KEY`),
-or to map a key to `EXT(TOGGLE_BOOT_PROTOCOL)` and use it to manually switch
-to the boot protocol when needed.
-
-> As an aside, it would indeed be possible to implement NKRO using a bitmap
-report for all keys, rather than just the modifiers, but I hope the above
-has convinced you that it is not worth it.
+ATMEGA32U4 or ATMEGA32U2 device. ARM-based keyboards can also be ported
+(e.g., [gmmkpro1](gmmkpro1/), but it is more likely to need manual tweaking,
+since there are more differences between different ARM controllers.
 
 ## About media keys
 
 I resisted implementing "media keys" support into the firmware for years
 because it complicates and potentially bloats the USB report
-considerably. However, support for the basic playback and volume control
-keys is now implemented. They work on macOS and Linux and take up NO space
-at all in the USB report, because they reside in the one "reserved" byte that
-is normally not used by the USB boot protocol (with which the AAKBD report is
-normally compatible). But turns out Windows does not support this kind of
-USB HID usage mixing in the same report and ignores the media keys.
+considerably, and I didn't really see any need for it: you can just map unused
+keys like <kbd>F22</kbd> and then use software like
+[SharpKeys](https://github.com/randyrants/sharpkeys) (Windows) or
+[Karabiner Elements](https://karabiner-elements.pqrs.org) (macOS) to map those
+keys to whatever you want.
 
-To "fix" this (i.e., work around Windows limitations) would require doing the
-same as other keyboards do: placing the media keys in a separate report,
-which would add overhead and complexity. So far I have chosen not to do it.
-What I do instead is use the Windows registry to remap F19-F24 to the media
-keys and then I use those keys in AAKBD. The registry remapping needs no
-software to run because it's a built-in Windows feature, and you can use a
-a helper program like [SharpKeys](https://github.com/randyrants/sharpkeys) to
-manage these mappings for you.
+Then I figured that since there is an unused extra byte in the normal USB
+keyboard report, I might as well put some media keys there, and I did. But
+turns out that only works on macOS and Linux – Windows doesn't implement proper
+parsing of the HID reports (probably because they can get away with less as all
+commercial manufacturers have to conform to it anyway). But that was fine by me
+since I mostly use macOS and Linux.
 
-So, if you only use Windows, just disable the media keys in AAKBD – they are
-of no benefit to you unless Microsoft fixes it (which seems unlikely given that
-all commercial hardware already works with the current Windows HID parser).
+But when implementing Vial configuration support, I finally gave in and
+implemented the Windows-compatible media keys (because I also needed to support
+more media keys so that the ones from Vial GUI will actually work, not just the
+6 of them that I use myself).
+
+The Vial builds will default to this Windows-compatible version. For non-Vial
+builds, or if building yourself, the settings are `ENABLE_MEDIA_KEYS` and
+`MEDIA_KEYS_ENDPOINT`. The `MEDIA_KEYS_ENDPOINT=1` setting enables the
+Windows-compatible endpoint and support for more media keys (at the cost of
+larger code size and more USB bandwidth used every millisecond), while setting
+it to zero uses the macOS and Linux -compatible extra byte that uses no extra
+bandwidth in the normal keyboard report (but it only supports up to 8 media
+keys, or 7 if Apple Fn is enabled).
 
 ## Host OS Fingerprinting
 
@@ -963,6 +918,13 @@ The fingerprinting concept is based on
 [keyboard.io FingerprintUSBHost](https://github.com/keyboardio/FingerprintUSBHost),
 but the implementation doesn't use any of their code, and mine _may_ be more
 reliable in detecting macOS.
+
+**Vial note**: To make a layer auto-activate on host OS detection, select the
+"User" tab in Vial GUI and put one of the "Mac Layer", "Win Layer" or "Linux
+Layer" (or "PS2 Layer") keycodes anywhere on the layer. That key will work as
+the default key in that position (e.g., if you put it on Enter, that key will
+still work as Enter, but if you have remapped Enter to something else on
+a layer below, that remapping is lost: pick any key you don't plan to remap).
 
 ## RGB LED support
 
@@ -1076,3 +1038,105 @@ in the `ps2` subdirectory. The PS/2 output supports all three scancode sets and
 all standard commands (unlike many later commercial keyboards). I have tested
 mine on an actual IBM PS/2 system, and it doesn't even complain about it not
 being an IBM keyboard (it does complain about several third-party keyboards).
+
+## About Rollover
+
+When it comes to USB keyboards, there's often talk about key rollover (KRO),
+and in particular "NKRO", i.e., the ability to press any number (_n_) keys down
+at the same time. NKRO is often contrasted with 6KRO (6-key rollover) of the
+USB "boot protocol", which is used by simple USB hosts like the BIOS and some
+devices that don't run a full general-purpose OS. However, I think that 6KRO is
+often misunderstood to imply 2KRO, which is a typical limitation of many
+key matrix -based physical keyboards. The physical rollover limit, however, is
+crucially distinct from the USB report rollover limit.
+
+First, let's define "rollover": in this context it means that _any_ combination
+of that many keys can be simultaneously recognised. Most keyboards physically
+wire the keys into a matrix such that each key is connected to one row and
+one column. When the key is pressed, both the row and the column show as
+having a keypress. In case of one or two simultaneously pressed keys, the
+keys are simply the ones at the positions where the "pressed" rows and columns
+intersect. However, pressing a third key connected to the same row or column
+as one of the other two keys can make it ambiguous which keys in that shared
+row/column in the simple matrix implementation. Hence, such keyboards often
+have _some_ combinations of only 3 keys that can't be detected, i.e.,
+2-key rollover (2KRO) since the maximum number of keys where _any_ combination
+can be detected is 2.
+
+> Modern keyboards tend to add diodes to the matrix to prevent this issue, or
+at least arrange the electrical matrix in such ways that those worst cases are
+very unlikely to occur in practice. Meanwhile older and simpler keyboards may
+use a simple matrix that closely follows the physical key layout, which can
+lead to some common combinations being impossible to detect. For example, the
+IBM Model M keyboard cannot recognise <kbd>Shift</kbd> <kbd>Caps Lock</kbd>
+<kbd>S</kbd>, which can be a problem if you remap <kbd>Caps Lock</kbd> to
+<kbd>Ctrl</kbd> or <kbd>Cmd</kbd>.
+
+Completely distinct from the limitations of the physical keyboard, we have the
+USB boot protocol limitation of 6KRO. Or, more accurately, any combination of
+all eight modifiers (left/right Shift/Ctrl/Alt/Cmd) and then any 6 other keys.
+So, if the physical keyboard can support the combination, even the boot protocol
+allows pressing one non-modifier key with each finger of one hand, one
+more non-modifier key on top of that, _and_ any combination of modifiers.
+Personally I find it hard to imagine any _real_ situation where more than this
+is needed; in gaming the other hand tends to be on the mouse, and furthermore
+the key bindings often include Shift and Ctrl, which do not count towards the
+6 keys limit. Perhaps if two people play on a single keyboard, but how common
+is that with USB devices where you can just plug in more controllers?
+Stenography might be an exception, but even that requires at most 10 keys.
+
+> I do fondly remember that Star Control for DOS came with a "Key jammin'"
+program to try which keys can be held down without jamming other keys. Each
+player needed to potentially press four keys at once, so for two players it
+was somewhat challenging, but not impossible, to find a suitable combination
+that is still ergonomic enough to be playable. But nowadays you can
+play Star Control 2 Super Melee in
+[The Ur-Quan Masters](http://sc2.sourceforge.net) with multiple controllers.
+
+Anyway, I think the desire for NKRO is more likely to be the desire for a
+keyboard that doesn't have 2KRO matrix limitations, but those limitations
+have become confused with the boot protocol modifiers + 6KRO. Of course gaming
+keyboard manufacturers are happy to take advantage of this and pretend that
+NKRO is important for gaming, which it isn't. (Even Star Control 2, two players
+on one keyboard, would work with 8-10KRO. And, yes, I consider that the
+ultimate benchmark.)
+
+This is why this project doesn't bother implementing true NKRO, which would
+increase memory use, the size of every USB report packet, and vastly complicate
+things. The rollover _is_ configurable, however. You can get modifiers + 7KRO
+"for free" since the 7th key uses the normally unused reserved byte of the
+boot protocol report. The default `USB_MAX_KEY_ROLLOVER` is set to 10, i.e.,
+modifiers + 10KRO, which really "should be enough for anybody", given that you
+can press one non-modifier key per finger _and_ any combination of modifiers
+on top of that.
+
+Ten keys with modifiers should even cover the most complex macros that press
+many virtual keys with one physical key, especially since most such combinations
+involve modifiers, e.g., the <kbd>Hyper</kbd> key of Shift Ctrl Alt Cmd is
+_only_ modifiers and thus "free" even in boot protocol mode. The cost of
+10KRO over the 6KRO is only 3 extra bytes in the report, and it is compatible
+with the boot protocol until more than 6 keys are pressed at once.
+If you really think you need more rollover, you can set `USB_MAX_KEY_ROLLOVER`
+higher, but I seriously doubt the need beyond bragging rights.
+
+> Just mash your palms on the keyboard once using the original NKRO firmware,
+> take a screenshot of the keyboard viewer to celebrate the moment, then
+> switch to a more efficient and compatible 6-10KRO (+ modifiers) for real use.
+
+Oh, and if you are wondering about boot protocol compatibility, this keyboard
+defaults to the "report" (non-boot) protocol unless the host (e.g., BIOS)
+specifically requests boot protocol. I believe this to be as
+specified. However, some BIOSes do not request the boot protocol. Yet, as
+long as they can handle more than 8 bytes in the report, the first 8 bytes
+are compatible with the boot protocol even in report protocol mode. To get
+similar compatibility with a bitmap NKRO, these bytes would typically be
+wasted. If you encounter a BIOS that does not work, the options are to
+decrease `USB_MAX_KEY_ROLLOVER` to 7 (or 6 if you need `ENABLE_APPLE_FN_KEY`),
+or to map a key to `EXT(TOGGLE_BOOT_PROTOCOL)` and use it to manually switch
+to the boot protocol when needed.
+
+> As an aside, it would indeed be possible to implement NKRO using a bitmap
+report for all keys, rather than just the modifiers, but I hope the above
+has convinced you that it is not worth it.
+
+Copyright © 2021–2026 Kimmo Kulovesi

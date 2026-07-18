@@ -53,6 +53,18 @@ void usb_keyboard_release_all_keys(void);
 /// Send the current keyboard state to the USB host.
 bool usb_keyboard_send_report(void);
 
+/// Send a consumer (media key) usage to the USB host via the consumer endpoint.
+/// Usage of 0 releases the previously sent usage. Requires MEDIA_KEYS_ENDPOINT.
+bool usb_keyboard_send_consumer(uint16_t usage);
+
+#if MEDIA_KEYS_ENDPOINT
+/// Current consumer usage to send (0 = none / release all).
+extern uint16_t usb_consumer_usage;
+
+/// Set to true when a consumer report should be sent.
+extern bool usb_consumer_updated;
+#endif
+
 /// Send the current keyboard state to the USB host if there have been changes.
 /// This must be called periodically (preferably after each set of keypresses)
 /// for the keyboard to react propertly to the press/release calls.
@@ -83,6 +95,9 @@ void usb_keyboard_remove_modifiers(const uint8_t modifier_flags);
 /// if there are already `USB_MAX_KEY_ROLLOVER` keys held down (or 6 in boot
 /// protocol mode).
 bool usb_keyboard_simulate_keypress(const uint8_t key, const uint8_t modifier_flags);
+
+/// Delay between or after keypresses to make sure they register properly.
+void usb_keyboard_keypress_delay(void);
 
 /// Toggles the keyboard protocol between boot protocol and report protocol.
 /// This can be used to work around a BIOS that does not request the boot
@@ -147,6 +162,8 @@ extern uint8_t usb_keys_buffer[MAX_KEY_ROLLOVER + 1];
 /// Flags indicating which modifier keys are currently pressed. Note that if
 /// multiple keys are mapped to the same modifier key, releasing either of
 /// them causes the modifier to be released.
+/// - Note: When using AAKBD (keys.h, macros.h) functions, any direct edits to
+/// these modifiers will be clobbered!
 extern uint8_t usb_keys_modifier_flags;
 
 #if VIRTUAL_KEY_BYTES_IN_REPORT > 1
@@ -193,15 +210,17 @@ extern volatile uint8_t key_error;
 #define VIRTUAL_KEYS_START      USB_KEY_VIRTUAL_MEDIA_1
 #endif
 
-#if ENABLE_MEDIA_KEYS
+#if ENABLE_MEDIA_KEYS && MEDIA_KEYS_COUNT <= 8 && !MEDIA_KEYS_ENDPOINT
 #define VIRTUAL_KEYS_END        (USB_KEY_VIRTUAL_MEDIA_1 + (MEDIA_KEYS_COUNT - 1))
+#elif ENABLE_MEDIA_KEYS
+#define VIRTUAL_KEYS_END        (VIRTUAL_KEYS_START + APPLE_KEYS_EXTRA_BITS - (APPLE_FN_IS_MODIFIER ? 1 : 0))
 #else
-#define VIRTUAL_KEYS_END        USB_KEY_VIRTUAL_APPLE_EXPOSE_DESKTOP
+#define VIRTUAL_KEYS_END        (VIRTUAL_KEYS_START + APPLE_KEYS_EXTRA_BITS - (APPLE_FN_IS_MODIFIER ? 1 : 0))
 #endif
 
 #define IS_VIRTUAL_KEY(key)     ((key) >= VIRTUAL_KEYS_START && (key) <= VIRTUAL_KEYS_END)
 
-#if ENABLE_MEDIA_KEYS && APPLE_KEYS_EXTRA_BITS <= 1 && ENABLE_APPLE_FN_KEY
+#if ENABLE_MEDIA_KEYS && !MEDIA_KEYS_ENDPOINT && APPLE_KEYS_EXTRA_BITS <= 1 && ENABLE_APPLE_FN_KEY
 #define VIRTUAL_KEY_BIT(key)    (((key) < USB_KEY_VIRTUAL_MEDIA_1) ? APPLE_KEYS_EXTRA_BITS : ((usb_keys_extended_flags_t) 1 << (((key) - USB_KEY_VIRTUAL_MEDIA_1) + APPLE_KEYS_EXTRA_BITS)))
 #else
 #define VIRTUAL_KEY_BIT(key)    ((usb_keys_extended_flags_t) 1 << ((key) - VIRTUAL_KEYS_START))

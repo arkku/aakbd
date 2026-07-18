@@ -26,7 +26,7 @@
 /// side effects wanted. A single byte of data is available to store state
 /// information for this specific keypress. The same byte is used for macros
 /// in `execute_macro` and for the release `postprocess_release`.
-static inline keycode_t preprocess_press(keycode_t keycode, uint8_t physical_key, uint8_t * restrict data) {
+static inline keycode_t preprocess_press(keycode_t keycode, uint8_t physical_key, uint8_t layer, uint8_t *  restrict data) {
     return keycode;
 }
 
@@ -41,7 +41,7 @@ static inline void postprocess_release(keycode_t keycode, uint8_t physical_key, 
 
 /// This function is called to execute macro keycodes. Macros are implemented
 /// as actual code, so you can do pretty much anything with them.
-static void execute_macro(uint8_t macro_number, bool is_release, uint8_t physical_key, uint8_t * restrict data) {
+static void execute_macro(uint8_t macro_number, bool is_release, uint8_t physical_key, uint8_t layer, uint8_t * restrict data) {
     const enum macro macro = macro_number;
 
     switch (macro) {
@@ -80,7 +80,7 @@ static const uint8_t layer_leds[LAYER_COUNT + 1] = {
 /// Called after enabling or disabling a layer.
 /// This can be used to do things like add/remove modifiers based on the state
 /// of a layer, or override LEDSs.
-static inline void layer_state_changed(uint8_t layer, bool is_enabled) {
+static void layer_state_changed(uint8_t layer, bool is_enabled) {
     uint8_t led = layer_leds[layer];
 
     if (led) {

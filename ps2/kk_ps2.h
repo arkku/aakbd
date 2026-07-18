@@ -25,12 +25,12 @@
 
 // MARK: - Replies
 
-#define PS2_REPLY_ACK                       ((uint8_t) 0xFAU)
-#define PS2_REPLY_ERROR                     ((uint8_t) 0xFCU)
-#define PS2_REPLY_INTERNAL_FAILURE          ((uint8_t) 0xFDU)
-#define PS2_REPLY_RESEND                    ((uint8_t) 0xFEU)
-#define PS2_REPLY_KEYBOARD_ERROR            ((uint8_t) 0xFFU)
-#define PS2_REPLY_TEST_PASSED               ((uint8_t) 0xAAU)
+#define PS2_REPLY_ACK              ((uint8_t) 0xFAU)
+#define PS2_REPLY_ERROR            ((uint8_t) 0xFCU)
+#define PS2_REPLY_INTERNAL_FAILURE ((uint8_t) 0xFDU)
+#define PS2_REPLY_RESEND           ((uint8_t) 0xFEU)
+#define PS2_REPLY_KEYBOARD_ERROR   ((uint8_t) 0xFFU)
+#define PS2_REPLY_TEST_PASSED      ((uint8_t) 0xAAU)
 
 // MARK: - Commands
 
@@ -56,11 +56,11 @@
 #define PS2_COMMAND_RESET                   ((uint8_t) 0xFFU)
 #define PS2_COMMAND_RESEND                  ((uint8_t) 0xFEU)
 
-#define PS2_COMMAND_DISABLE_SCALING         ((uint8_t) 0xE6U)
-#define PS2_COMMAND_ENABLE_SCALING          ((uint8_t) 0xE7U)
-#define PS2_COMMAND_SET_RESOLUTION          ((uint8_t) 0xE8U)
+#define PS2_COMMAND_DISABLE_SCALING ((uint8_t) 0xE6U)
+#define PS2_COMMAND_ENABLE_SCALING  ((uint8_t) 0xE7U)
+#define PS2_COMMAND_SET_RESOLUTION  ((uint8_t) 0xE8U)
 
-#define PS2_COMMAND_RANGE_START             ((uint8_t) 0xE6U)
+#define PS2_COMMAND_RANGE_START ((uint8_t) 0xE6U)
 
 // MARK: - Keyboard
 
@@ -68,33 +68,33 @@
 /// The default scancode set should be 2 according to specs, but if you wish
 /// to simulate an XT keyboard you could try changing this to 1 (and
 /// also setting the `PS2_DEVICE_ID` to zero).
-#define PS2_KEYBOARD_DEFAULT_SCANCODE_SET   2
+#define PS2_KEYBOARD_DEFAULT_SCANCODE_SET 2
 #endif
 
-#define PS2_KEYBOARD_DEFAULT_REPEAT_RATE    ((uint8_t) 0x2BU)
-#define PS2_EXT_PREFIX                      ((uint8_t) 0xE0U)
-#define PS2_BREAK_PREFIX                    ((uint8_t) 0xF0U)
-#define PS2_PAUSE_PREFIX                    ((uint8_t) 0xE1U)
-#define PS2_LED_SCROLL_LOCK_BIT             ((uint8_t) 1U)
-#define PS2_LED_NUM_LOCK_BIT                ((uint8_t) 2U)
-#define PS2_LED_CAPS_LOCK_BIT               ((uint8_t) 4U)
+#define PS2_KEYBOARD_DEFAULT_REPEAT_RATE ((uint8_t) 0x2BU)
+#define PS2_EXT_PREFIX                   ((uint8_t) 0xE0U)
+#define PS2_BREAK_PREFIX                 ((uint8_t) 0xF0U)
+#define PS2_PAUSE_PREFIX                 ((uint8_t) 0xE1U)
+#define PS2_LED_SCROLL_LOCK_BIT          ((uint8_t) 1U)
+#define PS2_LED_NUM_LOCK_BIT             ((uint8_t) 2U)
+#define PS2_LED_CAPS_LOCK_BIT            ((uint8_t) 4U)
 
 // MARK: - Mouse
 
-#define PS2_RESOLUTION_1_MM                 ((uint8_t) 0x00U)
-#define PS2_RESOLUTION_2_MM                 ((uint8_t) 0x01U)
-#define PS2_RESOLUTION_4_MM                 ((uint8_t) 0x02U)
-#define PS2_RESOLUTION_8_MM                 ((uint8_t) 0x03U)
+#define PS2_RESOLUTION_1_MM ((uint8_t) 0x00U)
+#define PS2_RESOLUTION_2_MM ((uint8_t) 0x01U)
+#define PS2_RESOLUTION_4_MM ((uint8_t) 0x02U)
+#define PS2_RESOLUTION_8_MM ((uint8_t) 0x03U)
 
 // MARK: - Errors
 
-#define PS2_ERROR_PARITY            'P'
-#define PS2_ERROR_WRITE_BEGIN       'W'
-#define PS2_ERROR_WRITE_END         'w'
-#define PS2_ERROR_START_BIT         'S'
-#define PS2_ERROR_STOP_BIT          's'
-#define PS2_ERROR_BUSY              'B'
-#define PS2_ERROR_COMMAND           'C'
-#define PS2_ERROR_BUFFER_OVERFLOW   'Q'
+#define PS2_ERROR_PARITY          'P'
+#define PS2_ERROR_WRITE_BEGIN     'W'
+#define PS2_ERROR_WRITE_END       'w'
+#define PS2_ERROR_START_BIT       'S'
+#define PS2_ERROR_STOP_BIT        's'
+#define PS2_ERROR_BUSY            'B'
+#define PS2_ERROR_COMMAND         'C'
+#define PS2_ERROR_BUFFER_OVERFLOW 'Q'
 
 #endif

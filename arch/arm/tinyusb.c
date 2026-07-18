@@ -25,10 +25,10 @@
  */
 
 #include "platform_deps.h"
+#define USB_KEYBOARD_ACCESS_STATE 1
 #include "tinyusb.h"
+#include "usbkbd.h"
 #include "timer.h"
-
-#define HID_DESCRIPTOR_TYPE_REPORT  0x22
 
 /* Keyboard HID report header + key state */
 
@@ -52,9 +52,8 @@
 
 #include "usbkbd_config.h"
 
-#define USB_KEYBOARD_ACCESS_STATE 1
 #include "usb_hardware.h"
-#include "usbkbd.h"
+#include "usbkbd_descriptors.h"
 #include "usbkbd_descriptors.h"
 #include "aakbd.h"
 #include "keys.h"
@@ -84,6 +83,10 @@ static uint8_t keyboard_idle_rate = 0;
 #if ENABLE_GENERIC_HID_ENDPOINT
 static uint32_t generic_last_report = 0;
 static uint8_t generic_idle_rate = 0;
+#endif
+
+#if MEDIA_KEYS_ENDPOINT
+#define CONSUMER_HID_INSTANCE (1 + ENABLE_GENERIC_HID_ENDPOINT)
 #endif
 
 #if ENABLE_DFU_INTERFACE
@@ -163,9 +166,23 @@ usb_bus_detach (void) {
     }
 }
 
+#if ENABLE_GENERIC_HID_ENDPOINT
+static uint8_t generic_vial_response[GENERIC_HID_REPORT_SIZE];
+static uint8_t generic_vial_report_id;
+static bool generic_vial_pending;
+#endif
+
 void
 usb_tick (void) {
     tud_task();
+#if ENABLE_GENERIC_HID_ENDPOINT
+    if (generic_vial_pending) {
+        if (tud_hid_n_report(1, generic_vial_report_id, generic_vial_response, GENERIC_HID_REPORT_SIZE)) {
+            generic_vial_pending = false;
+        }
+    }
+    make_and_send_generic_hid_report();
+#endif
 
     // First call: connect to USB bus now that all init is complete.
     static bool connected = false;
@@ -279,6 +296,7 @@ usb_wake_up_host (void) {
             return true;
         }
     }
+
     // Clear low-power mode to allow endpoint transmission after wakeup:
     USB->CNTR &= ~(USB_CNTR_FSUSP | USB_CNTR_LPMODE);
     usb_suspended = false;
@@ -322,11 +340,6 @@ resume_done:
     uint8_t pos = 0;
 
     // usb_tx_report_header() — modifier + optional bytes
-#if USE_MULTIPLE_REPORTS
-    if (!usb_keyboard_is_in_boot_protocol) {
-        report[pos++] = KEYBOARD_REPORT_ID;
-    }
-#endif
     report[pos++] = usb_keys_modifier_flags;
 #if RESERVE_BOOT_PROTOCOL_RESERVED_BYTE
     report[pos++] = 0;
@@ -380,9 +393,36 @@ resume_done:
     return true;
 }
 
+// MARK: - Consumer / Media Keys Endpoint
+
+#if MEDIA_KEYS_ENDPOINT
+bool
+usb_keyboard_send_consumer (uint16_t usage) {
+    if (!tud_ready()) {
+        return false;
+    }
+
+    uint8_t report[2] = { usage & 0xFF, (usage >> 8) & 0xFF };
+
+    uint32_t send_start = timer_read32();
+    bool sent = false;
+    while (!sent && (uint32_t)(timer_read32() - send_start) < SEND_TIMEOUT_MS) {
+        sent = tud_hid_n_report(CONSUMER_HID_INSTANCE, CONSUMER_REPORT_ID, report, sizeof report);
+        if (!sent) {
+            tud_task();
+        }
+    }
+    return sent;
+}
+#endif
+
 // MARK: - Generic HID
 
 #if ENABLE_GENERIC_HID_ENDPOINT
+
+static uint8_t generic_vial_response[GENERIC_HID_REPORT_SIZE];
+static uint8_t generic_vial_report_id;
+static bool generic_vial_pending;
 
 bool
 send_generic_hid_report (uint8_t report_id, uint8_t count,
@@ -442,6 +482,11 @@ tud_hid_descriptor_report_cb (uint8_t instance) {
         index = GENERIC_INTERFACE_INDEX;
     }
 #endif
+#if MEDIA_KEYS_ENDPOINT
+    else if (instance == CONSUMER_HID_INSTANCE) {
+        index = CONSUMER_INTERFACE_INDEX;
+    }
+#endif
     else {
         return NULL;
     }
@@ -466,15 +511,16 @@ tud_hid_get_report_cb (uint8_t instance, uint8_t report_id,
             return reqlen;
         }
 #endif
+#if MEDIA_KEYS_ENDPOINT
+        if (instance == CONSUMER_HID_INSTANCE) {
+            // Consumer endpoint is event-driven; no state to report on GET.
+            return 0;
+        }
+#endif
         return 0;
     }
 
     uint8_t pos = 0;
-#if USE_MULTIPLE_REPORTS
-    if (!usb_keyboard_is_in_boot_protocol) {
-        buffer[pos++] = KEYBOARD_REPORT_ID;
-    }
-#endif
     buffer[pos++] = usb_keys_modifier_flags;
 #if RESERVE_BOOT_PROTOCOL_RESERVED_BYTE
     buffer[pos++] = 0;
@@ -511,17 +557,16 @@ tud_hid_set_report_cb (uint8_t instance, uint8_t report_id,
     }
 
 #if ENABLE_GENERIC_HID_ENDPOINT
-    if (instance == 1 &&
-        report_type == HID_REPORT_TYPE_OUTPUT && bufsize > 0) {
-        uint8_t response_length = GENERIC_HID_REPORT_SIZE;
-        uint8_t response[GENERIC_HID_REPORT_SIZE];
+    if (instance == 1 && bufsize > 0 &&
+        (report_type == HID_REPORT_TYPE_OUTPUT || report_type == HID_REPORT_TYPE_FEATURE)) {
+        uint8_t response_length = sizeof(generic_vial_response);
         uint8_t result = handle_generic_hid_report(
             report_id, bufsize, (uint8_t *) buffer,
-            &response_length, response);
+            &response_length, generic_vial_response);
+        generic_vial_report_id = report_id;
+        generic_vial_pending = (result == RESPONSE_SEND_REPLY && response_length);
         if (result == RESPONSE_JUMP_TO_BOOTLOADER) {
             jump_to_bootloader();
-        } else if (result == RESPONSE_SEND_REPLY && response_length) {
-            tud_hid_n_report(1, report_id, response, response_length);
         }
     }
 #endif

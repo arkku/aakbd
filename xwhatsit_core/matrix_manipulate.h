@@ -72,8 +72,27 @@ extern uint16_t cal_time;
 #define MATRIX_ROW_T_SIZE 2
 #endif
 
-#define CAPSENSE_CAL_SAVE_HEADER_SIZE 6
-#define CAPSENSE_CAL_SAVE_TOTAL_SIZE ((CAPSENSE_CAL_SAVE_HEADER_SIZE * 2) + (CAPSENSE_CAL_BINS * (((MATRIX_CAPSENSE_ROWS + 1) * MATRIX_ROW_T_SIZE) + 2)) + 2 + 2 + 2)
+// struct calibration_header (version + cols + rows + bins + 2 bytes checksum)
+#define CAPSENSE_CAL_SAVE_HEADER_SIZE (1 + 1 + 1 + 1 + 2)
+
+// Per calibration bin:
+//   cal_thresholds[bin]         uint16_t                       (2 bytes)
+//   cal_bin_rows_mask[bin]      uint8_t                        (1 byte)
+//   assigned_to_threshold[bin]  (MATRIX_CAPSENSE_ROWS + 1) * matrix_row_t
+//   cal_bin_key_count[bin]      uint8_t                        (1 byte)
+#define CAPSENSE_CAL_SAVE_BIN_SIZE   (2 + 1 + ((MATRIX_CAPSENSE_ROWS + 1) * MATRIX_ROW_T_SIZE) + 1)
+
+//   cal_threshold_max             uint16_t (2 bytes)
+//   cal_threshold_min             uint16_t (2 bytes)
+//   cal_threshold_offset          uint16_t (2 bytes)
+#define CAPSENSE_CAL_SAVE_FOOTER_SIZE (2 + 2 + 2)
+
+// Total calibration save size:
+//   headers                       2 * CAPSENSE_CAL_SAVE_HEADER_SIZE
+//   per-bin data                  CAPSENSE_CAL_BINS * CAPSENSE_CAL_SAVE_BIN_SIZE
+#define CAPSENSE_CAL_SAVE_TOTAL_SIZE ((CAPSENSE_CAL_SAVE_HEADER_SIZE * 2) \
+    + (CAPSENSE_CAL_BINS * CAPSENSE_CAL_SAVE_BIN_SIZE)                   \
+    + CAPSENSE_CAL_SAVE_FOOTER_SIZE)
 
 #else // ^ CAPSENSE_CAL_ENABLED
 #define CAPSENSE_CAL_SAVE_TOTAL_SIZE 1

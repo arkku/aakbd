@@ -6,6 +6,7 @@ MAX_KEY_ROLLOVER ?= 6
 POLL_INTERVAL ?= 1
 POWER_CONSUMPTION ?= 500
 DEBOUNCE_TYPE ?= asym_eager_defer_pk
+SIMULATED_TYPING ?= 1
 ENABLE_HOST_FINGERPRINT ?= 1
 
 VENDOR_ID ?= 0x320F
@@ -27,6 +28,9 @@ DEVICE_FLAGS += -DAW20216S_ENABLE -DENCODER_ENABLE -DRGB_MATRIX_ENABLE -DISO_LAY
 MCU_FAMILY = stm32f3
 
 DEVICE_OBJS = matrix_gpio.o $(QMK_CORE_OBJS) aw20216s.o led_map.o encoder.o spi_master.o rgb_matrix.o gmmkpro1.o
+
+# Select Vial layout JSON based on ISO/ANSI variant (must be before qmk_port.mk)
+VIAL_JSON_FILE = $(DEVICE)/vial_$(if $(filter 1,$(ISO_LAYOUT)),iso,ansi).json
 
 include arch/arm/stm32-common.mk
 include qmk_core/qmk_port.mk

@@ -36,15 +36,19 @@
 
 #include "keymap.h"
 #include "eeconfig.h"
+#include "progmem.h"
 
 #include <aakbd.h>
 
 #ifdef AW20216S_ENABLE
-#include "progmem.h"
 #include "aw20216s.h"
 #endif
 
 extern const uint8_t keymaps[1][MATRIX_ROWS][MATRIX_COLS];
+
+#if VIAL_ENABLE
+#include "vial.h"
+#endif
 
 #ifdef XWHATSIT
 #include "xwhatsit_port.h"

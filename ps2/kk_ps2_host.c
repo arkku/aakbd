@@ -293,97 +293,97 @@ ISR (PS2_CLK_INT_VECTOR) {
     uint8_t state = ps2_state;
 
     switch (state++) {
-    case PS2_STATE_ERROR:
-        return;
-
-    case PS2_STATE_END:
-        if (bit || is_ps2_clk_high()) {
-            ps2_clk_int_on_falling();
-            ps2_state = PS2_STATE_IDLE;
+        case PS2_STATE_ERROR:
             return;
-        }
-        // fallthrough
-    case PS2_STATE_IDLE:
-        if (bit == 0) {
-            ps2_state = state;
-            ps2_data_byte = 0;
-            ps2_parity = 0;
-            ps2_bits_left = 8;
-        } else {
-            ps2_set_error(PS2_ERROR_START_BIT);
-        }
-        break;
 
-    case PS2_STATE_READ_DATA:
-        ps2_parity ^= bit;
-
-        ps2_data_byte >>= 1;
-        ps2_data_byte |= bit;
-
-        if (--ps2_bits_left == 0) {
-            ps2_state = state;
-        }
-        break;
-
-    case PS2_STATE_READ_PARITY:
-        ps2_parity ^= bit;
-
-        if (ps2_parity) {
-            ps2_state = state;
-        } else {
-            ps2_set_error(PS2_ERROR_PARITY);
-        }
-        break;
-
-    case PS2_STATE_READ_STOP:
-        ps2_state = PS2_STATE_END;
-        ps2_clk_int_on_change();
-
-        if (bit) {
-            const uint8_t next_pos = modulo_buffer_size(ps2_buffer_tail + 1);
-            if (next_pos != ps2_buffer_head) {
-                ps2_buffer[ps2_buffer_tail] = ps2_data_byte;
-                ps2_buffer_tail = next_pos;
+        case PS2_STATE_END:
+            if (bit || is_ps2_clk_high()) {
+                ps2_clk_int_on_falling();
+                ps2_state = PS2_STATE_IDLE;
+                return;
             }
-        } else {
-            ps2_set_error(PS2_ERROR_STOP_BIT);
-        }
-        break;
+            // fallthrough
+        case PS2_STATE_IDLE:
+            if (bit == 0) {
+                ps2_state = state;
+                ps2_data_byte = 0;
+                ps2_parity = 0;
+                ps2_bits_left = 8;
+            } else {
+                ps2_set_error(PS2_ERROR_START_BIT);
+            }
+            break;
 
-    case PS2_STATE_WRITE_BEGIN:
-        ps2_state = state;
-        // fallthrough
+        case PS2_STATE_READ_DATA:
+            ps2_parity ^= bit;
 
-    case PS2_STATE_WRITE_DATA:
-        bit = ps2_data_byte & 1;
-        ps2_data_set_value(bit);
+            ps2_data_byte >>= 1;
+            ps2_data_byte |= bit;
 
-        ps2_parity ^= bit;
-        ps2_data_byte >>= 1;
+            if (--ps2_bits_left == 0) {
+                ps2_state = state;
+            }
+            break;
 
-        if (--ps2_bits_left == 0) {
-            ps2_state = state;
-        }
-        break;
+        case PS2_STATE_READ_PARITY:
+            ps2_parity ^= bit;
 
-    case PS2_STATE_WRITE_PARITY:
-        ps2_data_set_value(ps2_parity ^ 1);
-        ps2_state = state;
-        break;
+            if (ps2_parity) {
+                ps2_state = state;
+            } else {
+                ps2_set_error(PS2_ERROR_PARITY);
+            }
+            break;
 
-    case PS2_STATE_WRITE_STOP:
-        ps2_data_release();
-        ps2_state = state;
-        break;
-
-    case PS2_STATE_WRITE_ACK:
-        if (bit == 0) {
+        case PS2_STATE_READ_STOP:
             ps2_state = PS2_STATE_END;
             ps2_clk_int_on_change();
-        } else {
-            ps2_set_error(PS2_ERROR_WRITE_END);
-        }
-        break;
+
+            if (bit) {
+                const uint8_t next_pos = modulo_buffer_size(ps2_buffer_tail + 1);
+                if (next_pos != ps2_buffer_head) {
+                    ps2_buffer[ps2_buffer_tail] = ps2_data_byte;
+                    ps2_buffer_tail = next_pos;
+                }
+            } else {
+                ps2_set_error(PS2_ERROR_STOP_BIT);
+            }
+            break;
+
+        case PS2_STATE_WRITE_BEGIN:
+            ps2_state = state;
+            // fallthrough
+
+        case PS2_STATE_WRITE_DATA:
+            bit = ps2_data_byte & 1;
+            ps2_data_set_value(bit);
+
+            ps2_parity ^= bit;
+            ps2_data_byte >>= 1;
+
+            if (--ps2_bits_left == 0) {
+                ps2_state = state;
+            }
+            break;
+
+        case PS2_STATE_WRITE_PARITY:
+            ps2_data_set_value(ps2_parity ^ 1);
+            ps2_state = state;
+            break;
+
+        case PS2_STATE_WRITE_STOP:
+            ps2_data_release();
+            ps2_state = state;
+            break;
+
+        case PS2_STATE_WRITE_ACK:
+            if (bit == 0) {
+                ps2_state = PS2_STATE_END;
+                ps2_clk_int_on_change();
+            } else {
+                ps2_set_error(PS2_ERROR_WRITE_END);
+            }
+            break;
     }
 }
 

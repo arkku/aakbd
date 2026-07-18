@@ -63,6 +63,14 @@ uint8_t usb_keys_modifier_flags = 0;
 /// Flags of extended keys (e.g., media keys and Apple Fn).
 usb_keys_extended_flags_t usb_keys_extended_flags = 0;
 
+#if MEDIA_KEYS_ENDPOINT
+/// Consumer endpoint: 16-bit usage (0 = none / release all).
+uint16_t usb_consumer_usage = 0;
+
+/// Consumer report needs to be sent.
+bool usb_consumer_updated = false;
+#endif
+
 /// The selected keyboard protocol.
 uint8_t usb_keyboard_protocol = HID_PROTOCOL_REPORT;
 
@@ -197,8 +205,65 @@ usb_keyboard_release (const uint8_t key) {
 }
 
 #if ENABLE_VIRTUAL_KEYS
+#if MEDIA_KEYS_COUNT > 8
+/// Low bytes of 22 consumer usage IDs in USB_KEY enum order (matches CONSUMER_KEY_ENUM).
+static const uint8_t PROGMEM consumer_usage_low[MEDIA_KEYS_COUNT] = {
+    CC_KEY_MEDIA_VOLUME_MUTE,     // USB_KEY_VOLUME_MUTE
+    CC_KEY_MEDIA_VOLUME_UP,       // USB_KEY_VOLUME_UP
+    CC_KEY_MEDIA_VOLUME_DOWN,     // USB_KEY_VOLUME_DOWN
+    CC_KEY_MEDIA_NEXT_TRACK,      // USB_KEY_NEXT_TRACK
+    CC_KEY_MEDIA_PREVIOUS_TRACK,  // USB_KEY_PREVIOUS_TRACK
+    CC_KEY_MEDIA_STOP_PLAYING,    // USB_KEY_MEDIA_STOP
+    CC_KEY_MEDIA_PLAY_PAUSE,      // USB_KEY_PLAY_PAUSE
+    CC_KEY_MEDIA_STOP_EJECT,      // USB_KEY_MEDIA_EJECT
+    CC_KEY_LAUNCH_MAIL,           // USB_KEY_LAUNCH_MAIL
+    CC_KEY_LAUNCH_CALCULATOR,     // USB_KEY_LAUNCH_CALCULATOR
+    CC_KEY_LAUNCH_MY_PC,          // USB_KEY_LAUNCH_MY_PC
+    (uint8_t) CC_KEY_BROWSE_SEARCH,     // USB_KEY_BROWSE_SEARCH
+    (uint8_t) CC_KEY_BROWSE_HOME,       // USB_KEY_BROWSE_HOME
+    (uint8_t) CC_KEY_BROWSE_BACK,       // USB_KEY_BROWSE_BACK
+    (uint8_t) CC_KEY_BROWSE_FORWARD,    // USB_KEY_BROWSE_FORWARD
+    (uint8_t) CC_KEY_BROWSE_STOP,       // USB_KEY_BROWSE_STOP
+    (uint8_t) CC_KEY_BROWSE_REFRESH,    // USB_KEY_BROWSE_REFRESH
+    (uint8_t) CC_KEY_BROWSE_FAVORITES,  // USB_KEY_BROWSE_FAVORITES
+    CC_KEY_MEDIA_FAST_FORWARD,    // USB_KEY_FAST_FORWARD
+    CC_KEY_MEDIA_REWIND,          // USB_KEY_REWIND
+    CC_KEY_BRIGHTNESS_UP,         // USB_KEY_BRIGHTNESS_UP
+    CC_KEY_BRIGHTNESS_DOWN,       // USB_KEY_BRIGHTNESS_DOWN
+};
+#elif MEDIA_KEYS_ENDPOINT
+/// Low bytes of media key usage IDs.
+static const uint8_t PROGMEM consumer_usage_low[MEDIA_KEYS_COUNT] = {
+    CC_MEDIA_KEY_1,
+    CC_MEDIA_KEY_2,
+    CC_MEDIA_KEY_3,
+    CC_MEDIA_KEY_4,
+    CC_MEDIA_KEY_5,
+    CC_MEDIA_KEY_6,
+    CC_MEDIA_KEY_7,
+#if MEDIA_KEYS_COUNT >= 8
+    CC_MEDIA_KEY_8,
+#endif
+};
+#endif
+
 void
 press_virtual (const uint8_t key) {
+#if MEDIA_KEYS_ENDPOINT
+    if (key >= USB_KEY_VIRTUAL_MEDIA_1 && key < USB_KEY_VIRTUAL_MEDIA_1 + MEDIA_KEYS_COUNT) {
+        uint8_t low = pgm_read_byte(&consumer_usage_low[key - USB_KEY_VIRTUAL_MEDIA_1]);
+        uint16_t usage = low;
+#if MEDIA_KEYS_COUNT > 8
+        if (key >= USB_KEY_BROWSE_SEARCH && key <= USB_KEY_BROWSE_FAVORITES) {
+            // The BROWSE_* keys have a 16-bit keycode
+            usage = 0x0200U | low;
+        }
+#endif
+        usb_consumer_usage = usage;
+        usb_consumer_updated = true;
+        return;
+    }
+#endif
     if (IS_VIRTUAL_KEY(key)) {
 #if APPLE_FN_IS_MODIFIER
         if (key == USB_KEY_VIRTUAL_APPLE_FN) {
@@ -212,6 +277,13 @@ press_virtual (const uint8_t key) {
 
 void
 release_virtual (const uint8_t key) {
+#if MEDIA_KEYS_ENDPOINT
+    if (key >= USB_KEY_VIRTUAL_MEDIA_1 && key < USB_KEY_VIRTUAL_MEDIA_1 + MEDIA_KEYS_COUNT) {
+        usb_consumer_usage = 0;
+        usb_consumer_updated = true;
+        return;
+    }
+#endif
     if (IS_VIRTUAL_KEY(key)) {
 #if APPLE_FN_IS_MODIFIER
         if (key == USB_KEY_VIRTUAL_APPLE_FN) {
@@ -253,6 +325,11 @@ usb_keyboard_release_all_keys (void) {
     key_error = 0;
     usb_keyboard_updated = true;
 
+#if MEDIA_KEYS_ENDPOINT
+    usb_consumer_updated = true;
+    usb_consumer_usage = 0;
+#endif
+
 #if ENABLE_PS2_DEVICE
     {
         uint8_t mods = ps2_modifier_flags;
@@ -275,6 +352,17 @@ usb_keyboard_release_all_keys (void) {
 
 }
 
+void
+usb_keyboard_keypress_delay (void) {
+    for (int_fast8_t i = SIMULATED_KEYPRESS_TIME_MS; i; --i) {
+        delay_milliseconds(1);
+#if ENABLE_PS2_DEVICE
+        ps2_output_task();
+#endif
+    }
+    (void) usb_keyboard_send_if_needed();
+}
+
 bool
 usb_keyboard_simulate_keypress (const uint8_t key, const uint8_t mods) {
     const uint8_t old_mods = usb_keys_modifier_flags;
@@ -284,13 +372,7 @@ usb_keyboard_simulate_keypress (const uint8_t key, const uint8_t mods) {
     if (ps2_output_is_scanning()) {
         usb_keyboard_set_modifiers(mods);
         usb_keyboard_press(key);
-
-        uint8_t timeout = SIMULATED_KEYPRESS_TIME_MS;
-        do {
-            ps2_output_task();
-            delay_milliseconds(1);
-        } while (timeout-- && ps2_output_is_scanning());
-
+        usb_keyboard_keypress_delay();
         usb_keyboard_release(key);
         ps2_output_task();
         usb_keyboard_set_modifiers(old_mods);
@@ -302,7 +384,7 @@ usb_keyboard_simulate_keypress (const uint8_t key, const uint8_t mods) {
     usb_keys_modifier_flags = mods;
     usb_keyboard_press(key);
     (void) usb_keyboard_send_report();
-    delay_milliseconds(SIMULATED_KEYPRESS_TIME_MS);
+    usb_keyboard_keypress_delay();
     usb_keyboard_release(key);
 
     usb_keys_modifier_flags = old_mods;
@@ -571,23 +653,13 @@ usb_keyboard_set_modifiers (const uint8_t modifier_flags) {
 #endif
 
     if (usb_keys_modifier_flags != modifier_flags) {
-        if (modifier_flags == (SHIFT_BIT | RIGHT_SHIFT_BIT) && !(usb_keys_modifier_flags & RIGHT_SHIFT_BIT)) {
 #if ENABLE_BOOTLOADER_SHORTCUT
-            if (keys_buffer[0] == USB_KEY_SCROLL_LOCK) {
+        if (modifier_flags == (SHIFT_BIT | RIGHT_SHIFT_BIT) && !(usb_keys_modifier_flags & RIGHT_SHIFT_BIT)) {
+            if (keys_buffer[0] == USB_KEY_ESC) {
                 jump_to_bootloader();
             }
-#endif
-#if ENABLE_RESET_SHORTCUT
-            if (keys_buffer[0] == USB_KEY_ESC || keys_buffer[1] == USB_KEY_ESC) {
-                keyboard_reset();
-            }
-#endif
-#if ENABLE_DEBUG_SHORTCUT
-            if (keys_buffer[0] == USB_KEY_F1) {
-                usb_keyboard_type_debug_report();
-            }
-#endif
         }
+#endif
 
         usb_keys_modifier_flags = modifier_flags;
         usb_keyboard_updated = true;
@@ -610,6 +682,12 @@ usb_keyboard_send_if_needed (void) {
     if (usb_keyboard_updated) {
         did_send = usb_keyboard_send_report();
     }
+#if MEDIA_KEYS_ENDPOINT
+    if (usb_consumer_updated) {
+        usb_consumer_updated = false;
+        usb_keyboard_send_consumer(usb_consumer_usage);
+    }
+#endif
     return did_send;
 }
 

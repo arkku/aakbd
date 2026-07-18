@@ -15,13 +15,15 @@ F_USB ?= $(F_CPU)
 DFU_TARGET ?= dfuavr
 
 AVR_FLAGS = -mmcu=$(MCU) -DF_CPU=$(F_CPU) -DF_USB=$(F_USB)
-CC_FLAGS += $(AVR_FLAGS)
-LD_FLAGS += $(AVR_FLAGS)
+CC_FLAGS += $(AVR_FLAGS) -fno-unroll-loops -mrelax
+LD_FLAGS += $(AVR_FLAGS) -Wl,--gc-sections -Wl,--relax
 
 PLATFORM_OBJS = avrusb.o
 vpath %.c arch/avr
 vpath %.h arch/avr
 
+# AVR libc's default printf includes floating-point parsing (~1.5 KB).
+# The minimal printf (%d, %u, %c, %s, %x) is sufficient for this firmware.
 HEX ?= $(BIN:.bin=.hex)
 
 $(HEX): $(BIN)
@@ -32,9 +34,30 @@ all: $(HEX)
 # AVR link rule (prerequisites added by root rule after device .mk is included)
 $(BIN): | $(BUILDDIR)
 	@echo $(CC) $(LDFLAGS) -s -o $@ ...
-	@$(CC) $(LDFLAGS) -s -o $@ $+
+	@$(CC) $(LDFLAGS) -s -o $@ $+ $(AVR_LIBS)
 	@chmod a-x $@
 	@$(SIZE) $@
+	@boot=0; \
+	 for f in $(DEVICE_FLAGS); do \
+	   case "$$f" in -DBOOTLOADER_SIZE=*) boot=$${f#-DBOOTLOADER_SIZE=} ;; esac; \
+	 done; \
+	 case '$(MCU)' in \
+	   atmega32u2|atmega32u4|atmega328p) total=32768 ;; \
+	   atmega16u2) total=16384 ;; \
+	   at90usb1286) total=131072 ;; \
+	   at90usb646) total=65536 ;; \
+	   *) total=0 ;; \
+	 esac; \
+	 [ "$$total" -gt 0 ] && { \
+	   used=$$($(SIZE) $@ | tail -1 | awk '{print $$1+$$2}'); \
+	   avail=$$((total - boot)); \
+	   free=$$((avail - used)); \
+	   echo "  $$used of $$avail bytes used ($$free bytes free)"; \
+	   if [ "$$free" -lt 0 ]; then \
+	     echo "  FIRMWARE_OVERFLOW: exceeds flash by $$((-free)) bytes"; \
+	     exit 1; \
+	   fi; \
+	}
 
 # LFUSE configures the clock speed; it is probably correct out of the box if
 # you use a ready-made board. If not, `make fuses LFUSE=CE` for a 16 MHz
@@ -71,6 +94,10 @@ dfuavr: $(HEX)
 	$(SUDO) dfu-programmer $(MCU) flash $<
 	$(SUDO) dfu-programmer $(MCU) launch || $(SUDO) dfu-programmer $(MCU) reset
 
+teensy: $(HEX)
+	$(SUDO) dfu-util -e && sleep 2 || true
+	$(SUDO) teensy_loader_cli -v -w -mmcu=$(MCU) $<
+
 fuses:
 	$(SUDO) $(AVRDUDE) -c $(BURNER) $(if $(PORT),-P $(PORT) ,)$(if $(BPS),-b (BPS) ,)-p $(MCU) -U efuse:w:0x$(EFUSE):m -U hfuse:w:0x$(HFUSE):m $(if $(LFUSE),-U lfuse:w:0x$(LFUSE):m,)
 
@@ -105,4 +132,4 @@ lock:
 	@echo '    - -Wno-gnu-zero-variadic-macro-arguments' >>$@
 	@cat $@
 
-.PHONY: burn upload dfuavr fuses unlock lock
+.PHONY: burn upload dfuavr teensy fuses unlock lock

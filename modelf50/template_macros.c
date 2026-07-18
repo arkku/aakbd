@@ -37,14 +37,14 @@ static uint8_t apple_fn_pressed = 0;
 #define is_weak_apple_fn_pressed()      (apple_fn_pressed == APPLE_FN_WEAK)
 #define is_strong_apple_fn_pressed()    (apple_fn_pressed == APPLE_FN_STRONG)
 
-static inline void press_weak_apple_fn(void) {
+static void press_weak_apple_fn(void) {
     if (!is_virtual_pressed(USB_KEY_VIRTUAL_APPLE_FN)) {
         press_virtual(USB_KEY_VIRTUAL_APPLE_FN);
         apple_fn_pressed = APPLE_FN_WEAK;
     }
 }
 
-static inline bool release_weak_apple_fn(void) {
+static bool release_weak_apple_fn(void) {
     if (is_weak_apple_fn_pressed()) {
         release_virtual(USB_KEY_VIRTUAL_APPLE_FN);
         if (apple_fn_pressed == APPLE_FN_WEAK) {
@@ -72,29 +72,20 @@ static inline void press_strong_apple_fn() {
 /// side effects wanted. A single byte of data is available to store state
 /// information for this specific keypress. The same byte is used for macros
 /// in `execute_macro` and for the release `postprocess_release`.
-static inline keycode_t preprocess_press(keycode_t keycode, uint8_t physical_key, uint8_t * restrict data) {
+static inline keycode_t preprocess_press(keycode_t keycode, uint8_t physical_key, uint8_t layer, uint8_t *  restrict data) {
 #if ENABLE_APPLE_FN_KEY
-    if (physical_key >= KEY(F13) && physical_key <= KEY(F24)
-        && is_layer_active(APPLE_LAYER) && !is_layer_active(FN_LAYER)
-    ) {
-        // Use as F-keys (F1-F12, which have been moved to the second block)
-        if (is_strong_apple_fn_pressed()) {
-            *data = APPLE_FN_STRONG;
-            release_virtual(USB_KEY_VIRTUAL_APPLE_FN);
-            usb_keyboard_send_if_needed();
-        } else {
-            *data = APPLE_FN_WEAK;
-            press_weak_apple_fn();
-        }
-        return keycode;
-    } else if (keycode == KEY_APPLE_FN) {
-        apple_fn_pressed = APPLE_FN_STRONG; // Real Apple Fn makes weak strong
+    if (keycode == KEY_APPLE_FN) {
+        // Real Apple Fn makes weak strong
+        is_weak_apple_fn_pressed = false;
+    } else if (layer < FN_LAYER && is_layer_enabled(FN_LAYER)) {
+        // A passthrough key on Apple Fn layer will be used for Fn-combos
+        press_weak_apple_fn();
     } else if (release_weak_apple_fn()) {
         // Release the weak Apple Fn when pressing any other key
         usb_keyboard_send_if_needed();
     }
-    *data = 0;
 #endif
+
     return keycode;
 }
 
@@ -146,7 +137,7 @@ static void matrix_print_calibration_stats(void) {
 
 /// This function is called to execute macro keycodes. Macros are implemented
 /// as actual code, so you can do pretty much anything with them.
-static void execute_macro(uint8_t macro_number, bool is_release, uint8_t physical_key, uint8_t * restrict data) {
+static void execute_macro(uint8_t macro_number, bool is_release, uint8_t physical_key, uint8_t layer, uint8_t * restrict data) {
     const enum macro macro = macro_number;
 
     switch (macro) {
@@ -159,10 +150,10 @@ static void execute_macro(uint8_t macro_number, bool is_release, uint8_t physica
 
     case MACRO_CYCLE_OS_LAYERS:
         if (is_release) {
-            if (is_layer_active(APPLE_LAYER)) {
+            if (is_layer_enabled(APPLE_LAYER)) {
                 disable_layer(APPLE_LAYER);
                 enable_layer(LINUX_LAYER);
-            } else if (is_layer_active(LINUX_LAYER)) {
+            } else if (is_layer_enabled(LINUX_LAYER)) {
                 disable_layer(LINUX_LAYER);
             } else {
                 enable_layer(APPLE_LAYER);
@@ -210,7 +201,7 @@ static void execute_macro(uint8_t macro_number, bool is_release, uint8_t physica
 /// Called after enabling or disabling a layer.
 /// This can be used to do things like add/remove modifiers based on the state
 /// of a layer, or override LEDSs.
-static inline void layer_state_changed(uint8_t layer, bool is_enabled) {
+static void layer_state_changed(uint8_t layer, bool is_enabled) {
     if (is_enabled) {
         switch (layer) {
 #ifdef NUM_LOCK_LAYER

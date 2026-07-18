@@ -7,9 +7,9 @@ Supported devices: `ps2usb`, `ergodox`, `modelf77`, `modelf62`, `modelf50`, `gmm
 ## Build
 
 ```sh
-make DEVICE=modelf77       # AVR
-make DEVICE=gmmkpro1       # ARM (requires git submodule update --init)
-make MODEL=foo             # Optional: pick layers_foo.c / macros_foo.c if they exist
+make DEVICE=modelf77        # AVR
+make DEVICE=gmmkpro1        # ARM (requires git submodule update --init)
+make MODEL=vial             # Enable Vial
 make clean
 make distclean
 ```
@@ -26,6 +26,13 @@ CONFIG_FLAGS = -DUSB_MAX_KEY_ROLLOVER=10
 **Do not** edit or delete user's `local.mk`, `layers.c`, `macros.c`, `layers_*.c`, `macros_*.c` without prompting. They are gitignored so changes are unrecoverable! Even if prompted, never overwrite large parts without taking a backup.
 
 Everything must work with sane defaults without these files present. (But do not delete or move them out of the way on your own for testing, they are sacred user input.)
+
+Any required configuration options must be defined in **one place** and used
+from there throughout. If there can be no safe default guaranteed to work,
+always **fail at compile time** - do not guard with `#ifndef` if the default
+might be incorrect (e.g., if you don't know GPIO pin assignments or USB
+endpoint configuration, you cannot just assume and not failing at compile time
+would be horrible footgun).
 
 ## Makefile System
 
@@ -117,7 +124,15 @@ make -C ps2 test          # ps2_output.c unit tests
 make -C ps2 device_test   # kk_ps2_device_test.c unit tests
 ```
 
-The test outputs contain only errors and final result, **do not filter**.
+The test outputs contain only errors and final result, **do not grep or tail**.
+
+#### Testing Vial output (on host, no hardware needed)
+
+```sh
+make -C vial test
+```
+
+The test outputs contain only errors and final result, **do not grep or tail**.
 
 ### `arch/{arch}/` — Architecture-specific
 
@@ -174,13 +189,25 @@ Each device (e.g., `ps2usb/`, `ergodox/`, `gmmkpro1/`, `modelf77/`):
 Physical key → process_key() → layer resolution → preprocess_press() hook → execute_macro() or standard processing → usb_keyboard_press/release() → usb_keyboard_send_if_needed()
 ```
 
+## Vial
+
+- **`vial/vial.c`** / **`vial/vial.h`** — Vial protocol handler, bootloader magic, unlock
+- **`vial/vial_keys.c`** – Vial/QMK keypresses handler (mainly called by `keys.c`)
+- **`vial/dynamic_keymap.c/h`** — EEPROM layout: keymaps, combos, tap dance, encoders, macros
+- **`vial/via_handler.c`** — VIA command dispatch
+- **`vial/qmk_translate.c`** – AAKBD/QMK bidirectional keycode translation
+- **`DEVICE/keymap.c`** MUST define: `vial_unlock_combo_rows/cols/len` (unlock keys, same half), `vial_keyboard_uid`, `vial_default_layout_options`
+
+Vial stores a number of dynamic layers in EEPROM or flash (`VIAL_LAYER_COUNT`), in addition there can be static layers (`STATIC_LAYER_1` etc.) that appear in Vial GUI as read-only, in `layers_vial.c`. EEPROM layers store QMK keycodes which are translated to AAKBD at the read/write interface, static layers store AAKBD keycodes that are translated to QMK keycodes for Vial GUI. Several QMK keycodes translate to the same `EXTENDED(QMK_KEYCODE)` - the processing of this keycode falls through to `vial_process_qmk_keycode(…)`, which loads the original QMK keycode from EEPROM and processes that.
+
 ### PS/2 output
 
-In PS/2 device mode (ENABLE_PS2_DEVICE=1), key events are queued via `ps2_press_key()` / `ps2_release_key()` and processed asynchronously by `ps2_output_task()`. The queue holds 10 events (5 key press+release pairs). `ps2_output_task()` drains the queue, sends scancodes, handles repeat, and processes incoming host commands.
-
-- Simulated typing (`usb_keyboard_simulate_keypress()`) calls `ps2_output_task()` after each press and release to keep the queue drained.
-- Repeat is implemented in firmware with configurable delay and rate via the F3 command.
-- All three scancode sets are supported; Sets 1 and 3 can be disabled to save space.
+In PS/2 device mode (`ENABLE_PS2_DEVICE=1`), key events are queued via
+`ps2_press_key()` / `ps2_release_key()` and processed asynchronously by
+`ps2_output_task()`. The queue holds 10 events (5 key press+release
+pairs). `ps2_output_task()` drains the queue, sends scancodes, handles repeat,
+and processes incoming host commands - it must be called frequently, e.g., if
+waiting 10 ms it should be done in 1 ms increments while calling the task.
 
 ### Layer system
 
@@ -210,7 +237,7 @@ void execute_macro(uint8_t macro_number, bool is_release, uint8_t physical_key, 
 
 ### Hooks in macros.c
 
-- `preprocess_press(keycode, physical_key, data)` → returns `keycode_t` (override or pass through)
+- `preprocess_press(keycode, physical_key, layer, data, row, col)` → returns `keycode_t` (override or pass through)
 - `postprocess_release(keycode, physical_key, data)`
 - `layer_state_changed(layer, is_enabled)`
 - `handle_tick(tick_10ms_count)` — ~10 ms timer
@@ -228,6 +255,13 @@ void execute_macro(uint8_t macro_number, bool is_release, uint8_t physical_key, 
 ## Coding Rules
 
 - All architectures and devices must continue to work at all times (but no need to test building every device during focused development, just do a regression test once all other tasks are done and verified)
-- Prefer to fail at compile time for unsupported configurations rather than providing a default, if the default might be incorrect
+- No magic numbers - define well-named macros (in exactly one place)
+- Fail at compile time for any unsupported/non-sensical configuration, do not silently correct it
+- Fail at compile time if some hardware-dependent configuration is not set, do not assume defaults if they can be wrong (e.g., pin assignments, MCU type) - the only exception is that "extra" features (like rotary encoders or RGB lighting) can default to absent when the only downside is that optional feature not being active
+- Each configuration option (or its default value) should be set in one file and if it is needed elsewhere, then that one header should be included
+- Do not depend on order of header inclusion - include headers recursively if needed
+- Each `*.o` file should have its dependencies defined in exactly one makefile, the one nearest to the actual location
 - Do not hide issues by forcing configuration options where the issue doesn't occur, unless those configuration options are inherently part of the device spec
+- Do *not* cast unused arguments to `(void)`
 - C-code formatting: `.clang-format` at project root
+

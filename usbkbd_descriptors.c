@@ -24,6 +24,13 @@
 #include "usb_keys.h"
 #include "generic_hid.h"
 
+#if VIAL_ENABLE
+// Vial looks for a magic string in the serial number.
+#define SERIAL_NUMBER_ASCII  SERIAL_NUMBER_STRING " vial:f64c2b3c"
+#else
+#define SERIAL_NUMBER_ASCII  SERIAL_NUMBER_STRING
+#endif
+
 // MARK: - USB Descriptors
 
 /// Device descriptor.
@@ -64,10 +71,6 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
     HID_USAGE,              HID_USAGE_KEYBOARD,
     HID_COLLECTION,         HID_COLLECTION_APPLICATION,
 
-#if USE_MULTIPLE_REPORTS
-    HID_REPORT_ID,          KEYBOARD_REPORT_ID,
-#endif
-
     // Modifier keys
     HID_USAGE_PAGE,         HID_USAGE_PAGE_KEYCODES,
     HID_USAGE_MINIMUM,      MODIFIERS_START,
@@ -102,7 +105,7 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
 #if ENABLE_APPLE_FN_KEY
     HID_LOGICAL_MINIMUM,    0,
     HID_LOGICAL_MAXIMUM,    1,
-#if APPLE_KEYS_EXTRA_BITS == 1 && !ENABLE_MEDIA_KEYS
+#if APPLE_KEYS_EXTRA_BITS == 1 && (!ENABLE_MEDIA_KEYS || MEDIA_KEYS_ENDPOINT)
     HID_REPORT_SIZE,        8,
 #else
     HID_REPORT_SIZE,        1,
@@ -115,7 +118,7 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
 
     HID_LOGICAL_MINIMUM,    0,
     HID_LOGICAL_MAXIMUM,    1,
-#if APPLE_KEYS_EXTRA_BITS == 1 && !ENABLE_MEDIA_KEYS
+#if APPLE_KEYS_EXTRA_BITS == 1 && (!ENABLE_MEDIA_KEYS || MEDIA_KEYS_ENDPOINT)
     HID_REPORT_SIZE,        1,
 #endif
 #if APPLE_FN_IS_MODIFIER
@@ -149,7 +152,7 @@ static const uint8_t PROGMEM kbd_boot_hid_descriptor[] = {
 #endif // ^ !ENABLE_EXTRA_APPLE_KEYS
 #endif // ^ ENABLE_APPLE_FN_KEY
 
-#if ENABLE_MEDIA_KEYS
+#if ENABLE_MEDIA_KEYS && !MEDIA_KEYS_ENDPOINT
     HID_USAGE_PAGE,         HID_USAGE_PAGE_CONSUMER,
     //HID_USAGE,              HID_USAGE_CONSUMER_CONTROL,
     HID_LOGICAL_MINIMUM,    0,
@@ -234,14 +237,35 @@ static const uint8_t PROGMEM generic_hid_descriptor[] = {
     HID_LOGICAL_MINIMUM,    0x00,
     HID_LOGICAL_MAXIMUM,    0xFF,
     HID_REPORT_COUNT,       GENERIC_HID_FEATURE_SIZE,
-    HID_FEATURE,            HID_IO_VARIABLE,
+    HID_OUTPUT,             HID_IO_VARIABLE,
 #endif
 
     HID_END_COLLECTION
 };
 #endif
 
-#define HID_INTERFACE_COUNT     (ENABLE_KEYBOARD_ENDPOINT + ENABLE_GENERIC_HID_ENDPOINT)
+#if MEDIA_KEYS_ENDPOINT
+/// Consumer control HID descriptor (QMK-compatible 16-bit array format).
+static const uint8_t PROGMEM consumer_hid_descriptor[] = {
+    HID_USAGE_PAGE_WORD,    WORD_BYTES(HID_USAGE_PAGE_CONSUMER),
+    HID_USAGE,              HID_USAGE_CONSUMER_CONTROL,
+    HID_COLLECTION,         HID_COLLECTION_APPLICATION,
+
+    HID_REPORT_ID,          CONSUMER_REPORT_ID,
+
+    HID_USAGE_MINIMUM,              0x01,
+    HID_USAGE_MAXIMUM_WORD,         WORD_BYTES(0x02A0),
+    HID_LOGICAL_MINIMUM_WORD,       WORD_BYTES(0x0001),
+    HID_LOGICAL_MAXIMUM_WORD,       WORD_BYTES(0x02A0),
+    HID_REPORT_COUNT,       1,
+    HID_REPORT_SIZE,        16,
+    HID_INPUT,              HID_IO_ARRAY,
+
+    HID_END_COLLECTION
+};
+#endif
+
+#define HID_INTERFACE_COUNT     (ENABLE_KEYBOARD_ENDPOINT + ENABLE_GENERIC_HID_ENDPOINT + MEDIA_KEYS_ENDPOINT)
 
 #define SUB_DESCRIPTOR_COUNT    (HID_INTERFACE_COUNT + ENABLE_DFU_INTERFACE)
 
@@ -255,6 +279,15 @@ static const uint8_t PROGMEM generic_hid_descriptor[] = {
 
 #define KEYBOARD_HID_CONFIGURATION_OFFSET   HID_CONFIGURATION_OFFSET(KEYBOARD_INTERFACE_INDEX)
 #define GENERIC_HID_CONFIGURATION_OFFSET    HID_CONFIGURATION_OFFSET(GENERIC_INTERFACE_INDEX)
+#if MEDIA_KEYS_ENDPOINT
+// Generic HID may have 2 endpoints (IN+OUT). The consumer offset must count
+// keyboard (1) + generic (1 + ENABLE_GENERIC_HID_OUTPUT) endpoints before it.
+#define CONSUMER_ENDPOINTS_BEFORE           (ENABLE_KEYBOARD_ENDPOINT + 1 + ENABLE_GENERIC_HID_OUTPUT)
+#define CONSUMER_HID_CONFIGURATION_OFFSET   CONFIGURATION_SIZE_I_F_E( \
+    CONSUMER_INTERFACE_INDEX + 1,           \
+    CONSUMER_INTERFACE_INDEX,               \
+    CONSUMER_ENDPOINTS_BEFORE)
+#endif
 #define DFU_CONFIGURATION_OFFSET            CONFIGURATION_SIZE_I_F_E(INTERFACES_COUNT, SUB_DESCRIPTOR_COUNT - 1, ENDPOINT_COUNT)
 
 #if IS_SUSPEND_SUPPORTED
@@ -358,6 +391,36 @@ static const uint8_t PROGMEM configuration_descriptor[] = {
 #endif
 #endif
 
+#if MEDIA_KEYS_ENDPOINT
+    // Interface
+    DESCRIPTOR_SIZE_INTERFACE,              // bLength
+    DESCRIPTOR_TYPE_INTERFACE,              // bDescriptorType
+    CONSUMER_INTERFACE_INDEX,               // bInterfaceNumber
+    0,                                      // bAlternateSetting
+    1,                                      // bNumEndpoints
+    INTERFACE_CLASS_HID,                    // bInterfaceClass
+    INTERFACE_NO_SPECIFIC_SUBCLASS,         // bInterfaceSubClass
+    INTERFACE_NO_SPECIFIC_PROTOCOL,         // bInterfaceProtocol
+    INTERFACE_NO_DESCRIPTOR,                // iInterface
+
+    // HID
+    DESCRIPTOR_SIZE_HID,                    // bLength
+    DESCRIPTOR_TYPE_HID,                    // bDescriptorType
+    WORD_BYTES(0x0111),                     // bcdHID 1.11
+    COUNTRY_CODE_NONE,                      // bCountryCode
+    1,                                      // bNumDescriptors
+    HID_DESCRIPTOR_TYPE_REPORT,             // bDescriptorType
+    WORD_BYTES(sizeof consumer_hid_descriptor), // wDescriptorLength
+
+    // Endpoint
+    DESCRIPTOR_SIZE_ENDPOINT,               // bLength
+    DESCRIPTOR_TYPE_ENDPOINT,               // bDescriptorType
+    CONSUMER_ENDPOINT_ADDRESS,              // bEndpointAddress
+    ENDPOINT_ATTRIBUTES_INTERRUPT,          // bmAttributes
+    WORD_BYTES(CONSUMER_ENDPOINT_SIZE),     // wMaxPacketSize
+    1,                                      // bInterval
+#endif
+
 #if ENABLE_DFU_INTERFACE
     // Interface
     DESCRIPTOR_SIZE_INTERFACE,              // bLength
@@ -400,7 +463,7 @@ static const uint16_t PROGMEM supported_languages[] = {
 
 static const char PROGMEM manufacturer_string[] = MANUFACTURER_STRING;
 static const char PROGMEM product_string[] = PRODUCT_STRING;
-static const char PROGMEM serial_string[] = SERIAL_NUMBER_STRING;
+static const char PROGMEM serial_string[] = SERIAL_NUMBER_ASCII;
 
 /// Helper to list a descriptor from an ASCII string.
 #define DESC_STR(num, lang, str, ascii) {BYTES_WORD((num), DESCRIPTOR_TYPE_STRING), (lang), (str), sizeof(ascii) * 2}
@@ -432,7 +495,7 @@ struct usb_string_descriptor {
 
 static const struct usb_string_descriptor PROGMEM manufacturer_string = USB_STRING_DESCRIPTOR(MANUFACTURER_STRING);
 static const struct usb_string_descriptor PROGMEM product_string = USB_STRING_DESCRIPTOR(PRODUCT_STRING);
-static const struct usb_string_descriptor PROGMEM serial_string = USB_STRING_DESCRIPTOR(SERIAL_NUMBER_STRING);
+static const struct usb_string_descriptor PROGMEM serial_string = USB_STRING_DESCRIPTOR(SERIAL_NUMBER_ASCII);
 
 #define DESC_STR(num, lang, desc, ascii) {BYTES_WORD((num), DESCRIPTOR_TYPE_STRING), (lang), (const char *) &(desc), sizeof(ascii) * 2 }
 #endif
@@ -481,6 +544,19 @@ const struct usb_descriptor PROGMEM descriptor_list[] = {
         DESCRIPTOR_SIZE_HID
     ),
 #endif
+#if MEDIA_KEYS_ENDPOINT
+    DESC_FULL(
+        HID_DESCRIPTOR_TYPE_REPORT, 0,
+        CONSUMER_INTERFACE_INDEX,
+        consumer_hid_descriptor
+    ),
+    DESC_PART(
+        DESCRIPTOR_TYPE_HID, 0,
+        CONSUMER_INTERFACE_INDEX,
+        configuration_descriptor + CONSUMER_HID_CONFIGURATION_OFFSET,
+        DESCRIPTOR_SIZE_HID
+    ),
+#endif
 #if ENABLE_DFU_INTERFACE
     DESC_PART(
         DESCRIPTOR_TYPE_FUNCTIONAL, 0, // TBH not sure should it be 0 or index
@@ -492,7 +568,7 @@ const struct usb_descriptor PROGMEM descriptor_list[] = {
     DESC_FULL(DESCRIPTOR_TYPE_STRING, 0, 0, supported_languages),
     DESC_STR(STRING_INDEX_MANUFACTURER,     LANGUAGE_ID, manufacturer_string, MANUFACTURER_STRING),
     DESC_STR(STRING_INDEX_PRODUCT,          LANGUAGE_ID, product_string, PRODUCT_STRING),
-    DESC_STR(STRING_INDEX_SERIAL_NUMBER,    LANGUAGE_ID, serial_string, SERIAL_NUMBER_STRING),
+    DESC_STR(STRING_INDEX_SERIAL_NUMBER,    LANGUAGE_ID, serial_string, SERIAL_NUMBER_ASCII),
 #if HARDWARE_SUPPORTS_HIGH_SPEED
     DESC_FULL(
         DESCRIPTOR_TYPE_DEVICE_QUALIFIER, 0,

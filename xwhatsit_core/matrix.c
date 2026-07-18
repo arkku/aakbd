@@ -71,7 +71,7 @@ bool keyboard_scan_enabled = true;
 
 #if CAPSENSE_CAL_ENABLED
 #ifndef CAPSENSE_CAL_VERSION
-#define CAPSENSE_CAL_VERSION 5
+#define CAPSENSE_CAL_VERSION 6
 #endif
 
 // If this this number, or fewer (but non-zero), keys appear to be suspiciously
@@ -411,6 +411,7 @@ static uint16_t calibration_measure_all(uint8_t time, int_fast8_t samples, bool 
 }
 
 void calibrate_matrix(void) {
+    cal_threshold_offset = CAPSENSE_CAL_THRESHOLD_OFFSET;
     uint16_t cal_thresholds_max[CAPSENSE_CAL_BINS];
     uint16_t cal_thresholds_min[CAPSENSE_CAL_BINS];
 
@@ -864,7 +865,12 @@ static bool load_matrix_calibration(void) {
     const char *p = EECONFIG_CALIBRATION_DATA;
     struct calibration_header header;
 
-    _Static_assert((((char * )EECONFIG_CALIBRATION_DATA) + CAPSENSE_CAL_SAVE_TOTAL_SIZE) <= (((char *) EECONFIG_MAGIC) + EECONFIG_SIZE), "EECONFIG_SIZE is wrong");
+    _Static_assert(CAPSENSE_CAL_SAVE_TOTAL_SIZE == sizeof(struct calibration_header) * 2
+        + sizeof(cal_thresholds) + sizeof(cal_bin_rows_mask)
+        + sizeof(assigned_to_threshold) + sizeof(cal_bin_key_count)
+        + sizeof(cal_threshold_max) + sizeof(cal_threshold_min)
+        + sizeof(cal_threshold_offset),
+        "CAPSENSE_CAL_SAVE_TOTAL_SIZE does not match actual data layout");
 
     // Check that the saved calibration matches this configuration
     eeprom_read_block(&header, p, sizeof(header));
@@ -942,16 +948,13 @@ static uint16_t keymap_checksum(void) {
 
     for (int_fast8_t col = 0; col < MATRIX_COLS; ++col) {
         for (int_fast8_t row = 0; row < MATRIX_CAPSENSE_ROWS; ++row) {
-            uint16_t keycode = usb_keycode_for_matrix(row, col);
-            if (keycode) {
-                checksum += ~keycode + (((keycode * (col + 1))) ^ (row + 1));
-                checksum <<= 3;
-                checksum >>= (16 - 3);
-            }
+            const uint16_t keycode = usb_keycode_for_matrix(row, col);
+            checksum ^= keycode ^ ((uint16_t)(col) << 8 | row);
+            checksum *= 40503U;
         }
     }
 
-    return ~checksum;
+    return checksum;
 }
 
 #define MASK_TO_ROW_CASE(x) (1 << (x)): row = CAPSENSE_PHYSICAL_ROW_TO_KEYMAP_ROW((x)); break

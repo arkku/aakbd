@@ -159,24 +159,24 @@ enum keycode_ps2 {
     KEY_MENU = 0x8D,
 
     // Additional keys
-    KEY_KATAKANA = 0x8A,                // Note: same as KEY_KP_EQUALS
+    KEY_KATAKANA = 0x8A, // Note: same as KEY_KP_EQUALS
     KEY_KANJI = 0x86,
     KEY_HIRAGANA = 0x85,
 
-    // Scancode set 2 codes, where different and not prefixed by E0
+// Scancode set 2 codes, where different and not prefixed by E0
 #ifdef KK_KEYCODES_INCLUDE_DUPLICATES
-    KEY_ANSI_BACKSLASH_SET2 = 0x5D,     // Set 3: KEY_INT_LEFT_OF_BACKSPACE
-    KEY_CAPS_LOCK_SET2 = 0x58,          // Set 3: KEY_RIGHT_CTRL
-    KEY_LEFT_CTRL_SET2 = 0x14,          // Set 3: KEY_CAPS_LOCK
-    KEY_LEFT_ALT_SET2 = 0x11,           // Set 3: KEY_LEFT_CTRL
-    KEY_NUM_LOCK_SET2 = 0x77,           // Set 3: KEY_KP_DIVIDE
-    KEY_KP_MULTIPLY_SET2 = 0x7C,        // Set 3: KEY_KP_PLUS
-    KEY_KP_PLUS_SET2 = 0x79,            // Set 3: KEY_KP_ENTER
-    KEY_SCROLL_LOCK_SET2 = 0x7E,        // Set 3: KEY_KP_MULTIPLY
-    KEY_ALT_SYSRQ_SET2 = 0x84,          // Set 3: KEY_KP_MINUS
-    KEY_ESC_SET2 = 0x76,                // Set 3: KEY_NUM_LOCK
-    KEY_F7_SET2 = 0x83,                 // Set 3: KEY_F17
-    KEY_F12_SET2 = 0x07,                // Set 3: KEY_F1
+    KEY_ANSI_BACKSLASH_SET2 = 0x5D, // Set 3: KEY_INT_LEFT_OF_BACKSPACE
+    KEY_CAPS_LOCK_SET2 = 0x58,      // Set 3: KEY_RIGHT_CTRL
+    KEY_LEFT_CTRL_SET2 = 0x14,      // Set 3: KEY_CAPS_LOCK
+    KEY_LEFT_ALT_SET2 = 0x11,       // Set 3: KEY_LEFT_CTRL
+    KEY_NUM_LOCK_SET2 = 0x77,       // Set 3: KEY_KP_DIVIDE
+    KEY_KP_MULTIPLY_SET2 = 0x7C,    // Set 3: KEY_KP_PLUS
+    KEY_KP_PLUS_SET2 = 0x79,        // Set 3: KEY_KP_ENTER
+    KEY_SCROLL_LOCK_SET2 = 0x7E,    // Set 3: KEY_KP_MULTIPLY
+    KEY_ALT_SYSRQ_SET2 = 0x84,      // Set 3: KEY_KP_MINUS
+    KEY_ESC_SET2 = 0x76,            // Set 3: KEY_NUM_LOCK
+    KEY_F7_SET2 = 0x83,             // Set 3: KEY_F17
+    KEY_F12_SET2 = 0x07,            // Set 3: KEY_F1
     KEY_F13_SET2 = 0x08,
     KEY_F14_SET2 = 0x10,
     KEY_F15_SET2 = 0x18,
@@ -200,7 +200,7 @@ enum keycode_ps2 {
     KEY_INT_NEXT_TO_RETURN_SET2 = 0x5D,     // Set 3: not used (has own code 0x53)
     KEY_INT_LEFT_OF_BACKSPACE_SET2 = 0x6A,  // Set 3: 0x5D (doubled with KEY_ANSI_BACKSLASH_SET2)
 
-    KEY_COMPOSE = 0x8D,                     // Set 3: Also KEY_MENU (or 0x91?)
+    KEY_COMPOSE = 0x8D, // Set 3: Also KEY_MENU (or 0x91?)
 #endif
     KEY_F1_SET2 = 0x05,
     KEY_F2_SET2 = 0x06,

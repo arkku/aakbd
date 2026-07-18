@@ -24,4 +24,4 @@ void encoder_init(void);
 void encoder_task(void);
 
 /// Override this in macros.c to handle encoder rotation.
-void handle_encoder_rotation(bool is_clockwise) __attribute__((weak));
+void handle_encoder_rotation(bool is_clockwise);

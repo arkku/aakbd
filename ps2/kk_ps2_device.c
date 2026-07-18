@@ -80,13 +80,13 @@ static uint8_t ps2_buffer_head = 0;
 static uint8_t ps2_buffer_tail = 0;
 
 /// The number of elements in `ps2_buffer`.
-#define ps2_buffer_count    ((uint8_t) (ps2_buffer_head - ps2_buffer_tail))
+#define ps2_buffer_count ((uint8_t) (ps2_buffer_head - ps2_buffer_tail))
 
 /// Is the ps2_buffer empty?
 #define is_ps2_buffer_empty (ps2_buffer_count == 0)
 
 /// Is the ps2_buffer full?
-#define is_ps2_buffer_full  (ps2_buffer_count == KK_PS2_BUFFER_SIZE)
+#define is_ps2_buffer_full (ps2_buffer_count == KK_PS2_BUFFER_SIZE)
 
 #if KK_PS2_BUFFER_SIZE == 256
 #define modulo_buffer_size(x) ((uint8_t) (x))
@@ -241,14 +241,14 @@ ps2_wait_idle (uint8_t timeout_us) {
 
 /// Send one bit out (setup data, wait, pulse clock).
 /// Returns `false` from _caller_ (because this is a macro) on clock inhibit.
-#define PS2_DEVICE_TX_BIT(bit)       \
-    do {                             \
-        ps2_data_set_value((bit));   \
+#define PS2_DEVICE_TX_BIT(bit) \
+    do { \
+        ps2_data_set_value((bit)); \
         ps2_delay_us(DATA_SETUP_US); \
         if (!ps2_clock_pulse_tx()) { \
-            ps2_data_release();      \
-            return false;            \
-        }                            \
+            ps2_data_release(); \
+            return false; \
+        } \
     } while (0)
 
 static bool

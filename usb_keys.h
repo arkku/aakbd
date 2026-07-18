@@ -20,6 +20,8 @@
 #ifndef KK_USB_KEYS_H
 #define KK_USB_KEYS_H
 
+#include "usbkbd_config.h"
+
 #ifndef PASTE
 #define _PASTE(a,b) a##b
 #define PASTE(a,b)  _PASTE(a,b)
@@ -92,7 +94,6 @@ enum keycode_usb {
     USB_KEY_SLASH = 0x38,
 
     USB_KEY_BACKSLASH = USB_KEY_ANSI_BACKSLASH,
-
     USB_KEY_MINUS = USB_KEY_DASH,
 
     USB_KEY_CAPS_LOCK = 0x39,
@@ -149,6 +150,8 @@ enum keycode_usb {
     USB_KEY_KP_COMMA = USB_KEY_KP_COMMA_DEL,
     USB_KEY_KP_PERIOD = USB_KEY_KP_COMMA_DEL,
     USB_KEY_KP_DOT = USB_KEY_KP_COMMA_DEL,
+
+    USB_KEY_GRAVE = USB_KEY_BACKTICK,
 
     USB_KEY_KP_1 = USB_KEY_KP_1_END,
     USB_KEY_KP_2 = USB_KEY_KP_2_DOWN,
@@ -280,6 +283,10 @@ enum keycode_usb {
     USB_KEY_RIGHT_WIN = 0xE7,
 
     // Aliases
+    USB_KEY_RIGHT = USB_KEY_RIGHT_ARROW,
+    USB_KEY_LEFT = USB_KEY_LEFT_ARROW,
+    USB_KEY_DOWN = USB_KEY_DOWN_ARROW,
+    USB_KEY_UP = USB_KEY_UP_ARROW,
     USB_KEY_ALT = USB_KEY_LEFT_ALT,
     USB_KEY_SHIFT = USB_KEY_LEFT_SHIFT,
     USB_KEY_CTRL = USB_KEY_LEFT_CTRL,
@@ -364,6 +371,21 @@ enum keycode_usb {
     CC_KEY_MEDIA_VOLUME_UP = 0xE9,
     CC_KEY_MEDIA_VOLUME_DOWN = 0xEA,
 
+    // Application launch / browser controls (QMK/Vial GUI names)
+    CC_KEY_LAUNCH_MEDIA = 0x83,
+    CC_KEY_LAUNCH_MAIL = 0x8A,
+    CC_KEY_LAUNCH_CALCULATOR = 0x92,
+    CC_KEY_LAUNCH_MY_PC = 0x94,
+    CC_KEY_BROWSE_SEARCH = 0x221,
+    CC_KEY_BROWSE_HOME = 0x223,
+    CC_KEY_BROWSE_BACK = 0x224,
+    CC_KEY_BROWSE_FORWARD = 0x225,
+    CC_KEY_BROWSE_STOP = 0x226,
+    CC_KEY_BROWSE_REFRESH = 0x227,
+    CC_KEY_BROWSE_FAVORITES = 0x22A,
+    CC_KEY_BRIGHTNESS_UP = 0x6F,
+    CC_KEY_BRIGHTNESS_DOWN = 0x70,
+
     // MARK: - Virtual keys (these need special support)
 
     // Requires the use of Apple's vendor id and a separate byte in the
@@ -374,6 +396,8 @@ enum keycode_usb {
 #else
     USB_KEY_VIRTUAL_APPLE_FN = (USB_KEY_RIGHT_CMD + 1),
 #endif
+
+#if MEDIA_KEYS_COUNT <= 8
     USB_KEY_VIRTUAL_APPLE_BRIGHTNESS_UP,
     USB_KEY_VIRTUAL_APPLE_BRIGHTNESS_DOWN,
     USB_KEY_VIRTUAL_APPLE_SPOTLIGHT,
@@ -381,8 +405,40 @@ enum keycode_usb {
     USB_KEY_VIRTUAL_APPLE_LAUNCHPAD,
     USB_KEY_VIRTUAL_APPLE_EXPOSE,
     USB_KEY_VIRTUAL_APPLE_EXPOSE_DESKTOP,
+#endif
 
-    // Media keys
+#if MEDIA_KEYS_COUNT > 8
+    // 22 consumer keys ordered by QMK keycode. First 7 (0xA8-0xAE) then
+    // 15 (0xB0-0xBE, skipping 0xAF Media Select). Makes QMK→AAKBD
+    // translation a simple range check instead of a 22-case switch.
+#define CONSUMER_KEY_ENUM(name, idx) \
+    PASTE(USB_KEY_VIRTUAL_MEDIA_,idx), \
+    PASTE(USB_KEY_, name) = PASTE(USB_KEY_VIRTUAL_MEDIA_,idx)
+    CONSUMER_KEY_ENUM(VOLUME_MUTE,      1),  // 0xA8
+    CONSUMER_KEY_ENUM(VOLUME_UP,        2),  // 0xA9
+    CONSUMER_KEY_ENUM(VOLUME_DOWN,      3),  // 0xAA
+    CONSUMER_KEY_ENUM(NEXT_TRACK,       4),  // 0xAB
+    CONSUMER_KEY_ENUM(PREVIOUS_TRACK,   5),  // 0xAC
+    CONSUMER_KEY_ENUM(MEDIA_STOP,       6),  // 0xAD
+    CONSUMER_KEY_ENUM(PLAY_PAUSE,       7),  // 0xAE
+    // skip 0xAF (KC_MEDIA_SELECT — not supported)
+    CONSUMER_KEY_ENUM(MEDIA_EJECT,      8),  // 0xB0
+    CONSUMER_KEY_ENUM(LAUNCH_MAIL,      9),  // 0xB1
+    CONSUMER_KEY_ENUM(LAUNCH_CALCULATOR,10), // 0xB2
+    CONSUMER_KEY_ENUM(LAUNCH_MY_PC,    11), // 0xB3
+    CONSUMER_KEY_ENUM(BROWSE_SEARCH,   12), // 0xB4
+    CONSUMER_KEY_ENUM(BROWSE_HOME,     13), // 0xB5
+    CONSUMER_KEY_ENUM(BROWSE_BACK,     14), // 0xB6
+    CONSUMER_KEY_ENUM(BROWSE_FORWARD,  15), // 0xB7
+    CONSUMER_KEY_ENUM(BROWSE_STOP,     16), // 0xB8
+    CONSUMER_KEY_ENUM(BROWSE_REFRESH,  17), // 0xB9
+    CONSUMER_KEY_ENUM(BROWSE_FAVORITES,18), // 0xBA
+    CONSUMER_KEY_ENUM(FAST_FORWARD,    19), // 0xBB
+    CONSUMER_KEY_ENUM(REWIND,          20), // 0xBC
+    CONSUMER_KEY_ENUM(BRIGHTNESS_UP,   21), // 0xBD
+    CONSUMER_KEY_ENUM(BRIGHTNESS_DOWN, 22), // 0xBE
+#else
+    // Media keys (traditional bitfield mode, up to 8 keys)
 
 #define MEDIA_KEY_ENUM(name, idx)                                   \
     PASTE(USB_KEY_VIRTUAL_MEDIA_,idx),                              \
@@ -401,7 +457,16 @@ enum keycode_usb {
     MEDIA_KEY_ENUM(REWIND,         8),
 #endif
 #endif
+#endif
+
+    USB_KEYS_COUNT
 };
+
+_Static_assert(USB_KEYS_COUNT <= 0xFF, "Too many virtual keys!");
+#if MEDIA_KEYS_COUNT > 0
+_Static_assert(USB_KEY_VIRTUAL_MEDIA_1 + MEDIA_KEYS_COUNT <= 0xFF,
+    "Media key range exceeds uint8_t");
+#endif
 
 // MARK: - Modifiers
 
@@ -438,5 +503,11 @@ enum keycode_usb {
 #define LEFT_META_BIT               MODIFIER_BIT(USB_KEY_META)
 
 #define IS_MODIFIER(key)            ((key) >= MODIFIERS_START && (key) <= MODIFIERS_END)
+
+#if ENABLE_APPLE_FN_KEY && APPLE_FN_IS_MODIFIER
+/// Repurpose the last modifier (right command) to be Apple Fn.
+#define USB_KEY_APPLE_FN            MODIFIERS_END
+#define APPLE_FN_BIT                MODIFIER_BIT(USB_KEY_APPLE_FN)
+#endif
 
 #endif

@@ -34,8 +34,6 @@ CONFIG_FLAGS =  \
                -DPRODUCT_STRING='$(PRODUCT)' \
                -DKEYBOARD_POLL_INTERVAL_MS=$(POLL_INTERVAL) \
                -DENABLE_BOOTLOADER_SHORTCUT=0 \
-               -DENABLE_RESET_SHORTCUT=0 \
-               -DENABLE_DEBUG_SHORTCUT=0 \
                -DENABLE_SIMULATED_TYPING=1 \
                -DDVORAK_MAPPINGS=1
 ```
@@ -55,10 +53,19 @@ Recompile by running `make` again.
 
 ## Flashing Firmware
 
-Use [Wally](https://www.zsa.io/wally/) to flash the firmware. After flashing
-this firmware, you need to use a key bound to `EXT(ENTER_BOOTLOADER)` or
-press the reset button to flash again. The reset button is deeply recessed
-in the top right corner of the right side keyboard module – press it with a
-straightened paperclip. If you change the USB vendor and/or product id, Wally
-may not recognise the keyboard. You can work around that by plugging it in
-while pressing the reset button.
+Use [Wally](https://www.zsa.io/wally/) or `make dfu` to flash the firmware.
+The `make dfu` target requires
+[teensy_loader_cli](https://github.com/PaulStoffregen/teensy_loader_cli). You
+can also use the teensy loader manually:
+
+``` sh
+teensy_loader_cli -v -w -mmcu=atmega32u4 ergodox.hex
+```
+
+After flashing this firmware, you may need to use a key bound to
+`EXT(ENTER_BOOTLOADER)` or press the reset button to flash again. Enabling
+DFU in the firmware allows `dfu-util -e` to be used as well. The reset
+button is deeply recessed in the top right corner of the right side keyboard
+module – press it with a straightened paperclip. If you change the USB vendor
+and/or product id, Wally may not recognise the keyboard. You can work around
+that by plugging it in while pressing the reset button.

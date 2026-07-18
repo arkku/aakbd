@@ -17,6 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "keyboard.h"
+#include "eeconfig.h"
+#ifdef EEPROM_DRIVER
+#include "eeprom_driver.h"
+#endif
 #include "matrix.h"
 #include "timer.h"
 #include "led.h"
@@ -36,6 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifdef ENCODER_ENABLE
 #include "encoder.h"
 #endif
+#if VIAL_ENABLE
+#include "vial.h"
+#endif
 #include "bootloader.h"
 #ifdef BOOTMAGIC_ENABLE
 #include "bootmagic.h"
@@ -53,6 +60,9 @@ __attribute__((weak)) void matrix_setup(void) {}
 
 void quantum_init(void) {
     led_init_ports();
+#if defined(EEPROM_DRIVER) && !defined(__AVR__)
+    eeprom_driver_init();
+#endif
 #ifdef BACKLIGHT_ENABLE
     backlight_init_ports();
 #endif
@@ -64,6 +74,9 @@ void quantum_init(void) {
 #endif
 #ifdef HAPTIC_ENABLE
     haptic_init();
+#endif
+#if VIAL_ENABLE
+    vial_init();
 #endif
 }
 
@@ -79,6 +92,10 @@ void keyboard_init(void) {
 #ifdef BOOTMAGIC_ENABLE
     bootmagic();
 #endif
+
+    if (!eeconfig_is_enabled()) {
+        eeconfig_init();
+    }
 
     quantum_init();
 

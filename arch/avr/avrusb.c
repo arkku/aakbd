@@ -200,6 +200,11 @@ usb_init_endpoints (void) {
     usb_init_endpoint(GENERIC_HID_ENDPOINT_OUT_NUM, GENERIC_ENDPOINT_OUT_TYPE, GENERIC_ENDPOINT_SIZE, GENERIC_ENDPOINT_FLAGS);
 #endif
 #endif
+#if MEDIA_KEYS_ENDPOINT
+    _Static_assert(IS_ENDPOINT_SIZE_VALID(CONSUMER_ENDPOINT_SIZE), "Invalid consumer endpoint size");
+    _Static_assert(CONSUMER_ENDPOINT_NUM <= USB_MAX_ENDPOINT, "Consumer endpoint number exceeds device maximum");
+    usb_init_endpoint(CONSUMER_ENDPOINT_NUM, EP_TYPE_INTERRUPT_IN, CONSUMER_ENDPOINT_SIZE, EP_SINGLE_BUFFER);
+#endif
 }
 
 static INLINE void
@@ -279,12 +284,6 @@ usb_wake_up_host (void) {
 
 static INLINE void
 usb_tx_report_header (void) {
-#if USE_MULTIPLE_REPORTS
-    if (!is_boot_protocol) {
-        usb_tx(KEYBOARD_REPORT_ID);
-    }
-#endif
-
     usb_tx(usb_keys_modifier_flags);
 #if RESERVE_BOOT_PROTOCOL_RESERVED_BYTE
     usb_tx(0);
@@ -386,6 +385,31 @@ usb_keyboard_send_report (void) {
 #endif
     return true;
 }
+
+#if MEDIA_KEYS_ENDPOINT
+bool
+usb_keyboard_send_consumer (uint16_t usage) {
+    if (!usb_configuration) {
+        return false;
+    }
+
+    usb_wake_up_if_suspended();
+
+    uint8_t old_sreg;
+    if (!usb_wait_for_rw_on_endpoint(CONSUMER_ENDPOINT_NUM, &old_sreg)) {
+        return false;
+    }
+
+    usb_tx(CONSUMER_REPORT_ID);
+    usb_tx(usage & 0xFF);
+    usb_tx((usage >> 8) & 0xFF);
+
+    usb_release_tx();
+    SREG = old_sreg;
+
+    return true;
+}
+#endif
 
 // MARK: - Generic HID
 
@@ -904,6 +928,27 @@ ISR(USB_COM_vect) {
         }
     }
 #endif // ^ ENABLE_GENERIC_HID_ENDPOINT
+#if MEDIA_KEYS_ENDPOINT
+    else if (index == CONSUMER_INTERFACE_INDEX) {
+        if (type == USB_REQUEST_DEVICE_TO_HOST_CLASS_INTERFACE) {
+            if (request == HID_REQUEST_GET_IDLE) {
+                usb_tx(0);
+            } else if (request == HID_REQUEST_GET_PROTOCOL) {
+                usb_tx(INTERFACE_NO_SPECIFIC_PROTOCOL);
+            } else {
+                success = false;
+            }
+        } else if (type == USB_REQUEST_HOST_TO_DEVICE_CLASS_INTERFACE) {
+            if (request == HID_REQUEST_SET_IDLE) {
+                // No idle needed — consumer reports are event-driven
+            } else {
+                success = false;
+            }
+        } else {
+            success = false;
+        }
+    }
+#endif
 #if ENABLE_DFU_INTERFACE
     else if (index == DFU_INTERFACE_INDEX) {
         if (type == USB_REQUEST_HOST_TO_DEVICE_CLASS_INTERFACE) {
@@ -948,7 +993,7 @@ ISR(USB_COM_vect) {
 void
 usb_deinit (void) {
     usb_keyboard_release_all_keys();
-    usb_keyboard_leds = 5;
+    usb_keyboard_leds = 7;
     usb_keyboard_send_report();
     _delay_ms(8);
 

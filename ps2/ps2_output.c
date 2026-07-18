@@ -40,6 +40,10 @@
 #define ENABLE_PS2_DEVICE 1
 #endif
 
+#ifndef ENABLE_PS2_LEGACY_COMPATIBILITY
+#define ENABLE_PS2_LEGACY_COMPATIBILITY 1
+#endif
+
 #include "kk_ps2_device.h"
 #include "usb2ps2_keys.h"
 #include <qmk_core/platforms/timer.h>
@@ -98,14 +102,14 @@
 /// PS/2 output state flags.
 static uint8_t ps2_output_flags = 0;
 
-#define FLAG_OUTPUT_INITIALIZED         ((uint8_t) 0x01U)
-#define FLAG_SHIFT_SUPPRESSED_LEFT      ((uint8_t) 0x02U)
-#define FLAG_SHIFT_VIRTUAL_ON           ((uint8_t) 0x04U)
-#define FLAG_SHIFT_VIRTUAL_WAS_ACTIVE   ((uint8_t) 0x08U)
-#define FLAG_HOST_ACTIVE                ((uint8_t) 0x10U)
-#define FLAG_SHIFT_SUPPRESSED_RIGHT     ((uint8_t) 0x20U)
-#define FLAG_WAS_SCANNING_ENABLED       ((uint8_t) 0x40U)
-#define FLAG_SCANNING_ENABLED           ((uint8_t) 0x80U)
+#define FLAG_OUTPUT_INITIALIZED       ((uint8_t) 0x01U)
+#define FLAG_SHIFT_SUPPRESSED_LEFT    ((uint8_t) 0x02U)
+#define FLAG_SHIFT_VIRTUAL_ON         ((uint8_t) 0x04U)
+#define FLAG_SHIFT_VIRTUAL_WAS_ACTIVE ((uint8_t) 0x08U)
+#define FLAG_HOST_ACTIVE              ((uint8_t) 0x10U)
+#define FLAG_SHIFT_SUPPRESSED_RIGHT   ((uint8_t) 0x20U)
+#define FLAG_WAS_SCANNING_ENABLED     ((uint8_t) 0x40U)
+#define FLAG_SCANNING_ENABLED         ((uint8_t) 0x80U)
 
 /// The active scancode set (1, 2 or 3).
 static uint8_t ps2_active_scancode_set = PS2_KEYBOARD_DEFAULT_SCANCODE_SET;
@@ -124,26 +128,45 @@ static uint8_t ps2_modifiers = 0;
 
 #define PS2_OUTPUT_KEY_EVENT_SENTINEL_COUNT 0
 
-#define key_event_queue_count           ((uint8_t) (key_event_queue_head - key_event_queue_tail))
-#define is_key_event_queue_empty        (key_event_queue_count == 0)
-#define is_key_event_queue_full         (key_event_queue_count == PS2_OUTPUT_MAX_KEY_EVENTS)
-#define key_event_head                  modulo_key_event_queue(key_event_queue_head)
-#define key_event_tail                  modulo_key_event_queue(key_event_queue_tail)
-#define increment_key_event_queue()     do { ++key_event_queue_head; } while (0)
-#define decrement_key_event_queue()     do { ++key_event_queue_tail; } while (0)
-#define unshift_key_event_queue()       do { --key_event_queue_tail; } while (0)
+#define key_event_queue_count    ((uint8_t) (key_event_queue_head - key_event_queue_tail))
+#define is_key_event_queue_empty (key_event_queue_count == 0)
+#define is_key_event_queue_full  (key_event_queue_count == PS2_OUTPUT_MAX_KEY_EVENTS)
+#define key_event_head           modulo_key_event_queue(key_event_queue_head)
+#define key_event_tail           modulo_key_event_queue(key_event_queue_tail)
+#define increment_key_event_queue() \
+    do { \
+        ++key_event_queue_head; \
+    } while (0)
+#define decrement_key_event_queue() \
+    do { \
+        ++key_event_queue_tail; \
+    } while (0)
+#define unshift_key_event_queue() \
+    do { \
+        --key_event_queue_tail; \
+    } while (0)
 
 #else
 
 #define PS2_OUTPUT_KEY_EVENT_SENTINEL_COUNT 1
 
-#define is_key_event_queue_empty        (key_event_queue_head == key_event_queue_tail)
-#define is_key_event_queue_full         (modulo_key_event_queue(key_event_queue_head + 1) == key_event_queue_tail)
-#define key_event_head                  (key_event_queue_head)
-#define key_event_tail                  (key_event_queue_tail)
-#define increment_key_event_queue()     do { key_event_queue_head = modulo_key_event_queue(key_event_queue_head + 1); } while (0)
-#define decrement_key_event_queue()     do { key_event_queue_tail = modulo_key_event_queue(key_event_queue_tail + 1); } while (0)
-#define unshift_key_event_queue()       do { key_event_queue_tail = modulo_key_event_queue(key_event_queue_tail - 1); } while (0)
+#define is_key_event_queue_empty (key_event_queue_head == key_event_queue_tail)
+#define is_key_event_queue_full \
+    (modulo_key_event_queue(key_event_queue_head + 1) == key_event_queue_tail)
+#define key_event_head (key_event_queue_head)
+#define key_event_tail (key_event_queue_tail)
+#define increment_key_event_queue() \
+    do { \
+        key_event_queue_head = modulo_key_event_queue(key_event_queue_head + 1); \
+    } while (0)
+#define decrement_key_event_queue() \
+    do { \
+        key_event_queue_tail = modulo_key_event_queue(key_event_queue_tail + 1); \
+    } while (0)
+#define unshift_key_event_queue() \
+    do { \
+        key_event_queue_tail = modulo_key_event_queue(key_event_queue_tail - 1); \
+    } while (0)
 
 #endif
 
@@ -152,14 +175,15 @@ static struct {
     uint8_t is_release;
 } key_event_queue[PS2_OUTPUT_MAX_KEY_EVENTS + PS2_OUTPUT_KEY_EVENT_SENTINEL_COUNT];
 
-#define modulo_key_event_queue(index)   ((index) % (PS2_OUTPUT_MAX_KEY_EVENTS + PS2_OUTPUT_KEY_EVENT_SENTINEL_COUNT))
+#define modulo_key_event_queue(index) \
+    ((index) % (PS2_OUTPUT_MAX_KEY_EVENTS + PS2_OUTPUT_KEY_EVENT_SENTINEL_COUNT))
 
 /// A special marker in `key_event_queue`, which is not a keypress. The
 /// `is_release` field will then define which event it is.
 #define KEY_EVENT_SPECIAL ((uint8_t) 0U)
 
 #define SPECIAL_EVENT_ALL_KEYS_RELEASED ((uint8_t) 0U)
-#if PS2_OUTPUT_NUM_LOCK_LED_EVENT
+#if PS2_OUTPUT_NUM_LOCK_LED_EVENT && ENABLE_PS2_LEGACY_COMPATIBILITY
 #define SPECIAL_EVENT_NUM_LOCK_TOGGLED ((uint8_t) 1U)
 #endif
 
@@ -171,11 +195,13 @@ uint8_t key_event_queue_tail = 0;
 
 // MARK: Tenkey Tracking
 
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
 /// The count of tenkey cluster keys being held down currently.
 /// Why does it matter? Because in scancode sets 1 and 2, these keys have
 /// virtual modifiers added depending on shift and num lock states,
 /// and those need to be undone after the last tenkey cluster key release.
 static uint8_t tenkey_count = 0;
+#endif
 
 // MARK: Repeat Tracking
 
@@ -242,7 +268,9 @@ send_3_bytes (const uint8_t a, const uint8_t b, const uint8_t c) {
 /// Converts PS/2 LED flags to USB LED flags.
 static uint8_t
 ps2_leds_to_usb (const uint8_t ps2_leds) {
-    return ((ps2_leds & PS2_LED_SCROLL_LOCK_BIT) ? LED_SCROLL_LOCK_BIT : 0) | ((ps2_leds & PS2_LED_NUM_LOCK_BIT) ? LED_NUM_LOCK_BIT : 0) | ((ps2_leds & PS2_LED_CAPS_LOCK_BIT) ? LED_CAPS_LOCK_BIT : 0);
+    return ((ps2_leds & PS2_LED_SCROLL_LOCK_BIT) ? LED_SCROLL_LOCK_BIT : 0)
+        | ((ps2_leds & PS2_LED_NUM_LOCK_BIT) ? LED_NUM_LOCK_BIT : 0)
+        | ((ps2_leds & PS2_LED_CAPS_LOCK_BIT) ? LED_CAPS_LOCK_BIT : 0);
 }
 
 /// Is the PS/2 host active (have we received something from them)?
@@ -280,7 +308,10 @@ ps2_restore_scanning_state (void) {
 /// As a special case, pass `0` for `scancode` to stop any active repeat.
 static void
 clear_repeat_for_key (const uint8_t scancode, const bool is_extended) {
-    if (!scancode || (ps2_repeat_key.scancode == scancode && (ps2_repeat_key.flags & REPEAT_FLAG_KEY_IS_EXTENDED) == (is_extended ? REPEAT_FLAG_KEY_IS_EXTENDED : 0))) {
+    if (!scancode
+        || (ps2_repeat_key.scancode == scancode
+            && (ps2_repeat_key.flags & REPEAT_FLAG_KEY_IS_EXTENDED)
+                == (is_extended ? REPEAT_FLAG_KEY_IS_EXTENDED : 0))) {
         ps2_repeat_key.scancode = 0;
     }
 }
@@ -350,7 +381,9 @@ static unsigned char ps2_key_repeat_state[SET3_STATE_BYTES];
 
 static inline bool
 is_set3_break_enabled_for (const uint8_t scancode) {
-    return set3_is_native(scancode) ? (ps2_key_break_state[BITMAP_BYTE(scancode)] >> BITMAP_BIT(scancode)) & 1 : true;
+    return set3_is_native(scancode) ?
+        (ps2_key_break_state[BITMAP_BYTE(scancode)] >> BITMAP_BIT(scancode)) & 1 :
+        true;
 }
 
 static inline void
@@ -366,7 +399,9 @@ set3_set_break (const uint8_t scancode, const bool enable) {
 
 static inline bool
 is_set3_repeat_enabled_for (const uint8_t scancode) {
-    return set3_is_native(scancode) ? (ps2_key_repeat_state[BITMAP_BYTE(scancode)] >> BITMAP_BIT(scancode)) & 1 : true;
+    return set3_is_native(scancode) ?
+        (ps2_key_repeat_state[BITMAP_BYTE(scancode)] >> BITMAP_BIT(scancode)) & 1 :
+        true;
 }
 
 static inline void
@@ -381,7 +416,8 @@ set3_set_repeat (const uint8_t scancode, const bool enable) {
 }
 
 static inline void
-set3_set_break_and_repeat (const uint8_t scancode, const bool break_enabled, const bool repeat_enabled) {
+set3_set_break_and_repeat (
+    const uint8_t scancode, const bool break_enabled, const bool repeat_enabled) {
     set3_set_break(scancode, break_enabled);
     set3_set_repeat(scancode, repeat_enabled);
 }
@@ -456,6 +492,7 @@ send_ext_key_set1_break (const uint8_t keycode) {
     send_2_bytes(PS2_EXT_PREFIX, SET1_MAKE_TO_BREAK(keycode));
 }
 
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
 static void
 virtual_shift_on (void) {
     if (!(ps2_modifiers & BOTH_SHIFT_BITS) && !(ps2_output_flags & FLAG_SHIFT_VIRTUAL_ON)) {
@@ -516,6 +553,7 @@ static inline bool
 is_tenkey_cluster_key (const uint8_t key) {
     return key >= USB_KEY_INSERT && key <= USB_KEY_UP_ARROW;
 }
+#endif
 
 void
 ps2_send_key_press (const uint8_t usb_keycode) {
@@ -570,6 +608,7 @@ ps2_send_key_press (const uint8_t usb_keycode) {
     }
 
     if (!is_scancode_set_3_active) {
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
         virtual_shift_off();
         shift_unsuppress();
 
@@ -582,45 +621,52 @@ ps2_send_key_press (const uint8_t usb_keycode) {
             }
             ++tenkey_count;
         }
+#endif
 
         switch (usb_keycode) {
-        case USB_KEY_PRINT_SCREEN:
-            if (ps2_modifiers & BOTH_ALT_BITS) {
-                const uint8_t sysrq = is_scancode_set_1_active ? KEY_ALT_SYSRQ_SET1 : KEY_ALT_SYSRQ_SET2;
-                send_byte(sysrq);
-                ps2_repeat_key.scancode = sysrq;
-                ps2_repeat_key.flags = 0;
+            case USB_KEY_PRINT_SCREEN:
+                if (ps2_modifiers & BOTH_ALT_BITS) {
+                    const uint8_t sysrq =
+                        is_scancode_set_1_active ? KEY_ALT_SYSRQ_SET1 : KEY_ALT_SYSRQ_SET2;
+                    send_byte(sysrq);
+                    ps2_repeat_key.scancode = sysrq;
+                    ps2_repeat_key.flags = 0;
+                    return;
+                }
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
+                if (!(ps2_modifiers & (CTRL_BIT | RIGHT_CTRL_BIT | SHIFT_BIT | RIGHT_SHIFT_BIT))) {
+                    virtual_shift_on();
+                }
+#endif
+                break;
+
+            case USB_KEY_PAUSE_BREAK:
+                if (ps2_modifiers & BOTH_CTRL_BITS) {
+                    // Pause is a weird special case, so it happens that the
+                    // scancode resolves to the one with Ctrl active (other parts
+                    // of the scancode are not unique)
+                    send_ext_key_make(scancode);
+                } else if (is_scancode_set_1_active) {
+                    send_2_bytes(PS2_PAUSE_PREFIX, KEY_LEFT_CTRL_SET1);
+                    send_2_bytes(KEY_NUM_LOCK_SET1, PS2_PAUSE_PREFIX);
+                    send_2_bytes(
+                        SET1_MAKE_TO_BREAK(KEY_LEFT_CTRL_SET1), SET1_MAKE_TO_BREAK(KEY_NUM_LOCK_SET1));
+                } else {
+                    send_2_bytes(PS2_PAUSE_PREFIX, EXTENDED_KEY_PAUSE_SET2);
+                    send_2_bytes(KEY_NUM_LOCK_SET2, PS2_PAUSE_PREFIX);
+                    send_2_bytes(PS2_BREAK_PREFIX, EXTENDED_KEY_PAUSE_SET2);
+                    send_2_bytes(PS2_BREAK_PREFIX, KEY_NUM_LOCK_SET2);
+                }
                 return;
-            }
-            if (!(ps2_modifiers & (CTRL_BIT | RIGHT_CTRL_BIT | SHIFT_BIT | RIGHT_SHIFT_BIT))) {
-                virtual_shift_on();
-            }
-            break;
 
-        case USB_KEY_PAUSE_BREAK:
-            if (ps2_modifiers & BOTH_CTRL_BITS) {
-                // Pause is a weird special case, so it happens that the
-                // scancode resolves to the one with Ctrl active (other parts
-                // of the scancode are not unique)
-                send_ext_key_make(scancode);
-            } else if (is_scancode_set_1_active) {
-                send_2_bytes(PS2_PAUSE_PREFIX, KEY_LEFT_CTRL_SET1);
-                send_2_bytes(KEY_NUM_LOCK_SET1, PS2_PAUSE_PREFIX);
-                send_2_bytes(SET1_MAKE_TO_BREAK(KEY_LEFT_CTRL_SET1), SET1_MAKE_TO_BREAK(KEY_NUM_LOCK_SET1));
-            } else {
-                send_2_bytes(PS2_PAUSE_PREFIX, EXTENDED_KEY_PAUSE_SET2);
-                send_2_bytes(KEY_NUM_LOCK_SET2, PS2_PAUSE_PREFIX);
-                send_2_bytes(PS2_BREAK_PREFIX, EXTENDED_KEY_PAUSE_SET2);
-                send_2_bytes(PS2_BREAK_PREFIX, KEY_NUM_LOCK_SET2);
-            }
-            return;
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
+            case USB_KEY_KP_DIVIDE:
+                shift_suppress();
+                break;
+#endif
 
-        case USB_KEY_KP_DIVIDE:
-            shift_suppress();
-            break;
-
-        default:
-            break;
+            default:
+                break;
         }
     }
 
@@ -637,9 +683,12 @@ ps2_send_key_press (const uint8_t usb_keycode) {
 
 static void
 clear_key_state (void) {
-    ps2_output_flags &= ~(FLAG_SHIFT_VIRTUAL_ON | FLAG_SHIFT_SUPPRESSED_LEFT | FLAG_SHIFT_SUPPRESSED_RIGHT | FLAG_SHIFT_VIRTUAL_WAS_ACTIVE);
-    ps2_modifiers = 0;
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
+    ps2_output_flags &= ~(FLAG_SHIFT_VIRTUAL_ON | FLAG_SHIFT_SUPPRESSED_LEFT
+        | FLAG_SHIFT_SUPPRESSED_RIGHT | FLAG_SHIFT_VIRTUAL_WAS_ACTIVE);
     tenkey_count = 0;
+#endif
+    ps2_modifiers = 0;
 }
 
 void
@@ -669,79 +718,84 @@ ps2_send_key_release (const uint8_t usb_keycode) {
 
     if (!is_scancode_set_3_active) {
         switch (usb_keycode) {
-        case USB_KEY_PRINT_SCREEN:
-            if (ps2_modifiers & BOTH_ALT_BITS) {
-                if (is_scancode_set_1_active) {
-                    send_byte(SET1_MAKE_TO_BREAK(KEY_ALT_SYSRQ_SET1));
-                } else {
-                    send_2_bytes(PS2_BREAK_PREFIX, KEY_ALT_SYSRQ_SET2);
+            case USB_KEY_PRINT_SCREEN:
+                if (ps2_modifiers & BOTH_ALT_BITS) {
+                    if (is_scancode_set_1_active) {
+                        send_byte(SET1_MAKE_TO_BREAK(KEY_ALT_SYSRQ_SET1));
+                    } else {
+                        send_2_bytes(PS2_BREAK_PREFIX, KEY_ALT_SYSRQ_SET2);
+                    }
+                    clear_repeat();
+                    return;
                 }
+                if (is_scancode_set_1_active) {
+                    send_ext_key_set1_break(EXTENDED_KEY_PRINT_SCREEN_SET1);
+                } else {
+                    send_ext_key_set2_break(EXTENDED_KEY_PRINT_SCREEN_SET2);
+                }
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
+                if (!tenkey_count) {
+                    virtual_shift_off();
+                }
+#endif
                 clear_repeat();
                 return;
-            }
-            if (is_scancode_set_1_active) {
-                send_ext_key_set1_break(EXTENDED_KEY_PRINT_SCREEN_SET1);
-            } else {
-                send_ext_key_set2_break(EXTENDED_KEY_PRINT_SCREEN_SET2);
-            }
-            if (!tenkey_count) {
-                virtual_shift_off();
-            }
-            clear_repeat();
-            return;
 
-        case USB_KEY_PAUSE_BREAK:
-            if (ps2_modifiers & BOTH_CTRL_BITS) {
-                if (is_scancode_set_1_active) {
-                    send_ext_key_set1_break(EXTENDED_KEY_CTRL_PAUSE_SET1);
-                } else {
-                    send_ext_key_set2_break(EXTENDED_KEY_CTRL_PAUSE_SET2);
+            case USB_KEY_PAUSE_BREAK:
+                if (ps2_modifiers & BOTH_CTRL_BITS) {
+                    if (is_scancode_set_1_active) {
+                        send_ext_key_set1_break(EXTENDED_KEY_CTRL_PAUSE_SET1);
+                    } else {
+                        send_ext_key_set2_break(EXTENDED_KEY_CTRL_PAUSE_SET2);
+                    }
                 }
-            }
-            return;
+                return;
 
-        case USB_KEY_KP_DIVIDE:
-            if (is_scancode_set_1_active) {
-                send_ext_key_set1_break(EXTENDED_KEY_KP_DIVIDE_SET1);
-            } else {
-                send_ext_key_set2_break(EXTENDED_KEY_KP_DIVIDE_SET2);
-            }
-            shift_unsuppress();
-            return;
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
+            case USB_KEY_KP_DIVIDE:
+                if (is_scancode_set_1_active) {
+                    send_ext_key_set1_break(EXTENDED_KEY_KP_DIVIDE_SET1);
+                } else {
+                    send_ext_key_set2_break(EXTENDED_KEY_KP_DIVIDE_SET2);
+                }
+                shift_unsuppress();
+                return;
+#endif
 
-        default:
-            break;
+            default:
+                break;
         }
     }
 
     switch (ps2_active_scancode_set) {
 #if ENABLE_PS2_DEVICE_SET_3
-    case 3:
-        if (!is_extended && !is_set3_break_enabled_for(scancode)) {
-            return;
-        }
+        case 3:
+            if (!is_extended && !is_set3_break_enabled_for(scancode)) {
+                return;
+            }
 #endif
-        // fallthrough
-    case 2:
-        if (is_extended) {
-            send_ext_key_set2_break(scancode);
-        } else {
-            send_2_bytes(PS2_BREAK_PREFIX, scancode);
-        }
-        break;
+            // fallthrough
+        case 2:
+            if (is_extended) {
+                send_ext_key_set2_break(scancode);
+            } else {
+                send_2_bytes(PS2_BREAK_PREFIX, scancode);
+            }
+            break;
 #if ENABLE_PS2_DEVICE_SET_1
-    case 1:
-        if (is_extended) {
-            send_ext_key_set1_break(scancode);
-        } else {
-            send_byte(SET1_MAKE_TO_BREAK(scancode));
-        }
-        break;
+        case 1:
+            if (is_extended) {
+                send_ext_key_set1_break(scancode);
+            } else {
+                send_byte(SET1_MAKE_TO_BREAK(scancode));
+            }
+            break;
 #endif
-    default:
-        break;
+        default:
+            break;
     }
 
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
     if (!is_scancode_set_3_active && is_tenkey_cluster_key(usb_keycode)) {
         if (tenkey_count) {
             --tenkey_count;
@@ -752,10 +806,13 @@ ps2_send_key_release (const uint8_t usb_keycode) {
             ps2_output_flags &= ~FLAG_SHIFT_VIRTUAL_WAS_ACTIVE;
         }
     }
+#endif
 
     if (IS_MODIFIER(usb_keycode)) {
         const uint8_t modifier_bit = MODIFIER_BIT(usb_keycode);
         ps2_modifiers &= ~modifier_bit;
+
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
         if (!is_scancode_set_3_active && (modifier_bit & BOTH_SHIFT_BITS)) {
             ps2_output_flags &= ~modifier_bit;
             if (tenkey_count && !(ps2_modifiers & BOTH_SHIFT_BITS)
@@ -764,6 +821,7 @@ ps2_send_key_release (const uint8_t usb_keycode) {
                 virtual_shift_on();
             }
         }
+#endif
     }
 }
 
@@ -833,36 +891,38 @@ ps2_release_key (const uint8_t key) {
 static void
 handle_special_key_event (const uint8_t event) {
     switch (event) {
-    case SPECIAL_EVENT_ALL_KEYS_RELEASED:
-        /// This is a marker that the `ps2_output_clear_keys()`
-        /// was done at this point in the queue. This means that
-        /// all keys are now released.
-        virtual_shift_off();
-        clear_key_state();
-        break;
-#ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
-    case SPECIAL_EVENT_NUM_LOCK_TOGGLED:
-        if (tenkey_count && !is_scancode_set_3_active) {
-            // Tenkeys held across Num Lock change
-            // Note: Real IBM Model M keyboard does not trigger these changes
-            // on Num Lock LED change, instead it assumes that the Num Lock
-            // key is the only way to toggle the state (and assumes the Num
-            // Lock key always does so, even if the OS decides otherwise). So
-            // anything done here does not exactly match Model M, but at the
-            // same time I think it _might_ be more correct technically in a
-            // post-DOS world.
-            if (host_led_state & LED_NUM_LOCK_BIT) {
-                shift_unsuppress();
-                //virtual_shift_on();
-            } else {
-                virtual_shift_off();
-                //shift_suppress();
-            }
-        }
-        break;
+        case SPECIAL_EVENT_ALL_KEYS_RELEASED:
+            /// This is a marker that the `ps2_output_clear_keys()`
+            /// was done at this point in the queue. This means that
+            /// all keys are now released.
+#if ENABLE_PS2_LEGACY_COMPATIBILITY
+            virtual_shift_off();
 #endif
-    default:
-        break;
+            clear_key_state();
+            break;
+#ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
+        case SPECIAL_EVENT_NUM_LOCK_TOGGLED:
+            if (tenkey_count && !is_scancode_set_3_active) {
+                // Tenkeys held across Num Lock change
+                // Note: Real IBM Model M keyboard does not trigger these changes
+                // on Num Lock LED change, instead it assumes that the Num Lock
+                // key is the only way to toggle the state (and assumes the Num
+                // Lock key always does so, even if the OS decides otherwise). So
+                // anything done here does not exactly match Model M, but at the
+                // same time I think it _might_ be more correct technically in a
+                // post-DOS world.
+                if (host_led_state & LED_NUM_LOCK_BIT) {
+                    shift_unsuppress();
+                    // virtual_shift_on();
+                } else {
+                    virtual_shift_off();
+                    // shift_suppress();
+                }
+            }
+            break;
+#endif
+        default:
+            break;
     }
 }
 
@@ -901,219 +961,214 @@ ps2_process_cmd (const uint8_t cmd, const uint8_t argc) {
     ps2_set_host_active();
 
     switch (cmd) {
-    case PS2_COMMAND_RESET:
-        send_byte(PS2_REPLY_ACK);
-        ps2_output_reset(false);
-        break;
-
-    case PS2_COMMAND_ENABLE:
-        ps2_enable_scanning();
-        send_byte(PS2_REPLY_ACK);
-        break;
-
-    case PS2_COMMAND_DISABLE:
-        ps2_disable_scanning();
-        ps2_output_set_defaults();
-        send_byte(PS2_REPLY_ACK);
-        break;
-
-    case PS2_COMMAND_SET_DEFAULTS:
-        ps2_output_set_defaults();
-        send_byte(PS2_REPLY_ACK);
-        break;
-
-    case PS2_COMMAND_SET_LEDS:
-        if (argc == 0) {
-            ack_and_set_pending_cmd(cmd);
-        } else {
-            int led_byte = ps2_device_recv();
-            if (led_byte == EOF) {
-                return;
-            }
-            if (led_byte >= PS2_COMMAND_RANGE_START) {
-                clear_pending_cmd();
-                ps2_process_cmd(led_byte, 0);
-                return;
-            }
-#ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
-            const uint8_t old_leds = host_led_state;
-#endif
-            host_led_state = ps2_leds_to_usb(led_byte);
-            usb_keyboard_leds = host_led_state;
-            pending_argc = ALL_ARGS_READ;
+        case PS2_COMMAND_RESET:
             send_byte(PS2_REPLY_ACK);
-#ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
-            if (tenkey_count
-                && (old_leds & LED_NUM_LOCK_BIT) != (host_led_state & LED_NUM_LOCK_BIT)
-                && !is_key_event_queue_full
-            ) {
-                unshift_key_event_queue();
-                key_event_queue[key_event_tail].key = KEY_EVENT_SPECIAL;
-                key_event_queue[key_event_tail].is_release = SPECIAL_EVENT_NUM_LOCK_TOGGLED;
-            }
-#endif
-        }
-        return;
+            ps2_output_reset(false);
+            break;
 
-    case PS2_COMMAND_ECHO:
-        send_byte(PS2_COMMAND_ECHO);
-        break;
-
-    case PS2_COMMAND_SET_SCAN_CODES:
-        if (argc == 0) {
-            ack_and_set_pending_cmd(cmd);
-        } else {
-            int requested_set = ps2_device_recv();
-            if (requested_set == EOF) {
-                return;
-            }
-
-            if (requested_set >= PS2_COMMAND_RANGE_START) {
-                clear_pending_cmd();
-                ps2_process_cmd(requested_set, 0);
-                return;
-            }
-
-            if (requested_set) {
-                ps2_output_clear_keys(false);
-            }
-
-            switch (requested_set) {
-            case 2:
-                ps2_active_scancode_set = 2;
-                send_byte(PS2_REPLY_ACK);
-                break;
-            case 1:
-#if ENABLE_PS2_DEVICE_SET_1
-                ps2_active_scancode_set = 1;
-                send_byte(PS2_REPLY_ACK);
-#else
-                send_byte(PS2_REPLY_RESEND);
-#endif
-                break;
-            case 3:
-#if ENABLE_PS2_DEVICE_SET_3
-                ps2_active_scancode_set = 3;
-                send_byte(PS2_REPLY_ACK);
-#else
-                send_byte(PS2_REPLY_RESEND);
-#endif
-                break;
-            case 0:
-                send_2_bytes(PS2_REPLY_ACK, ps2_active_scancode_set);
-                break;
-            default:
-                send_byte(PS2_REPLY_RESEND);
-                break;
-            }
-
-            pending_argc = ALL_ARGS_READ;
-        }
-        return;
-
-    case PS2_COMMAND_SET_RATE:
-        if (argc == 0) {
-            ack_and_set_pending_cmd(cmd);
-        } else {
-            int rate_arg = ps2_device_recv();
-            if (rate_arg == EOF) {
-                return;
-            }
-            if (rate_arg >= PS2_COMMAND_RANGE_START) {
-                clear_pending_cmd();
-                ps2_process_cmd(rate_arg, 0);
-                return;
-            }
-            repeat_rate = rate_arg & 0x7FU;
+        case PS2_COMMAND_ENABLE:
+            ps2_enable_scanning();
             send_byte(PS2_REPLY_ACK);
-            pending_argc = ALL_ARGS_READ;
-        }
-        return;
+            break;
 
-    case PS2_COMMAND_ID:
-        send_byte(PS2_REPLY_ACK);
-#if PS2_DEVICE_ID != 0
-        send_byte((PS2_DEVICE_ID >> 8) & 0xFF);
-        send_byte(PS2_DEVICE_ID & 0xFF);
-#endif
-        break;
-
-    case PS2_COMMAND_SET_ALL_KEYS_TYPEMATIC:
-        set3_set_all_break(false);
-        set3_set_all_repeat(true);
-        clear_repeat();
-        send_byte(PS2_REPLY_ACK);
-        break;
-
-    case PS2_COMMAND_SET_ALL_KEYS_MAKE_BREAK:
-        set3_set_all_break(true);
-        set3_set_all_repeat(false);
-        clear_repeat();
-        send_byte(PS2_REPLY_ACK);
-        break;
-
-    case PS2_COMMAND_SET_ALL_KEYS_MAKE:
-        set3_set_all_break(false);
-        set3_set_all_repeat(false);
-        clear_repeat();
-        send_byte(PS2_REPLY_ACK);
-        break;
-
-    case PS2_COMMAND_SET_ALL_KEYS_NORMAL:
-        set3_set_all_break(true);
-        set3_set_all_repeat(true);
-        send_byte(PS2_REPLY_ACK);
-        break;
-
-    case PS2_COMMAND_SET_KEY_TYPEMATIC:
-        // fallthrough
-    case PS2_COMMAND_SET_KEY_MAKE_BREAK:
-        // fallthrough
-    case PS2_COMMAND_SET_KEY_MAKE:
-#if ENABLE_PS2_DEVICE_SET_3
-        if (argc == 0) {
+        case PS2_COMMAND_DISABLE:
             ps2_disable_scanning();
-            clear_repeat();
-            ack_and_set_pending_cmd(cmd);
-        } else {
-            int keycode = ps2_device_recv();
-            if (keycode == EOF) {
-                // The list must be terminated by a command byte, keep state
-                return;
-            }
-            if (keycode >= PS2_COMMAND_RANGE_START) {
-                // End of key list
-                ps2_restore_scanning_state();
-                clear_pending_cmd();
-                ps2_process_cmd(keycode, 0);
-                return;
-            }
-            if (cmd == PS2_COMMAND_SET_KEY_TYPEMATIC) {
-                set3_set_break(keycode, 0);
-                set3_set_repeat(keycode, 1);
-            } else if (cmd == PS2_COMMAND_SET_KEY_MAKE_BREAK) {
-                set3_set_break(keycode, 1);
-                set3_set_repeat(keycode, 0);
-            } else {
-                set3_set_break(keycode, 0);
-                set3_set_repeat(keycode, 0);
-            }
+            ps2_output_set_defaults();
             send_byte(PS2_REPLY_ACK);
-            // Stay in the state, host terminates the list with a command
-        }
-        return;
+            break;
+
+        case PS2_COMMAND_SET_DEFAULTS:
+            ps2_output_set_defaults();
+            send_byte(PS2_REPLY_ACK);
+            break;
+
+        case PS2_COMMAND_SET_LEDS:
+            if (argc == 0) {
+                ack_and_set_pending_cmd(cmd);
+            } else {
+                int led_byte = ps2_device_recv();
+                if (led_byte == EOF) {
+                    return;
+                }
+                if (led_byte >= PS2_COMMAND_RANGE_START) {
+                    clear_pending_cmd();
+                    ps2_process_cmd(led_byte, 0);
+                    return;
+                }
+#ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
+                const uint8_t old_leds = host_led_state;
+#endif
+                host_led_state = ps2_leds_to_usb(led_byte);
+                usb_keyboard_leds = host_led_state;
+                pending_argc = ALL_ARGS_READ;
+                send_byte(PS2_REPLY_ACK);
+#ifdef SPECIAL_EVENT_NUM_LOCK_TOGGLED
+                if (tenkey_count && (old_leds & LED_NUM_LOCK_BIT) != (host_led_state & LED_NUM_LOCK_BIT)
+                    && !is_key_event_queue_full) {
+                    unshift_key_event_queue();
+                    key_event_queue[key_event_tail].key = KEY_EVENT_SPECIAL;
+                    key_event_queue[key_event_tail].is_release = SPECIAL_EVENT_NUM_LOCK_TOGGLED;
+                }
+#endif
+            }
+            return;
+
+        case PS2_COMMAND_ECHO:
+            send_byte(PS2_COMMAND_ECHO);
+            break;
+
+        case PS2_COMMAND_SET_SCAN_CODES:
+            if (argc == 0) {
+                ack_and_set_pending_cmd(cmd);
+            } else {
+                int requested_set = ps2_device_recv();
+                if (requested_set == EOF) {
+                    return;
+                }
+
+                if (requested_set >= PS2_COMMAND_RANGE_START) {
+                    clear_pending_cmd();
+                    ps2_process_cmd(requested_set, 0);
+                    return;
+                }
+
+                if (requested_set) {
+                    ps2_output_clear_keys(false);
+                }
+
+                switch (requested_set) {
+                    case 2:
+                        ps2_active_scancode_set = 2;
+                        send_byte(PS2_REPLY_ACK);
+                        break;
+                    case 1:
+#if ENABLE_PS2_DEVICE_SET_1
+                        ps2_active_scancode_set = 1;
+                        send_byte(PS2_REPLY_ACK);
 #else
-        send_byte(PS2_REPLY_RESEND);
-        break;
+                        send_byte(PS2_REPLY_RESEND);
+#endif
+                        break;
+                    case 3:
+#if ENABLE_PS2_DEVICE_SET_3
+                        ps2_active_scancode_set = 3;
+                        send_byte(PS2_REPLY_ACK);
+#else
+                        send_byte(PS2_REPLY_RESEND);
+#endif
+                        break;
+                    case 0:
+                        send_2_bytes(PS2_REPLY_ACK, ps2_active_scancode_set);
+                        break;
+                    default:
+                        send_byte(PS2_REPLY_RESEND);
+                        break;
+                }
+
+                pending_argc = ALL_ARGS_READ;
+            }
+            return;
+
+        case PS2_COMMAND_SET_RATE:
+            if (argc == 0) {
+                ack_and_set_pending_cmd(cmd);
+            } else {
+                int rate_arg = ps2_device_recv();
+                if (rate_arg == EOF) {
+                    return;
+                }
+                if (rate_arg >= PS2_COMMAND_RANGE_START) {
+                    clear_pending_cmd();
+                    ps2_process_cmd(rate_arg, 0);
+                    return;
+                }
+                repeat_rate = rate_arg & 0x7FU;
+                send_byte(PS2_REPLY_ACK);
+                pending_argc = ALL_ARGS_READ;
+            }
+            return;
+
+        case PS2_COMMAND_ID:
+            send_byte(PS2_REPLY_ACK);
+#if PS2_DEVICE_ID != 0
+            send_byte((PS2_DEVICE_ID >> 8) & 0xFF);
+            send_byte(PS2_DEVICE_ID & 0xFF);
+#endif
+            break;
+
+        case PS2_COMMAND_RESEND:
+            ps2_device_resend();
+            break;
+
+#if ENABLE_PS2_DEVICE_SET_3
+        case PS2_COMMAND_SET_ALL_KEYS_TYPEMATIC:
+            set3_set_all_break(false);
+            set3_set_all_repeat(true);
+            clear_repeat();
+            send_byte(PS2_REPLY_ACK);
+            break;
+
+        case PS2_COMMAND_SET_ALL_KEYS_MAKE_BREAK:
+            set3_set_all_break(true);
+            set3_set_all_repeat(false);
+            clear_repeat();
+            send_byte(PS2_REPLY_ACK);
+            break;
+
+        case PS2_COMMAND_SET_ALL_KEYS_MAKE:
+            set3_set_all_break(false);
+            set3_set_all_repeat(false);
+            clear_repeat();
+            send_byte(PS2_REPLY_ACK);
+            break;
+
+        case PS2_COMMAND_SET_ALL_KEYS_NORMAL:
+            set3_set_all_break(true);
+            set3_set_all_repeat(true);
+            send_byte(PS2_REPLY_ACK);
+            break;
+
+        case PS2_COMMAND_SET_KEY_TYPEMATIC:
+            // fallthrough
+        case PS2_COMMAND_SET_KEY_MAKE_BREAK:
+            // fallthrough
+        case PS2_COMMAND_SET_KEY_MAKE:
+            if (argc == 0) {
+                ps2_disable_scanning();
+                clear_repeat();
+                ack_and_set_pending_cmd(cmd);
+            } else {
+                int keycode = ps2_device_recv();
+                if (keycode == EOF) {
+                    // The list must be terminated by a command byte, keep state
+                    return;
+                }
+                if (keycode >= PS2_COMMAND_RANGE_START) {
+                    // End of key list
+                    ps2_restore_scanning_state();
+                    clear_pending_cmd();
+                    ps2_process_cmd(keycode, 0);
+                    return;
+                }
+                if (cmd == PS2_COMMAND_SET_KEY_TYPEMATIC) {
+                    set3_set_break(keycode, 0);
+                    set3_set_repeat(keycode, 1);
+                } else if (cmd == PS2_COMMAND_SET_KEY_MAKE_BREAK) {
+                    set3_set_break(keycode, 1);
+                    set3_set_repeat(keycode, 0);
+                } else {
+                    set3_set_break(keycode, 0);
+                    set3_set_repeat(keycode, 0);
+                }
+                send_byte(PS2_REPLY_ACK);
+                // Stay in the state, host terminates the list with a command
+            }
+            return;
 #endif
 
-    case PS2_COMMAND_RESEND:
-        ps2_device_resend();
-        break;
-
-    default:
-        send_byte(PS2_REPLY_RESEND);
-        break;
+        default:
+            send_byte(PS2_REPLY_RESEND);
+            break;
     }
 
     if (!pending_cmd && !ps2_device_flush()) {
@@ -1163,7 +1218,8 @@ ps2_output_task (void) {
     }
 
     if (!read_and_process_cmd()) {
-        if (reset_pending_since && (uint16_t) (timer_read() - reset_pending_since) >= PS2_RESET_DURATION_MS) {
+        if (reset_pending_since
+            && (uint16_t) (timer_read() - reset_pending_since) >= PS2_RESET_DURATION_MS) {
             usb_keyboard_leds = 0;
             send_byte(PS2_REPLY_TEST_PASSED);
             ps2_enable_scanning();

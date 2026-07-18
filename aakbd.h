@@ -69,7 +69,7 @@ uint8_t current_10ms_tick_count(void);
 
 #define delay_milliseconds(ms) wait_ms(ms)
 #define reset_watchdog_timer() do {} while (0)
-#else
+#elif !defined(TESTING)
 #error "Platform not supported, edit aakbd.h accordingly."
 #endif
 

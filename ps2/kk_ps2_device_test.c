@@ -63,12 +63,14 @@ log_edge (const char *label) {
 #define _BV(x) (1U << (x))
 
 static uint8_t mock_ddr = 0, mock_port = 0;
-#define PS2_PORT         D
-#define PS2_CLK_PIN      0
-#define PS2_DATA_PIN     1
-#define DDRD             mock_ddr
-#define PORTD            mock_port
-#define PIND             (((mock_ddr & 1) ? (mock_port & 1) : (pin_clk ? 1 : 0)) | ((mock_ddr & 2) ? (mock_port & 2) : (pin_data ? 2 : 0)))
+#define PS2_PORT     D
+#define PS2_CLK_PIN  0
+#define PS2_DATA_PIN 1
+#define DDRD         mock_ddr
+#define PORTD        mock_port
+#define PIND \
+    (((mock_ddr & 1) ? (mock_port & 1) : (pin_clk ? 1 : 0)) \
+        | ((mock_ddr & 2) ? (mock_port & 2) : (pin_data ? 2 : 0)))
 #define PASTE_(a, b)     a##b
 #define PASTE(a, b)      PASTE_(a, b)
 #define PS2_DDR          DDRD
@@ -79,35 +81,35 @@ static uint8_t mock_ddr = 0, mock_port = 0;
 #define PS2_BIT_MASK     0x03
 #define INTERNAL_PULL_UP 1
 
-#define ps2_set_pin_state(p, s)      \
-    do {                             \
-        if (s)                       \
-            PS2_PORT_REG |= _BV(p);  \
-        else                         \
+#define ps2_set_pin_state(p, s) \
+    do { \
+        if (s) \
+            PS2_PORT_REG |= _BV(p); \
+        else \
             PS2_PORT_REG &= ~_BV(p); \
     } while (0)
 #define ps2_clk_set(s)  ps2_set_pin_state(PS2_CLK_PIN, (s))
 #define ps2_data_set(s) ps2_set_pin_state(PS2_DATA_PIN, (s))
 
-#define ps2_clk_set_input()      \
-    do {                         \
+#define ps2_clk_set_input() \
+    do { \
         PS2_DDR &= ~PS2_CLK_BIT; \
-        drv_clk = false;         \
+        drv_clk = false; \
     } while (0)
-#define ps2_clk_set_output()    \
-    do {                        \
+#define ps2_clk_set_output() \
+    do { \
         PS2_DDR |= PS2_CLK_BIT; \
-        drv_clk = true;         \
+        drv_clk = true; \
     } while (0)
-#define ps2_data_set_input()      \
-    do {                          \
+#define ps2_data_set_input() \
+    do { \
         PS2_DDR &= ~PS2_DATA_BIT; \
-        drv_data = false;         \
+        drv_data = false; \
     } while (0)
-#define ps2_data_set_output()    \
-    do {                         \
+#define ps2_data_set_output() \
+    do { \
         PS2_DDR |= PS2_DATA_BIT; \
-        drv_data = true;         \
+        drv_data = true; \
     } while (0)
 
 static unsigned long host_inhibit_after = 0;
@@ -197,19 +199,19 @@ setup_recv_bits (uint8_t byte) {
 }
 
 #define disable_interrupts() \
-    do {                     \
+    do { \
     } while (0)
 #define enable_interrupts() \
-    do {                    \
+    do { \
     } while (0)
 
-#define _delay_us(u)                                              \
-    do {                                                          \
-        now_us += (u);                                            \
+#define _delay_us(u) \
+    do { \
+        now_us += (u); \
         if (host_inhibit_after && now_us >= host_inhibit_after) { \
-            pin_clk = false;                                      \
-            host_inhibit_after = 0;                               \
-        }                                                         \
+            pin_clk = false; \
+            host_inhibit_after = 0; \
+        } \
     } while (0)
 #define ps2_delay_us(u) _delay_us(u)
 
@@ -334,7 +336,8 @@ test_recv_55 (void) {
 }
 static void
 test_recv_many (void) {
-    uint8_t bytes[] = {0x00, 0xFF, 0x55, 0xAA, 0x01, 0x80, 0x7F, 0xFA, 0xFE, 0x12, 0x34, 0x56, 0x78, 0x9A};
+    uint8_t bytes[] = { 0x00, 0xFF, 0x55, 0xAA, 0x01, 0x80, 0x7F, 0xFA, 0xFE, 0x12, 0x34, 0x56, 0x78,
+        0x9A };
     for (size_t i = 0; i < sizeof bytes; i++) {
         int r = do_recv(bytes[i]);
         if (r != (int) bytes[i]) {
@@ -407,7 +410,8 @@ test_timing_send (void) {
     }
     check(bad_lo == 0, "send clock low in range");
     if (bad_asym) {
-        printf("  asym pulse %d: low=%lu hi=%lu (limit %uu)\n", pulse_bad, bad_lo_v, bad_hi_v, PROCESSING_AFTER_PULSE_US);
+        printf("  asym pulse %d: low=%lu hi=%lu (limit %uu)\n", pulse_bad, bad_lo_v, bad_hi_v,
+            PROCESSING_AFTER_PULSE_US);
     }
     check(bad_asym == 0, "send clock low≈high");
     check(bad_setup == 0, "send data setup >= min");
@@ -455,7 +459,8 @@ test_timing_recv (void) {
     }
     check(bad_lo == 0, "recv clock low in range");
     if (bad_asym) {
-        printf("  asym pulse %d: low=%lu hi=%lu (limit %uu)\n", pulse_bad, bad_lo_v, bad_hi_v, PROCESSING_AFTER_PULSE_US);
+        printf("  asym pulse %d: low=%lu hi=%lu (limit %uu)\n", pulse_bad, bad_lo_v, bad_hi_v,
+            PROCESSING_AFTER_PULSE_US);
     }
     check(bad_asym == 0, "recv clock low≈high");
     check(bad_setup == 0, "recv data setup >= min");

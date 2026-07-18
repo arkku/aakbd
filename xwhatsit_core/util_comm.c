@@ -84,6 +84,7 @@ static const uint8_t magic[] = UTIL_COMM_MAGIC;
 
 _Static_assert(sizeof(magic) == 2, "UTIL_COMM_MAGIC should be 2 bytes");
 
+__attribute__((weak))
 uint8_t handle_generic_hid_report(uint8_t report_id, uint8_t count, uint8_t data[static count], uint8_t response_length[static 1], uint8_t response[static *response_length]) {
     const uint8_t response_max = *response_length;
 

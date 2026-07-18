@@ -17,9 +17,14 @@
 // Rotary encoder: C14 (B), C15 (A)
 #define ENCODER_A_PIN C15
 #define ENCODER_B_PIN C14
+#define NUM_ENCODERS 1
 
 // AW20216S RGB LED driver
 #define AW20216S_EN_PIN         C13
 #define AW20216S_CS_PIN_1       B13
 #define AW20216S_CS_PIN_2       B14
 #define AW20216S_CHIP_COUNT     2
+
+#if VIAL_ENABLE
+#include "vial_config.h"
+#endif

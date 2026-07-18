@@ -23,6 +23,28 @@
 #include <stdint.h>
 #include "usb_keys.h"
 
+#ifndef ENABLE_ONESHOT_KEYCODES
+/// Enable one-shot layer (OSL) and one-shot modifier (OSM) keycodes.
+#define ENABLE_ONESHOT_KEYCODES VIAL_ENABLE
+#endif
+
+#ifndef ENABLE_KEYLOCK
+/// Keylock enables mapping a key to `EXT(KEYLOCK)`, which causes the next key
+/// that is pressed to be locked down until either the lock key or the locked
+/// key itself is pressed again. This adds a very minimal amount of processing
+/// (basically two `if` equality comparisons per keypress and 1 byte of RAM),
+/// and is thus enabled by default.
+#define ENABLE_KEYLOCK 0
+#endif
+
+#ifndef ENABLE_SPACE_CADET
+#define ENABLE_SPACE_CADET VIAL_ENABLE
+#endif
+
+#ifndef ENABLE_EXT_HYPER_MEH
+#define ENABLE_EXT_HYPER_MEH 0
+#endif
+
 typedef uint16_t keycode_t;
 
 /// Plain key, no modifiers.
@@ -33,6 +55,7 @@ typedef uint16_t keycode_t;
 
 /// A special keycode that causes the keypress to have no effect.
 #define NONE                        (0xFFU)
+#define PLAIN_KEY_MAX               (NONE - 1) ///< Maximum valid plain USB keycode
 
 /// A special keycode that passes through to lower layers.
 #define PASS                        (0x00U)
@@ -430,12 +453,6 @@ typedef uint16_t keycode_t;
 /// Enter the bootloader mode for firmware update.
 #define KEY_EXT_ENTER_BOOTLOADER    EXTENDED(ENTER_BOOTLOADER)
 
-/// Reset layers to their default state. Note that there are corner cases
-/// where this causes an unexpected state if you hold down a layer toggle
-/// at the same time (in which case the toggle will first be reset by this
-/// key, and then toggle back on release).
-#define KEY_EXT_RESET_LAYERS        EXTENDED(RESET_LAYERS)
-
 /// The Apple Fn key. To enable this you need to use Apple's USB vendor id
 /// and define `ENABLE_APPLE_FN_KEY`. Note that you can make Apple Fn
 /// non-virtual by setting `APPLE_FN_IS_MODIFIER=1`, in which case you can
@@ -529,10 +546,11 @@ typedef uint16_t keycode_t;
 /// keys were pressed while holding, e.g., `MOD_OR_KEY(CTRL(ESC))`.
 #define MOD_OR_KEY(key)             (key | (COMMAND(CMD_MODIFIER_OR_KEY)))
 
-/// Construct the modifiers mask for adding to a regular key. Note that the
-/// modifiers are either all on the left or all on the right, due to
-/// limited number of bits available.
-#define MODS_FOR_KEY(mods)          ((((mods) & 0xF0U) ? (0x10U | ((mods) | ((mods) >> 4))) : (mods)) << 8)
+/// Construct the 5-bit modifiers mask for adding to a regular key. Note that
+/// the modifiers are either all on the left or all on the right, due to
+/// limited number of bits available, i.e., mixed handedness information is
+/// lost: if any modifiers are on the right, they all will be.
+#define MODS_FOR_KEY(mods)          (((mods) & 0xF0U) ? (RIGHT_MOD_BIT | ((uint16_t)((mods) >> 4) << 8)) : ((uint16_t)(mods) << 8))
 
 // The extended keyboard commands. These occupy an entirely separate 8-bit
 // namespace from the normal keys. To use these keys as mapping targets, use
@@ -544,14 +562,36 @@ enum extended_keycode {
     /// Enter the bootloader for firmware update. Disconnects the keyboard.
     EXT_ENTER_BOOTLOADER,
 
-    /// Reset layers to default state.
-    EXT_RESET_LAYERS,
+#if ENABLE_EXT_HYPER_MEH
+    /// Send all modifiers (Shift, Ctrl, Alt, Cmd). This is improved over the
+    /// `KEY_HYPER` in that this undoes only the modifers it set on release,
+    /// whereas the key releases all modifiers even if they also come from
+    /// other keys.
+    EXT_HYPER_MODIFIERS = 4,
 
-    /// Send all modifiers (Shift, Ctrl, Alt, Cmd).
-    EXT_HYPER_MODIFIERS,
+    /// Send almost all modifiers (Shift, Ctrl, Alt). Similarly to
+    /// EXT_HYPER_MODIFIERS, this is slightly improved over the normal
+    /// `KEY_MEH` with regard to how it only undoes the modifiers it set.
+    EXT_MEH_MODIFIERS = 5,
 
-    /// Send almost all modifiers (Shift, Ctrl, Alt).
-    EXT_MEH_MODIFIERS,
+    EXT_HYPER = EXT_HYPER_MODIFIERS,
+    EXT_MEH = EXT_MEH_MODIFIERS,
+#endif
+
+#if ENABLE_KEYLOCK
+    /// Locks the next key down until it, or the keylock key, is pressed again.
+    EXT_KEYLOCK = 6,
+#endif
+
+    /// Esc normally, ~ with shift, ` with Cmd or Alt Gr
+    EXT_GRAVE_ESCAPE = 7,
+#define KEY_EXT_GRAVE_ESCAPE        EXTENDED(GRAVE_ESCAPE)
+
+#if ENABLE_SIMULATED_TYPING
+    /// "Prints" (i.e., types) debug info.
+    EXT_PRINT_DEBUG_INFO = 8,
+#define KEY_EXT_PRINT_DEBUG_INFO    EXTENDED(PRINT_DEBUG_INFO)
+#endif
 
     /// Toggles whether boot or report protocol is used. This can be used to
     /// work around a BIOS that doesn't request the boot protocol but needs
@@ -560,24 +600,86 @@ enum extended_keycode {
     /// keys at once, so there might not be need for this. (Using this the
     /// other way around cannot force an OS or BIOS to accept the report
     /// protocol, and things may break if that is attempted.)
-    EXT_TOGGLE_BOOT_PROTOCOL,
+    EXT_TOGGLE_BOOT_PROTOCOL = 16,
 
-#if ENABLE_KEYLOCK
-    /// Locks the next key down until it, or the keylock key, is pressed again.
-    EXT_KEYLOCK,
+    /// Reset EEPROM to factory defaults (clear all settings).
+    EXT_EEPROM_RESET = 17,
+
+#if VIAL_ENABLE
+    /// Placeholder for unsupported QMK keycodes.
+    /// The actual QMK keycode is read directly from EEPROM by
+    /// the Vial subsystem, which calls a weak user hook.
+    EXT_QMK_KEYCODE = 47,
+#define KEY_EXT_QMK_KEYCODE         EXTENDED(QMK_KEYCODE)
+
+    EXT_VIAL_APPLE_FN = 48,
 #endif
 
-#if ENABLE_SIMULATED_TYPING
-    EXT_PRINT_DEBUG_INFO,
-
-/// "Print" (i.e., type) debug info.
-#define KEY_EXT_PRINT_DEBUG_INFO    EXTENDED(PRINT_DEBUG_INFO)
+#if ENABLE_TRI_LAYER
+    /// Momentary layer 2, tri-layer to layer 4 with EXT_LAYER_3_4.
+    EXT_LAYER_2_4 = 49,
+    /// Momentary layer 3, tri-layer to layer 4 with EXT_LAYER_2_4.
+    EXT_LAYER_3_4 = 50,
 #endif
 
-    // Aliases:
+#if ENABLE_SPACE_CADET
+    /// Left Ctrl when held, ( when tapped
+    EXT_SC_LEFT_CTRL_PARENTHESIS_OPEN = 56,
+    /// Right Ctrl when held, ) when tapped
+    EXT_SC_RIGHT_CTRL_PARENTHESIS_CLOSE,
+    /// Left Shift when held, ( when tapped
+    EXT_SC_LEFT_SHIFT_PARENTHESIS_OPEN,
+    /// Right Shift when held, ) when tapped
+    EXT_SC_RIGHT_SHIFT_PARENTHESIS_CLOSE,
+    /// Left Alt when held, ( when tapped
+    EXT_SC_LEFT_ALT_PARENTHESIS_OPEN,
+    /// Right Alt when held, ) when tapped
+    EXT_SC_RIGHT_ALT_PARENTHESIS_CLOSE,
+    /// Right Shift when held, Enter when tapped
+    EXT_SC_RIGHT_SHIFT_ENTER,
 
-    EXT_HYPER = EXT_HYPER_MODIFIERS,
-    EXT_MEH = EXT_MEH_MODIFIERS,
+    // Per-key configuration (user can override in config or local.h)
+    // Each key defines: hold_modifier, tap_modifier, tap_key
+    // Defaults for US QWERTY layout.
+#ifndef SC_LCPO_HOLD
+#define SC_LCPO_HOLD       CTRL_BIT
+#define SC_LCPO_TAP_MOD    SHIFT_BIT
+#define SC_LCPO_TAP_KEY    KEY(9)
+#endif
+#ifndef SC_RCPC_HOLD
+#define SC_RCPC_HOLD       RIGHT_CTRL_BIT
+#define SC_RCPC_TAP_MOD    SHIFT_BIT
+#define SC_RCPC_TAP_KEY    KEY(0)
+#endif
+#ifndef SC_LSPO_HOLD
+#define SC_LSPO_HOLD       SHIFT_BIT
+#define SC_LSPO_TAP_MOD    SHIFT_BIT
+#define SC_LSPO_TAP_KEY    KEY(9)
+#endif
+#ifndef SC_RSPC_HOLD
+#define SC_RSPC_HOLD       RIGHT_SHIFT_BIT
+#define SC_RSPC_TAP_MOD    SHIFT_BIT
+#define SC_RSPC_TAP_KEY    KEY(0)
+#endif
+#ifndef SC_LAPO_HOLD
+#define SC_LAPO_HOLD       ALT_BIT
+#define SC_LAPO_TAP_MOD    SHIFT_BIT
+#define SC_LAPO_TAP_KEY    KEY(9)
+#endif
+#ifndef SC_RAPC_HOLD
+#define SC_RAPC_HOLD       RIGHT_ALT_BIT
+#define SC_RAPC_TAP_MOD    SHIFT_BIT
+#define SC_RAPC_TAP_KEY    KEY(0)
+#endif
+#ifndef SC_SENT_HOLD
+#define SC_SENT_HOLD       RIGHT_SHIFT_BIT
+#define SC_SENT_TAP_MOD    0
+#define SC_SENT_TAP_KEY    KEY(RETURN)
+#endif
+#endif
+
+    /// KEEP THIS LAST before aliases
+    EXT_KEYCODE_COUNT,
 };
 
 // Layer commands. Use these through the `LAYER_COMMAND` macro, or other
@@ -627,7 +729,18 @@ enum extended_keycode {
 /// other key was pressed.
 #define ACT_ON_HOLD_KEEP_IF_NO_KEYPRESS 4
 
-#define COMMAND(cmd)        ((cmd) << (8+5))
+/// The command activates a one-shot layer, i.e., it takes effect only for
+/// one keypress and then returns to the previous state. This requires
+/// `ENABLE_ONESHOT_KEYCODES`.
+#define ACT_ONESHOT                    5
+
+/// One-shot layer: enable layer on press, disable on next keypress.
+#define LAYER_ONESHOT(num)             LAYER_COMMAND(ENABLE, ONESHOT, (num))
+
+/// One-shot modifier: apply modifier mask for one keypress.
+#define MOD_ONESHOT(mods)              (COMMAND(CMD_MODIFIER_OR_KEY) | (mods))
+
+#define COMMAND(cmd)                    ((cmd) << (8+5))
 
 // MARK: - Internals
 
@@ -673,8 +786,24 @@ enum extended_keycode {
 // 0001 0000 1nnn nnnn - macro number n (0-127) (`MACRO(...)`)
 // 0000 mmmm kkkk kkkk - modifiers (bitmask m, left side) and plain key k
 // 0001 mmmm kkkk kkkk - modifiers (bitmask m, right side) and plain key k
-// cccr mmmm aaan nnnn - command c (1-6), activate on a, layer number n
 // 111n nnnn kkkk kkkk - layer n when held, key k on click
+// cccr mmmm aaan nnnn - bit layout for all commands (1-7).
+//                       Commands:
+//                          1 - layer toggle
+//                          2 - layer disable
+//                          3 - layer enable
+//                          4 - set layer mask
+//                          5 - set base layer
+//                          6 - modifier or key (no action: low byte is key,
+//                              or if mmmm = 0000 then one-shot modifier mask)
+//                          7 - layer or key (no action, low byte is key)
+//                       Actions (for commands 1-5 only):
+//                          0 - hold (on press, deactivate on release)
+//                          1 - release (activate on release)
+//                          2 - press (activate on press, stay on)
+//                          3 - if alone (on release if no other keypress)
+//                          4 - hold, stay if no other keypress
+//                          5 - one-shot layer (only affects next key)
 
 #define is_extended_keycode(code)           ((code) >> 8)
 #define is_command_keycode(code)            (COMMAND_OF(code))
@@ -694,10 +823,32 @@ enum extended_keycode {
 #define LAYER_OF_COMMAND(code)      ((code) & LAYER_NUMBER_MASK)
 #define LAYER_CMD_MODIFIER_OF(code) (((code) & LAYER_CMD_MODIFIER_MASK) >> 5)
 #define LAYER_OF_LAYER_OR_KEY(code) (((code) & LAYER_IN_LAYER_OR_KEY_MASK) >> 8)
-#define MODIFIERS_OF_EXTENDED(code) (((code) & MODIFIERS_MASK) >> (((code) & RIGHT_MOD_BIT) ? 4 : 8))
 #define COMMAND_OF(code)            ((code) >> (8+5))
 #define PLAIN_KEY_OF(code)          ((code) & 0xFFU)
 #define MACRO_OF_EXTENDED(extcode)  ((extcode) & ~(MACRO_BIT))
-#define EXACT_MODS_OF_EXTENDED(code) (((code) & 0x0FU) << (((code) & 0x10U) ? 4 : 0))
+
+/// Extracts the 5-bit modifiers of an extended keycode to the full 8-bit mods
+#define MODIFIERS_OF_EXTENDED(code) ((uint8_t) (((code) & MODIFIERS_MASK) >> (((code) & RIGHT_MOD_BIT) ? 4 : 8)))
+
+/// Extracts the 5-bit modifiers of an extended keycode, keeping 5-bit format
+#define MODS_OF_EXTENDED(code)      ((uint8_t) (((code) & (RIGHT_MOD_BIT | MODIFIERS_MASK)) >> 8))
+
+/// Converts 5-bit modifiers (at low bits of a byte) to full 8-bit modifiers
+#define MODS_TO_MODIFIERS(mods)     ((uint8_t) ((mods) << (((mods) & 0x10U) ? 4 : 0)))
+
+/// Converts 5-bit modifiers (at low bits of a byte) to full 8-bit modifiers
+#define MODIFIERS_TO_MODS(mods)     ((uint8_t) (((mods) & 0xF0U) ? (0x10U | ((mods) >> 4)) : (mods)))
+
+/// Shifts the 5-bit modifiers to the correct position of an extended keycode
+#define MODS_TO_CMD(mods)           ((uint16_t ) ((mods) & 0xFFU) << 8)
+
+/// The 5-bit modifiers of "exact mods" keycode.
+#define EXACT_MODS_OF_EXTENDED(code) (((code) & 0x1FU))
+
+/// The 8-bit modifiers of "exact mods" keycode.
+#define EXACT_MODIFIERS_OF_EXTENDED(code) MODS_TO_MODIFIERS(EXACT_MODS_OF_EXTENDED(code))
+
+/// The maximum macro number
+#define MAX_AAKBD_MACRO 127
 
 #endif // KK_KEYCODES_H

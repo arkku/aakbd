@@ -132,7 +132,7 @@ kbd_input (void) {
                     const bool is_key_release = ((matrix_row & column_bit) == 0);
                     const uint8_t key = usb_keycode_for_matrix(row, column);
                     if (key) {
-                        process_key(key, is_key_release);
+                        process_key(key, is_key_release, row, column);
                     }
                     switch_events(key, row, column, !is_key_release);
                 }
@@ -289,6 +289,9 @@ keyboard_task (void) {
 #endif
 
     led_task();
+#if VIAL_ENABLE
+    keys_vial_task();
+#endif
 }
 
 static inline void
@@ -337,8 +340,8 @@ main (void) {
     keyboard_setup();
 
     protocol_init();
-    keyboard_init();
     reset_keys(false);
+    keyboard_init();
 
     for (;;) {
         protocol_task();
@@ -398,6 +401,13 @@ jump_to_bootloader (void) {
 #endif
     shutdown_quantum();
     bootloader_jump();
+}
+
+void keyboard_clear_settings(void) {
+    eeconfig_init();
+#if VIAL_ENABLE
+    eeconfig_init_via();
+#endif
 }
 
 bool

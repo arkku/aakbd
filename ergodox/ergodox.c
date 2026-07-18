@@ -56,8 +56,9 @@ led_set (uint8_t new_state) {
 #include "keys.h"
 #include "usb_hardware.h"
 
+#if !VIAL_ENABLE
 enum generic_request {
-    NONE,
+    GENERIC_REQUEST_NONE,
     SET_LED_LEVEL,
     JUMP_TO_BOOTLOADER,
 };
@@ -71,7 +72,7 @@ handle_generic_hid_report (uint8_t report_id, uint8_t count, uint8_t report[stat
     enum generic_request request = report[0];
 
     switch (request) {
-    case NONE:
+    case GENERIC_REQUEST_NONE:
         return RESPONSE_OK;
     case SET_LED_LEVEL:
         if (count < 1 || report[1] >= 16) {
@@ -86,9 +87,10 @@ handle_generic_hid_report (uint8_t report_id, uint8_t count, uint8_t report[stat
         return RESPONSE_ERROR;
     }
 }
+#endif // ^ !VIAL_ENABLE
 
-#if GENERIC_HID_REPORT_SIZE != 0 && GENERIC_HID_REPORT_SIZE != 8 && GENERIC_HID_REPORT_SIZE != (8 + MATRIX_ROWS)
-#error "GENERIC_HID_REPORT_SIZE should be 0, 8, or 8 + MATRIX_ROWS."
+#if GENERIC_HID_REPORT_SIZE != 0 && GENERIC_HID_REPORT_SIZE != 8 && GENERIC_HID_REPORT_SIZE != 32 && GENERIC_HID_REPORT_SIZE != (8 + MATRIX_ROWS)
+#error "GENERIC_HID_REPORT_SIZE should be 0, 8, 32 (Vial), or 8 + MATRIX_ROWS."
 #endif
 
 extern matrix_row_t raw_matrix[MATRIX_ROWS];
@@ -114,4 +116,4 @@ make_generic_hid_report (uint8_t report_id, uint8_t count, uint8_t report[static
 #endif
     return true;
 }
-#endif
+#endif // ^ ENABLE_GENERIC_HID_ENDPOINT
